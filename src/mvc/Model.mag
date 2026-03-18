@@ -1,14 +1,24 @@
 namespace: 'Alto'
 import: 'Go'
 
-Model subclass: Object [
-  | dependents |
+"Model — base model with Observer pattern for dependency/change notification."
+
+Model subclass: Object
+  instanceVars: dependents
 
   classMethod: new [
     | instance |
     instance := super new.
-    instance dependents: (Array new).
+    instance initialize.
     ^ instance
+  ]
+
+  method: initialize [
+    dependents := Array new: 0
+  ]
+
+  method: dependents [
+    ^ dependents
   ]
 
   method: dependents: anArray [
@@ -16,15 +26,11 @@ Model subclass: Object [
   ]
 
   method: addDependent: obj [
-    dependents add: obj
+    dependents := dependents copyWith: obj
   ]
 
   method: removeDependent: obj [
-    | idx |
-    idx := dependents indexOf: obj.
-    (idx >= 0) ifTrue: [
-      dependents removeAt: idx
-    ]
+    dependents := dependents reject: [:d | d = obj]
   ]
 
   method: changed [
@@ -34,8 +40,3 @@ Model subclass: Object [
   method: changed: aspect [
     dependents do: [:dep | dep update: aspect]
   ]
-
-  method: dependents [
-    ^ dependents
-  ]
-]

@@ -1,8 +1,10 @@
 namespace: 'Alto'
 import: 'Go'
 
-Controller subclass: Object [
-  | model view active |
+"Controller — base controller for handling events in the MVC triad."
+
+Controller subclass: Object
+  instanceVars: model view active
 
   classMethod: new [
     | instance |
@@ -46,4 +48,3 @@ Controller subclass: Object [
   method: deactivate [
     active := false
   ]
-]

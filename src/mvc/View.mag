@@ -1,14 +1,23 @@
 namespace: 'Alto'
 import: 'Go'
 
-View subclass: Object [
-  | model bounds buffer needsRedraw |
+"View — base view class with model binding, CellBuffer rendering, and redraw cycle."
+
+View subclass: Object
+  instanceVars: model bounds buffer needsRedraw
 
   classMethod: new [
     | instance |
     instance := super new.
-    instance needsRedraw: true.
+    instance initialize.
     ^ instance
+  ]
+
+  method: initialize [
+    model := nil.
+    bounds := nil.
+    buffer := nil.
+    needsRedraw := true
   ]
 
   method: model: aModel [
@@ -26,13 +35,9 @@ View subclass: Object [
   ]
 
   method: bounds: aRect [
-    | width height |
     bounds := aRect.
     aRect notNil ifTrue: [
-      width := aRect width.
-      height := aRect height.
-      buffer := Go::CellBuffer new.
-      buffer resize: width _: height
+      buffer := CellBuffer width: aRect width height: aRect height
     ].
     self invalidate
   ]
@@ -59,7 +64,7 @@ View subclass: Object [
   ]
 
   method: draw [
-    needsRedraw ifTrue: [
+    (needsRedraw and: [buffer notNil]) ifTrue: [
       self displayOn: buffer.
       needsRedraw := false
     ]
@@ -72,4 +77,3 @@ View subclass: Object [
   method: needsRedraw: aBoolean [
     needsRedraw := aBoolean
   ]
-]
