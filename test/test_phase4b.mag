@@ -1,0 +1,326 @@
+"Phase 4b Tests — Spec-driven tests for Label and ListView widgets.
+ Tests behavior from the spec, not implementation details.
+
+ Spec requirements tested:
+ - Label: text, style instance vars; Label text: factory; displayOn:; text: setter with invalidate
+ - ListView: items, selectedIndex, scrollOffset, onSelectBlock instance vars;
+   ListView items:onSelect: factory; displayOn: with reverse highlight;
+   handleEvent: for up/down/enter; selectedItem; items: setter with invalidate"
+
+"Simple test runner."
+T4b subclass: Object
+  instanceVars: passed failed failures
+
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^ r
+  ]
+
+  method: init [
+    passed := 0.
+    failed := 0.
+    failures := Array new
+  ]
+
+  method: assert: condition message: msg [
+    condition ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg) println
+    ]
+  ]
+
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg, ' (got: ', actual printString, ' expected: ', expected printString, ')') println
+    ]
+  ]
+
+  method: report [
+    '=== Phase 4b Test Results ===' println.
+    ('Passed: ', passed printString) println.
+    ('Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [
+      'Failures:' println.
+      failures do: [:f | ('  - ', f) println]
+    ].
+    (failed = 0)
+      ifTrue: [ 'ALL TESTS PASSED' println ]
+      ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+
+  method: failed [
+    ^ failed
+  ]
+
+"=== LABEL NON-RENDERING TESTS ==="
+LabelTests subclass: Object
+
+  classMethod: run: t [
+    | label label2 label3 rect |
+    '--- Label Non-Rendering Tests ---' println.
+
+    "L1: Label text: factory creates label with correct text"
+    label := Alto::Label text: 'Hello'.
+    t assertEqual: (label text) to: 'Hello' message: 'L1: Label text: creates with correct text'.
+
+    "L2: Label is a View (has needsRedraw)"
+    t assertEqual: (label needsRedraw) to: true message: 'L2: Label starts with needsRedraw true'.
+
+    "L3: Label new creates with empty text"
+    label2 := Alto::Label new.
+    t assertEqual: (label2 text) to: '' message: 'L3: Label new creates with empty text'.
+
+    "L4: Label style starts nil"
+    t assertEqual: (label2 style) to: nil message: 'L4: Label style starts nil'.
+
+    "L5: Label text: setter updates text"
+    label := Alto::Label text: 'Hello'.
+    label needsRedraw: false.
+    label text: 'World'.
+    t assertEqual: (label text) to: 'World' message: 'L5a: Label text: updates text'.
+    t assertEqual: (label needsRedraw) to: true message: 'L5b: Label text: invalidates (needsRedraw true)'.
+
+    "L6: Label style: setter updates style and invalidates"
+    label3 := Alto::Label text: 'Styled'.
+    label3 needsRedraw: false.
+    label3 style: #bold.
+    t assertEqual: (label3 style) to: #bold message: 'L6a: Label style: sets style'.
+    t assertEqual: (label3 needsRedraw) to: true message: 'L6b: Label style: invalidates'.
+
+    "L7: Label displayOn: with empty text does not crash"
+    label2 := Alto::Label new.
+    rect := Alto::Rectangle x: 0 y: 0 width: 10 height: 1.
+    label2 bounds: rect.
+    label2 draw.
+    t assert: true message: 'L7: displayOn: with empty text does not crash'.
+
+    "L8: Label has buffer after bounds: set"
+    t assert: (label2 buffer notNil) message: 'L8: Label has buffer after bounds: set'.
+
+    "L9: Label buffer dimensions match bounds"
+    t assertEqual: (label2 buffer width) to: 10 message: 'L9a: Label buffer width matches bounds'.
+    t assertEqual: (label2 buffer height) to: 1 message: 'L9b: Label buffer height matches bounds'.
+
+    "L10: Label text: factory with empty string"
+    label := Alto::Label text: ''.
+    t assertEqual: (label text) to: '' message: 'L10: Label text: with empty string works'.
+
+    "L11: Setting text multiple times"
+    label := Alto::Label text: 'First'.
+    label text: 'Second'.
+    label text: 'Third'.
+    t assertEqual: (label text) to: 'Third' message: 'L11: Multiple text: calls keep last value'
+  ]
+
+"=== LISTVIEW NON-RENDERING TESTS ==="
+ListViewTests subclass: Object
+
+  classMethod: run: t [
+    | lv lv2 lv3 lv4 lv5 downEvt upEvt enterEvt holder rect scrollLv scrollI |
+    '--- ListView Non-Rendering Tests ---' println.
+
+    "Setup reusable events"
+    downEvt := Dictionary new.
+    downEvt at: #key put: #down.
+    upEvt := Dictionary new.
+    upEvt at: #key put: #up.
+    enterEvt := Dictionary new.
+    enterEvt at: #key put: #enter.
+
+    "LV1: Factory creates with correct items"
+    lv := Alto::ListView items: #('Alpha' 'Beta' 'Gamma') onSelect: nil.
+    t assertEqual: (lv items size) to: 3 message: 'LV1: items:onSelect: creates with 3 items'.
+
+    "LV2: selectedIndex starts at 0"
+    t assertEqual: (lv selectedIndex) to: 0 message: 'LV2: selectedIndex starts at 0'.
+
+    "LV3: selectedItem returns first item when selectedIndex is 0"
+    t assertEqual: (lv selectedItem) to: 'Alpha' message: 'LV3: selectedItem returns Alpha (first item)'.
+
+    "LV4: items accessor returns the items array"
+    t assertEqual: ((lv items) size) to: 3 message: 'LV4: items accessor returns array of size 3'.
+
+    "LV5: handleEvent: down increments selectedIndex"
+    lv := Alto::ListView items: #('Alpha' 'Beta' 'Gamma') onSelect: nil.
+    lv handleEvent: downEvt.
+    t assertEqual: (lv selectedIndex) to: 1 message: 'LV5: down arrow increments selectedIndex to 1'.
+
+    "LV6: selectedItem after down returns second item"
+    t assertEqual: (lv selectedItem) to: 'Beta' message: 'LV6: selectedItem after down returns Beta'.
+
+    "LV7: handleEvent: up at 0 stays at 0 (clamping)"
+    lv2 := Alto::ListView items: #('A' 'B') onSelect: nil.
+    lv2 handleEvent: upEvt.
+    t assertEqual: (lv2 selectedIndex) to: 0 message: 'LV7: up at index 0 stays at 0'.
+
+    "LV8: handleEvent: down clamps at items size - 1"
+    lv3 := Alto::ListView items: #('A' 'B') onSelect: nil.
+    lv3 handleEvent: downEvt.
+    lv3 handleEvent: downEvt.
+    t assertEqual: (lv3 selectedIndex) to: 1 message: 'LV8: down clamps at items size - 1'.
+
+    "LV9: handleEvent: enter triggers onSelectBlock with selectedItem"
+    holder := Array new: 1.
+    lv4 := Alto::ListView items: #('Alpha' 'Beta') onSelect: [:item | holder at: 0 put: item].
+    lv4 handleEvent: enterEvt.
+    t assertEqual: (holder at: 0) to: 'Alpha' message: 'LV9: enter triggers onSelectBlock with Alpha'.
+
+    "LV10: items: setter resets selectedIndex and invalidates"
+    lv5 := Alto::ListView items: #('A' 'B' 'C') onSelect: nil.
+    lv5 handleEvent: downEvt.
+    lv5 needsRedraw: false.
+    lv5 items: #('X' 'Y').
+    t assertEqual: (lv5 selectedIndex) to: 0 message: 'LV10a: items: resets selectedIndex to 0'.
+    t assertEqual: (lv5 needsRedraw) to: true message: 'LV10b: items: invalidates'.
+    t assertEqual: (lv5 items size) to: 2 message: 'LV10c: items: updates items'.
+
+    "LV11: up arrow decrements selectedIndex"
+    lv := Alto::ListView items: #('A' 'B' 'C') onSelect: nil.
+    lv handleEvent: downEvt.
+    lv handleEvent: downEvt.
+    lv handleEvent: upEvt.
+    t assertEqual: (lv selectedIndex) to: 1 message: 'LV11: up after two downs gives index 1'.
+
+    "LV12: handleEvent: enter with nil onSelectBlock does not crash"
+    lv := Alto::ListView items: #('A' 'B') onSelect: nil.
+    lv handleEvent: enterEvt.
+    t assert: true message: 'LV12: enter with nil onSelectBlock does not crash'.
+
+    "LV13: down arrow invalidates"
+    lv := Alto::ListView items: #('A' 'B') onSelect: nil.
+    lv needsRedraw: false.
+    lv handleEvent: downEvt.
+    t assertEqual: (lv needsRedraw) to: true message: 'LV13: down arrow invalidates'.
+
+    "LV14: up arrow invalidates"
+    lv := Alto::ListView items: #('A' 'B') onSelect: nil.
+    lv handleEvent: downEvt.
+    lv needsRedraw: false.
+    lv handleEvent: upEvt.
+    t assertEqual: (lv needsRedraw) to: true message: 'LV14: up arrow invalidates'.
+
+    "LV15: Scrolling — 3-height buffer, 5 items, select index 3"
+    scrollLv := Alto::ListView items: #('Alpha' 'Beta' 'Gamma' 'Delta' 'Echo') onSelect: nil.
+    rect := Alto::Rectangle x: 0 y: 0 width: 10 height: 3.
+    scrollLv bounds: rect.
+    scrollI := 0.
+    [scrollI < 3] whileTrue: [
+      scrollLv handleEvent: downEvt.
+      scrollI := scrollI + 1
+    ].
+    t assertEqual: (scrollLv selectedIndex) to: 3 message: 'LV15: after 3 downs selectedIndex is 3'.
+
+    "LV16: Enter after navigation triggers correct item"
+    holder := Array new: 1.
+    lv := Alto::ListView items: #('Alpha' 'Beta' 'Gamma') onSelect: [:item | holder at: 0 put: item].
+    lv handleEvent: downEvt.
+    lv handleEvent: downEvt.
+    lv handleEvent: enterEvt.
+    t assertEqual: (holder at: 0) to: 'Gamma' message: 'LV16: enter after 2 downs triggers Gamma'.
+
+    "LV17: selectedItem after navigation"
+    lv := Alto::ListView items: #('Alpha' 'Beta' 'Gamma') onSelect: nil.
+    lv handleEvent: downEvt.
+    t assertEqual: (lv selectedItem) to: 'Beta' message: 'LV17: selectedItem after 1 down returns Beta'.
+
+    "LV18: Multiple rapid downs then up"
+    lv := Alto::ListView items: #('A' 'B' 'C' 'D' 'E') onSelect: nil.
+    lv handleEvent: downEvt.
+    lv handleEvent: downEvt.
+    lv handleEvent: downEvt.
+    lv handleEvent: downEvt.
+    t assertEqual: (lv selectedIndex) to: 4 message: 'LV18a: 4 downs on 5-item list gives index 4'.
+    lv handleEvent: downEvt.
+    t assertEqual: (lv selectedIndex) to: 4 message: 'LV18b: 5th down stays clamped at 4'.
+    lv handleEvent: upEvt.
+    t assertEqual: (lv selectedIndex) to: 3 message: 'LV18c: up from 4 gives 3'
+  ]
+
+"=== RENDERING TESTS ==="
+RenderingTests subclass: Object
+
+  classMethod: run: t [
+    | label rect cell lv lvCell lv2 scrollLv scrollCell scrollI downEvt |
+    '--- Rendering Tests (may crash due to CellBuffer charCode bug) ---' println.
+
+    downEvt := Dictionary new.
+    downEvt at: #key put: #down.
+
+    "LR1: Label displayOn: writes text chars to buffer at 0,0"
+    label := Alto::Label text: 'Hello'.
+    rect := Alto::Rectangle x: 0 y: 0 width: 10 height: 1.
+    label bounds: rect.
+    label draw.
+    cell := label buffer cellAt: 0 y: 0.
+    t assert: (cell notNil) message: 'LR1a: Label buffer cell at (0,0) is non-nil'.
+    t assertEqual: (cell at: #char) to: 72 message: 'LR1b: Label writes H (72) at (0,0)'.
+
+    "LR2: Second char of label"
+    cell := label buffer cellAt: 1 y: 0.
+    t assert: (cell notNil) message: 'LR2a: Label buffer cell at (1,0) is non-nil'.
+    t assertEqual: (cell at: #char) to: 101 message: 'LR2b: Label writes e (101) at (1,0)'.
+
+    "LR3: ListView displayOn: renders first item"
+    lv := Alto::ListView items: #('Alpha' 'Beta' 'Gamma') onSelect: nil.
+    rect := Alto::Rectangle x: 0 y: 0 width: 10 height: 3.
+    lv bounds: rect.
+    lv draw.
+    cell := lv buffer cellAt: 0 y: 0.
+    t assert: (cell notNil) message: 'LR3a: ListView cell at (0,0) is non-nil'.
+    t assertEqual: (cell at: #char) to: 65 message: 'LR3b: ListView renders A (65) at (0,0)'.
+
+    "LR4: ListView highlights selected item with reverse video"
+    lvCell := lv buffer cellAt: 0 y: 0.
+    t assertEqual: (lvCell at: #attrs) to: #reverse message: 'LR4: selected item at y=0 has reverse attrs'.
+
+    "LR5: Non-selected item does not have reverse"
+    lvCell := lv buffer cellAt: 0 y: 1.
+    t assert: (lvCell notNil) message: 'LR5a: non-selected row cell is non-nil'.
+
+    "LR6: Second row renders correctly"
+    t assertEqual: (lvCell at: #char) to: 66 message: 'LR6: row 1 renders B (66) at (0,1)'.
+
+    "LR7: Scrolling — verify first visible item after scroll"
+    scrollLv := Alto::ListView items: #('Alpha' 'Beta' 'Gamma' 'Delta' 'Echo') onSelect: nil.
+    rect := Alto::Rectangle x: 0 y: 0 width: 10 height: 3.
+    scrollLv bounds: rect.
+    scrollI := 0.
+    [scrollI < 3] whileTrue: [
+      scrollLv handleEvent: downEvt.
+      scrollI := scrollI + 1
+    ].
+    scrollLv draw.
+    scrollCell := scrollLv buffer cellAt: 0 y: 0.
+    t assert: (scrollCell notNil) message: 'LR7a: scrolled buffer cell is non-nil'.
+    t assertEqual: (scrollCell at: #char) to: 66 message: 'LR7b: first visible after scroll is Beta (66)'
+  ]
+
+"=== MAIN RUNNER ==="
+Phase4bTests subclass: Object
+  classMethod: run [
+    | t |
+    t := T4b new.
+
+    LabelTests run: t.
+    ListViewTests run: t.
+
+    "Print non-rendering results before attempting rendering tests"
+    t report.
+    '' println.
+
+    'Attempting rendering tests...' println.
+    RenderingTests run: t.
+
+    '' println.
+    t report.
+    ^ t failed
+  ]

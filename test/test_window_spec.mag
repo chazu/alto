@@ -1,0 +1,544 @@
+"Phase 4a Spec-Driven Tests for Window widget.
+ Tests behavior strictly from the specification:
+ - Instance vars: title, contentView, contentController, frame, buffer, dragState
+ - Class constructor: Window title: aString content: aView controller: aController frame: aRect
+ - Rendering: box-drawing border (9484/9488/9492/9496/9472/9474),
+   title bar with left-aligned text, [X] close box at right, content area with offset
+ - Event handling: dispatch to contentController, close box click, title bar drag
+ - Protocol: buffer, frame, handleEvent: evt
+ All tests use namespace Alto, import Go. No mid-block temp vars.
+ Chars are integer codes. Uses isNil ifTrue: pattern."
+
+"=== Test Runner ==="
+TWS subclass: Object
+  instanceVars: passed failed failures
+
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^r
+  ]
+
+  method: init [
+    passed := 0.
+    failed := 0.
+    failures := Array new
+  ]
+
+  method: assert: condition message: msg [
+    condition ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg) println
+    ]
+  ]
+
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg, ' (got: ', actual printString, ' expected: ', expected printString, ')') println
+    ]
+  ]
+
+  method: assertNotNil: value message: msg [
+    value isNil ifTrue: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg, ' (got nil)') println
+    ] ifFalse: [
+      passed := passed + 1
+    ]
+  ]
+
+  method: report [
+    '=== Phase 4a Window Spec Test Results ===' println.
+    ('Passed: ', passed printString) println.
+    ('Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [
+      'Failures:' println.
+      failures do: [:f | ('  - ', f) println]
+    ].
+    (failed = 0)
+      ifTrue: [ 'ALL TESTS PASSED' println ]
+      ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+
+  method: failed [
+    ^failed
+  ]
+
+"=== Mock Objects ==="
+
+"Mock view that records displayOn: calls and the buffer received."
+SpecMockView subclass: Object
+  instanceVars: displayCalled displayBuffer
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initMock.
+    ^instance
+  ]
+
+  method: initMock [
+    displayCalled := false.
+    displayBuffer := nil
+  ]
+
+  method: displayOn: aCellBuffer [
+    displayCalled := true.
+    displayBuffer := aCellBuffer
+  ]
+
+  method: displayCalled [
+    ^displayCalled
+  ]
+
+  method: displayBuffer [
+    ^displayBuffer
+  ]
+
+"Mock controller that records events received."
+SpecMockController subclass: Object
+  instanceVars: events
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initMockCtrl.
+    ^instance
+  ]
+
+  method: initMockCtrl [
+    events := Array new
+  ]
+
+  method: handleEvent: evt [
+    events := events copyWith: evt
+  ]
+
+  method: events [
+    ^events
+  ]
+
+  method: eventCount [
+    ^events size
+  ]
+
+"=== CONSTRUCTION TESTS ==="
+WindowSpecConstructionTests subclass: Object
+
+  classMethod: run: t [
+    | win rect mv mc win2 win3 |
+    '--- Spec: Window Construction ---' println.
+
+    "SC1: Factory constructor creates non-nil Window"
+    rect := Alto::Rectangle x: 5 y: 3 width: 40 height: 20.
+    mv := SpecMockView new.
+    mc := SpecMockController new.
+    win := Alto::Window title: 'Test' content: mv controller: mc frame: rect.
+    t assertNotNil: win message: 'SC1: Factory constructor creates non-nil Window'.
+
+    "SC2: title accessor returns the string passed to constructor"
+    t assertEqual: (win title) to: 'Test' message: 'SC2: title accessor returns constructor arg'.
+
+    "SC3: contentView accessor returns the view passed to constructor"
+    t assertEqual: (win contentView) to: mv message: 'SC3: contentView accessor returns constructor arg'.
+
+    "SC4: contentController accessor returns the controller passed to constructor"
+    t assertEqual: (win contentController) to: mc message: 'SC4: contentController accessor returns constructor arg'.
+
+    "SC5: frame accessor returns the rectangle passed to constructor"
+    t assertEqual: (win frame) to: rect message: 'SC5: frame accessor returns constructor arg'.
+
+    "SC6: frame preserves all dimensions from input rectangle"
+    t assertEqual: (win frame x) to: 5 message: 'SC6a: frame x preserved'.
+    t assertEqual: (win frame y) to: 3 message: 'SC6b: frame y preserved'.
+    t assertEqual: (win frame width) to: 40 message: 'SC6c: frame width preserved'.
+    t assertEqual: (win frame height) to: 20 message: 'SC6d: frame height preserved'.
+
+    "SC7: buffer is non-nil after construction (spec: buffer instance var)"
+    t assertNotNil: (win buffer) message: 'SC7: buffer is non-nil after construction'.
+
+    "SC8: buffer dimensions match frame dimensions"
+    t assertEqual: (win buffer width) to: 40 message: 'SC8a: buffer width matches frame'.
+    t assertEqual: (win buffer height) to: 20 message: 'SC8b: buffer height matches frame'.
+
+    "SC9: Window new creates instance with nil defaults for all instance vars"
+    win2 := Alto::Window new.
+    t assertNotNil: win2 message: 'SC9a: Window new creates instance'.
+    t assertEqual: (win2 title) to: nil message: 'SC9b: title defaults to nil'.
+    t assertEqual: (win2 contentView) to: nil message: 'SC9c: contentView defaults to nil'.
+    t assertEqual: (win2 contentController) to: nil message: 'SC9d: contentController defaults to nil'.
+    t assertEqual: (win2 frame) to: nil message: 'SC9e: frame defaults to nil'.
+    t assertEqual: (win2 buffer) to: nil message: 'SC9f: buffer defaults to nil'.
+
+    "SC10: Constructor with nil content and controller still works"
+    win3 := Alto::Window title: 'Empty' content: nil controller: nil frame: rect.
+    t assertEqual: (win3 title) to: 'Empty' message: 'SC10a: nil content constructor has title'.
+    t assertEqual: (win3 contentView) to: nil message: 'SC10b: nil contentView stored'.
+    t assertEqual: (win3 contentController) to: nil message: 'SC10c: nil contentController stored'.
+    t assertNotNil: (win3 buffer) message: 'SC10d: buffer still created with nil content'
+  ]
+
+"=== RENDERING TESTS: Border ==="
+WindowSpecBorderTests subclass: Object
+
+  classMethod: run: t [
+    | win rect buf cell |
+    '--- Spec: Window Border Rendering ---' println.
+
+    rect := Alto::Rectangle x: 0 y: 0 width: 20 height: 10.
+    win := Alto::Window title: 'Test' content: nil controller: nil frame: rect.
+    buf := Alto::CellBuffer width: 20 height: 10.
+    win displayOn: buf.
+
+    "SB1: Top-left corner char 9484"
+    cell := buf cellAt: 0 y: 0.
+    t assertNotNil: cell message: 'SB1a: top-left cell exists'.
+    t assertEqual: (cell at: #char) to: 9484 message: 'SB1b: top-left corner is 9484'.
+
+    "SB2: Top-right corner char 9488"
+    cell := buf cellAt: 19 y: 0.
+    t assertEqual: (cell at: #char) to: 9488 message: 'SB2: top-right corner is 9488'.
+
+    "SB3: Bottom-left corner char 9492"
+    cell := buf cellAt: 0 y: 9.
+    t assertEqual: (cell at: #char) to: 9492 message: 'SB3: bottom-left corner is 9492'.
+
+    "SB4: Bottom-right corner char 9496"
+    cell := buf cellAt: 19 y: 9.
+    t assertEqual: (cell at: #char) to: 9496 message: 'SB4: bottom-right corner is 9496'.
+
+    "SB5: Top border uses horizontal line char 9472"
+    cell := buf cellAt: 1 y: 0.
+    t assertEqual: (cell at: #char) to: 9472 message: 'SB5a: top border at (1,0) is 9472'.
+    cell := buf cellAt: 10 y: 0.
+    t assertEqual: (cell at: #char) to: 9472 message: 'SB5b: top border at (10,0) is 9472'.
+    cell := buf cellAt: 18 y: 0.
+    t assertEqual: (cell at: #char) to: 9472 message: 'SB5c: top border at (18,0) is 9472'.
+
+    "SB6: Bottom border uses horizontal line char 9472"
+    cell := buf cellAt: 1 y: 9.
+    t assertEqual: (cell at: #char) to: 9472 message: 'SB6a: bottom border at (1,9) is 9472'.
+    cell := buf cellAt: 18 y: 9.
+    t assertEqual: (cell at: #char) to: 9472 message: 'SB6b: bottom border at (18,9) is 9472'.
+
+    "SB7: Left border uses vertical line char 9474"
+    cell := buf cellAt: 0 y: 1.
+    t assertEqual: (cell at: #char) to: 9474 message: 'SB7a: left border at (0,1) is 9474'.
+    cell := buf cellAt: 0 y: 5.
+    t assertEqual: (cell at: #char) to: 9474 message: 'SB7b: left border at (0,5) is 9474'.
+    cell := buf cellAt: 0 y: 8.
+    t assertEqual: (cell at: #char) to: 9474 message: 'SB7c: left border at (0,8) is 9474'.
+
+    "SB8: Right border uses vertical line char 9474"
+    cell := buf cellAt: 19 y: 1.
+    t assertEqual: (cell at: #char) to: 9474 message: 'SB8a: right border at (19,1) is 9474'.
+    cell := buf cellAt: 19 y: 5.
+    t assertEqual: (cell at: #char) to: 9474 message: 'SB8b: right border at (19,5) is 9474'.
+    cell := buf cellAt: 19 y: 8.
+    t assertEqual: (cell at: #char) to: 9474 message: 'SB8c: right border at (19,8) is 9474'
+  ]
+
+"=== RENDERING TESTS: Title Bar ==="
+WindowSpecTitleBarTests subclass: Object
+
+  classMethod: run: t [
+    | win rect buf cell closeX win2 buf2 cell2 closeX2 |
+    '--- Spec: Window Title Bar ---' println.
+
+    rect := Alto::Rectangle x: 0 y: 0 width: 20 height: 10.
+    win := Alto::Window title: 'Hello' content: nil controller: nil frame: rect.
+    buf := Alto::CellBuffer width: 20 height: 10.
+    win displayOn: buf.
+
+    "ST1: Title text at first row inside top border (y=1), left-aligned starting at x=1"
+    cell := buf cellAt: 1 y: 1.
+    t assertEqual: (cell at: #char) to: 72 message: 'ST1a: title char H (72) at (1,1)'.
+    cell := buf cellAt: 2 y: 1.
+    t assertEqual: (cell at: #char) to: 101 message: 'ST1b: title char e (101) at (2,1)'.
+    cell := buf cellAt: 3 y: 1.
+    t assertEqual: (cell at: #char) to: 108 message: 'ST1c: title char l (108) at (3,1)'.
+    cell := buf cellAt: 4 y: 1.
+    t assertEqual: (cell at: #char) to: 108 message: 'ST1d: title char l (108) at (4,1)'.
+    cell := buf cellAt: 5 y: 1.
+    t assertEqual: (cell at: #char) to: 111 message: 'ST1e: title char o (111) at (5,1)'.
+
+    "ST2: Close box [X] at right side of title bar (x = width - 4)"
+    closeX := 20 - 4.
+    cell := buf cellAt: closeX y: 1.
+    t assertEqual: (cell at: #char) to: 91 message: 'ST2a: close box [ (91) at (16,1)'.
+    cell := buf cellAt: closeX + 1 y: 1.
+    t assertEqual: (cell at: #char) to: 88 message: 'ST2b: close box X (88) at (17,1)'.
+    cell := buf cellAt: closeX + 2 y: 1.
+    t assertEqual: (cell at: #char) to: 93 message: 'ST2c: close box ] (93) at (18,1)'.
+
+    "ST3: Nil title does not crash and still draws close box"
+    win2 := Alto::Window title: nil content: nil controller: nil frame: rect.
+    buf2 := Alto::CellBuffer width: 20 height: 10.
+    win2 displayOn: buf2.
+    closeX2 := 20 - 4.
+    cell2 := buf2 cellAt: closeX2 + 1 y: 1.
+    t assertEqual: (cell2 at: #char) to: 88 message: 'ST3: nil title still draws X close box'.
+
+    "ST4: Long title is truncated to fit (w - 5 max length)"
+    rect := Alto::Rectangle x: 0 y: 0 width: 10 height: 5.
+    win := Alto::Window title: 'VeryLongTitleThatExceedsWindow' content: nil controller: nil frame: rect.
+    buf := Alto::CellBuffer width: 10 height: 5.
+    win displayOn: buf.
+    "Title should be at most w-5 = 5 chars. Close box [X] at x=6"
+    closeX := 10 - 4.
+    cell := buf cellAt: closeX y: 1.
+    t assertEqual: (cell at: #char) to: 91 message: 'ST4: long title does not overwrite close box'
+  ]
+
+"=== RENDERING TESTS: Content Area ==="
+WindowSpecContentTests subclass: Object
+
+  classMethod: run: t [
+    | win rect mv mc buf |
+    '--- Spec: Window Content Area ---' println.
+
+    rect := Alto::Rectangle x: 0 y: 0 width: 20 height: 10.
+    mv := SpecMockView new.
+    mc := SpecMockController new.
+    win := Alto::Window title: 'Content' content: mv controller: mc frame: rect.
+    buf := Alto::CellBuffer width: 20 height: 10.
+    win displayOn: buf.
+
+    "SR1: contentView displayOn: is called during rendering"
+    t assert: (mv displayCalled) message: 'SR1: contentView displayOn: called'.
+
+    "SR2: Content buffer has offset dimensions (w-2 wide, h-3 tall)"
+    t assertNotNil: (mv displayBuffer) message: 'SR2a: content buffer is non-nil'.
+    t assertEqual: (mv displayBuffer width) to: 18 message: 'SR2b: content buffer width is w-2 (18)'.
+    t assertEqual: (mv displayBuffer height) to: 7 message: 'SR2c: content buffer height is h-3 (7)'.
+
+    "SR3: displayOn: with nil contentView does not crash"
+    win := Alto::Window title: 'NoView' content: nil controller: nil frame: rect.
+    buf := Alto::CellBuffer width: 20 height: 10.
+    win displayOn: buf.
+    t assert: true message: 'SR3: nil contentView does not crash'.
+
+    "SR4: draw method renders into own buffer"
+    win := Alto::Window title: 'Draw' content: nil controller: nil frame: rect.
+    win draw.
+    t assertNotNil: (win buffer cellAt: 0 y: 0) message: 'SR4a: draw produces cells'.
+    t assertEqual: ((win buffer cellAt: 0 y: 0) at: #char) to: 9484 message: 'SR4b: draw renders border'.
+
+    "SR5: draw with nil buffer does not crash"
+    win := Alto::Window new.
+    win draw.
+    t assert: true message: 'SR5: draw with nil buffer does not crash'
+  ]
+
+"=== EVENT HANDLING TESTS ==="
+WindowSpecEventTests subclass: Object
+
+  classMethod: run: t [
+    | win rect mc evt closeX mc2 win2 evt2 mc3 win3 win4 downEvt dragEvt upEvt dragEvt2 |
+    '--- Spec: Window Event Handling ---' println.
+
+    "SE1: handleEvent: dispatches non-mouse events to contentController"
+    rect := Alto::Rectangle x: 0 y: 0 width: 30 height: 15.
+    mc := SpecMockController new.
+    win := Alto::Window title: 'Events' content: nil controller: mc frame: rect.
+    evt := Dictionary new.
+    evt at: #key put: #someKey.
+    win handleEvent: evt.
+    t assertEqual: (mc eventCount) to: 1 message: 'SE1: non-mouse event dispatches to controller'.
+
+    "SE2: handleEvent: nil does not crash"
+    win handleEvent: nil.
+    t assert: true message: 'SE2: handleEvent: nil is safe'.
+
+    "SE3: Mouse click on close box [X] triggers close (not dispatched to controller)"
+    closeX := 30 - 4.
+    mc2 := SpecMockController new.
+    win2 := Alto::Window title: 'Close' content: nil controller: mc2 frame: rect.
+    evt := Dictionary new.
+    evt at: #type put: #mouseClick.
+    evt at: #x put: closeX + 1.
+    evt at: #y put: 1.
+    win2 handleEvent: evt.
+    t assertEqual: (mc2 eventCount) to: 0 message: 'SE3: close box click does not dispatch to controller'.
+
+    "SE4: Close box detection at left edge [ (x = closeX)"
+    mc := SpecMockController new.
+    win := Alto::Window title: 'Left' content: nil controller: mc frame: rect.
+    evt := Dictionary new.
+    evt at: #type put: #mouseClick.
+    evt at: #x put: closeX.
+    evt at: #y put: 1.
+    win handleEvent: evt.
+    t assertEqual: (mc eventCount) to: 0 message: 'SE4: click on [ of close box triggers close'.
+
+    "SE5: Close box detection at right edge ] (x = closeX + 2)"
+    mc := SpecMockController new.
+    win := Alto::Window title: 'Right' content: nil controller: mc frame: rect.
+    evt := Dictionary new.
+    evt at: #type put: #mouseClick.
+    evt at: #x put: closeX + 2.
+    evt at: #y put: 1.
+    win handleEvent: evt.
+    t assertEqual: (mc eventCount) to: 0 message: 'SE5: click on ] of close box triggers close'.
+
+    "SE6: Mouse click outside close box on title bar y=1 dispatches to controller"
+    mc := SpecMockController new.
+    win := Alto::Window title: 'Other' content: nil controller: mc frame: rect.
+    evt := Dictionary new.
+    evt at: #type put: #mouseClick.
+    evt at: #x put: 5.
+    evt at: #y put: 1.
+    win handleEvent: evt.
+    t assertEqual: (mc eventCount) to: 1 message: 'SE6: non-close-box title bar click dispatches to controller'.
+
+    "SE7: Mouse click on body area dispatches to controller"
+    mc := SpecMockController new.
+    win := Alto::Window title: 'Body' content: nil controller: mc frame: rect.
+    evt := Dictionary new.
+    evt at: #type put: #mouseClick.
+    evt at: #x put: 5.
+    evt at: #y put: 5.
+    win handleEvent: evt.
+    t assertEqual: (mc eventCount) to: 1 message: 'SE7: body area click dispatches to controller'.
+
+    "SE8: Close box click at wrong y (not title bar) dispatches to controller"
+    mc := SpecMockController new.
+    win := Alto::Window title: 'WrongY' content: nil controller: mc frame: rect.
+    evt := Dictionary new.
+    evt at: #type put: #mouseClick.
+    evt at: #x put: closeX + 1.
+    evt at: #y put: 5.
+    win handleEvent: evt.
+    t assertEqual: (mc eventCount) to: 1 message: 'SE8: close-box x at wrong y dispatches to controller'.
+
+    "SE9: handleEvent: with nil contentController does not crash"
+    win := Alto::Window title: 'NoCtrl' content: nil controller: nil frame: rect.
+    evt := Dictionary new.
+    evt at: #key put: #test.
+    win handleEvent: evt.
+    t assert: true message: 'SE9: nil contentController does not crash'.
+
+    "SE10: mouseDown on title bar starts drag (y=1)"
+    rect := Alto::Rectangle x: 10 y: 10 width: 30 height: 15.
+    win4 := Alto::Window title: 'Drag' content: nil controller: nil frame: rect.
+    downEvt := Dictionary new.
+    downEvt at: #type put: #mouseDown.
+    downEvt at: #x put: 5.
+    downEvt at: #y put: 1.
+    win4 handleEvent: downEvt.
+    t assert: true message: 'SE10: mouseDown on title bar does not crash'.
+
+    "SE11: mouseDrag after mouseDown updates frame position"
+    dragEvt := Dictionary new.
+    dragEvt at: #type put: #mouseDrag.
+    dragEvt at: #x put: 8.
+    dragEvt at: #y put: 4.
+    win4 handleEvent: dragEvt.
+    t assertEqual: (win4 frame x) to: 13 message: 'SE11a: drag updates x (10 + 8 - 5 = 13)'.
+    t assertEqual: (win4 frame y) to: 13 message: 'SE11b: drag updates y (10 + 4 - 1 = 13)'.
+    t assertEqual: (win4 frame width) to: 30 message: 'SE11c: drag preserves width'.
+    t assertEqual: (win4 frame height) to: 15 message: 'SE11d: drag preserves height'.
+
+    "SE12: mouseUp clears drag state"
+    upEvt := Dictionary new.
+    upEvt at: #type put: #mouseUp.
+    upEvt at: #x put: 8.
+    upEvt at: #y put: 4.
+    win4 handleEvent: upEvt.
+    t assert: true message: 'SE12: mouseUp does not crash'.
+
+    "SE13: mouseDrag after mouseUp is no-op (drag state cleared)"
+    dragEvt2 := Dictionary new.
+    dragEvt2 at: #type put: #mouseDrag.
+    dragEvt2 at: #x put: 20.
+    dragEvt2 at: #y put: 20.
+    win4 handleEvent: dragEvt2.
+    t assertEqual: (win4 frame x) to: 13 message: 'SE13a: drag after mouseUp does not change x'.
+    t assertEqual: (win4 frame y) to: 13 message: 'SE13b: drag after mouseUp does not change y'.
+
+    "SE14: mouseDrag without prior mouseDown is no-op"
+    rect := Alto::Rectangle x: 20 y: 20 width: 30 height: 15.
+    win := Alto::Window title: 'NoDrag' content: nil controller: nil frame: rect.
+    dragEvt := Dictionary new.
+    dragEvt at: #type put: #mouseDrag.
+    dragEvt at: #x put: 25.
+    dragEvt at: #y put: 25.
+    win handleEvent: dragEvt.
+    t assertEqual: (win frame x) to: 20 message: 'SE14a: drag without mouseDown does not move x'.
+    t assertEqual: (win frame y) to: 20 message: 'SE14b: drag without mouseDown does not move y'.
+
+    "SE15: mouseDown on non-title-bar row does NOT start drag"
+    rect := Alto::Rectangle x: 50 y: 50 width: 30 height: 15.
+    win := Alto::Window title: 'NoDragBody' content: nil controller: nil frame: rect.
+    downEvt := Dictionary new.
+    downEvt at: #type put: #mouseDown.
+    downEvt at: #x put: 5.
+    downEvt at: #y put: 5.
+    win handleEvent: downEvt.
+    dragEvt := Dictionary new.
+    dragEvt at: #type put: #mouseDrag.
+    dragEvt at: #x put: 10.
+    dragEvt at: #y put: 10.
+    win handleEvent: dragEvt.
+    t assertEqual: (win frame x) to: 50 message: 'SE15a: mouseDown on body does not enable drag'.
+    t assertEqual: (win frame y) to: 50 message: 'SE15b: mouseDown on body does not enable drag'
+  ]
+
+"=== PROTOCOL TESTS ==="
+WindowSpecProtocolTests subclass: Object
+
+  classMethod: run: t [
+    | win rect |
+    '--- Spec: Window Protocol ---' println.
+
+    rect := Alto::Rectangle x: 2 y: 3 width: 25 height: 12.
+    win := Alto::Window title: 'Protocol' content: nil controller: nil frame: rect.
+
+    "SP1: buffer returns a CellBuffer (protocol for Display integration)"
+    t assertNotNil: (win buffer) message: 'SP1: buffer returns non-nil CellBuffer'.
+
+    "SP2: frame returns the Rectangle (protocol for Display integration)"
+    t assertNotNil: (win frame) message: 'SP2a: frame returns non-nil Rectangle'.
+    t assertEqual: (win frame x) to: 2 message: 'SP2b: frame x accessible'.
+    t assertEqual: (win frame y) to: 3 message: 'SP2c: frame y accessible'.
+
+    "SP3: handleEvent: is callable (protocol for Display integration)"
+    win handleEvent: nil.
+    t assert: true message: 'SP3: handleEvent: nil callable'
+  ]
+
+"=== MAIN RUNNER ==="
+WindowSpecTests subclass: Object
+  classMethod: run [
+    | t |
+    t := TWS new.
+
+    "Non-rendering tests first (most reliable)"
+    WindowSpecConstructionTests run: t.
+    WindowSpecEventTests run: t.
+    WindowSpecProtocolTests run: t.
+
+    "Print non-rendering results"
+    t report.
+    '' println.
+
+    "Rendering tests (depend on CellBuffer working correctly)"
+    'Attempting rendering tests...' println.
+    WindowSpecBorderTests run: t.
+    WindowSpecTitleBarTests run: t.
+    WindowSpecContentTests run: t.
+
+    '' println.
+    'FINAL RESULTS:' println.
+    t report.
+    ^t failed
+  ]
