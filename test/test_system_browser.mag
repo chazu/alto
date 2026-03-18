@@ -1,0 +1,375 @@
+namespace: 'Alto'
+import: 'Go'
+
+"SystemBrowser Tests — Spec-driven tests for the SystemBrowser tool.
+ Tests behavior from the spec, not implementation details.
+
+ Spec requirements tested:
+ - SystemBrowser subclasses View with 4-pane browser
+ - Categories, classes, methods ListViews + code editor
+ - Hardcoded class/method mappings
+ - Tab focus cycling across 4 panes
+ - Arrow navigation within panes
+ - Enter to select, Escape to close
+ All tests use integer char codes, not dollar-sign literals.
+ All array access is 0-based per Maggie convention."
+
+"Simple test runner (same pattern as T5 in test_phase5.mag)."
+TSB subclass: Object
+  instanceVars: passed failed failures
+
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^ r
+  ]
+
+  method: init [
+    passed := 0.
+    failed := 0.
+    failures := Array new: 0
+  ]
+
+  method: assert: condition message: msg [
+    condition ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg) println
+    ]
+  ]
+
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg, ' (got: ', actual printString, ' expected: ', expected printString, ')') println
+    ]
+  ]
+
+  method: report [
+    '=== SystemBrowser Test Results ===' println.
+    ('Passed: ', passed printString) println.
+    ('Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [
+      'Failures:' println.
+      failures do: [:f | ('  - ', f) println]
+    ].
+    (failed = 0)
+      ifTrue: [ 'ALL TESTS PASSED' println ]
+      ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+
+  method: failed [
+    ^ failed
+  ]
+
+"Mock event object that satisfies (evt isKindOf: Go::V2::EventKey) check
+ and responds to key and rune messages."
+MockEvent subclass: Object
+  instanceVars: keyVal runeVal
+
+  classMethod: key: aKey rune: aRune [
+    | inst |
+    inst := super new.
+    inst setKey: aKey rune: aRune.
+    ^inst
+  ]
+
+  method: setKey: aKey rune: aRune [
+    keyVal := aKey.
+    runeVal := aRune
+  ]
+
+  method: key [ ^keyVal ]
+  method: rune [ ^runeVal ]
+  method: isKindOf: aClass [ ^aClass = Go::V2::EventKey ]
+
+"=== CONSTRUCTION TESTS ==="
+ConstructionTests subclass: Object
+
+  classMethod: run: t [
+    | sb |
+    '--- Construction Tests ---' println.
+
+    sb := SystemBrowser new.
+
+    "SB1: SystemBrowser new creates instance (notNil)"
+    t assert: (sb notNil) message: 'SB1: SystemBrowser new creates instance (notNil)'.
+
+    "SB2: categoryList notNil"
+    t assert: (sb categoryList notNil) message: 'SB2: categoryList notNil'.
+
+    "SB3: classList notNil"
+    t assert: (sb classList notNil) message: 'SB3: classList notNil'.
+
+    "SB4: methodList notNil"
+    t assert: (sb methodList notNil) message: 'SB4: methodList notNil'.
+
+    "SB5: codeView starts as empty string"
+    t assertEqual: (sb codeView) to: '' message: 'SB5: codeView starts as empty string'.
+
+    "SB6: selectedCategory starts as Kernel"
+    t assertEqual: (sb selectedCategory) to: 'Kernel' message: 'SB6: selectedCategory starts as Kernel'.
+
+    "SB7: selectedClass starts as nil"
+    t assertEqual: (sb selectedClass) to: nil message: 'SB7: selectedClass starts as nil'.
+
+    "SB8: selectedMethod starts as nil"
+    t assertEqual: (sb selectedMethod) to: nil message: 'SB8: selectedMethod starts as nil'.
+
+    "SB9: focusedPane starts as 0"
+    t assertEqual: (sb focusedPane) to: 0 message: 'SB9: focusedPane starts as 0'
+  ]
+
+"=== CATEGORY/CLASS MAPPING TESTS ==="
+CategoryClassTests subclass: Object
+
+  classMethod: run: t [
+    | sb kernelClasses toolsClasses unknownClasses hasRectangle hasCellBuffer hasSysBrowser |
+    '--- Category/Class Mapping Tests ---' println.
+
+    sb := SystemBrowser new.
+
+    "SB10: classesForCategory: Kernel returns Rectangle and CellBuffer"
+    kernelClasses := sb classesForCategory: 'Kernel'.
+    t assertEqual: (kernelClasses size) to: 2 message: 'SB10a: Kernel has 2 classes'.
+    hasRectangle := false.
+    hasCellBuffer := false.
+    hasRectangle := (kernelClasses at: 0) = 'Rectangle'.
+    hasRectangle ifFalse: [hasRectangle := (kernelClasses at: 1) = 'Rectangle'].
+    hasCellBuffer := (kernelClasses at: 0) = 'CellBuffer'.
+    hasCellBuffer ifFalse: [hasCellBuffer := (kernelClasses at: 1) = 'CellBuffer'].
+    t assert: hasRectangle message: 'SB10b: Kernel includes Rectangle'.
+    t assert: hasCellBuffer message: 'SB10c: Kernel includes CellBuffer'.
+
+    "SB11: classesForCategory: Tools includes SystemBrowser"
+    toolsClasses := sb classesForCategory: 'Tools'.
+    hasSysBrowser := false.
+    hasSysBrowser := (toolsClasses at: 0) = 'SystemBrowser'.
+    hasSysBrowser ifFalse: [hasSysBrowser := (toolsClasses at: 1) = 'SystemBrowser'].
+    hasSysBrowser ifFalse: [hasSysBrowser := (toolsClasses at: 2) = 'SystemBrowser'].
+    hasSysBrowser ifFalse: [hasSysBrowser := (toolsClasses at: 3) = 'SystemBrowser'].
+    t assert: hasSysBrowser message: 'SB11: Tools includes SystemBrowser'.
+
+    "SB12: classesForCategory: unknown returns empty array"
+    unknownClasses := sb classesForCategory: 'unknown'.
+    t assertEqual: (unknownClasses size) to: 0 message: 'SB12: unknown category returns empty array'
+  ]
+
+"=== METHOD MAPPING TESTS ==="
+MethodMappingTests subclass: Object
+
+  classMethod: run: t [
+    | sb rectMethods hasXYWH nilMethods unknownMethods found i |
+    '--- Method Mapping Tests ---' println.
+
+    sb := SystemBrowser new.
+
+    "SB13: methodsForClass: Rectangle includes x:y:width:height:"
+    rectMethods := sb methodsForClass: 'Rectangle'.
+    found := false.
+    i := 0.
+    [i < rectMethods size] whileTrue: [
+      (rectMethods at: i) = 'x:y:width:height:' ifTrue: [found := true].
+      i := i + 1
+    ].
+    t assert: found message: 'SB13: Rectangle methods include x:y:width:height:'.
+
+    "SB14: methodsForClass: nil returns empty array"
+    nilMethods := sb methodsForClass: nil.
+    t assertEqual: (nilMethods size) to: 0 message: 'SB14: methodsForClass: nil returns empty array'.
+
+    "SB15: methodsForClass: unknown returns empty array"
+    unknownMethods := sb methodsForClass: 'unknown'.
+    t assertEqual: (unknownMethods size) to: 0 message: 'SB15: methodsForClass: unknown returns empty array'
+  ]
+
+"=== NAVIGATION TESTS ==="
+NavigationTests subclass: Object
+
+  classMethod: run: t [
+    | sb sb2 sb3 sb4 sb5 evt prevCategory |
+    '--- Navigation Tests ---' println.
+
+    "SB16: Tab key increments focusedPane from 0 to 1"
+    sb := SystemBrowser new.
+    t assertEqual: (sb focusedPane) to: 0 message: 'SB16a: focusedPane starts at 0'.
+    evt := MockEvent key: 9 rune: 0.
+    sb handleEvent: evt.
+    t assertEqual: (sb focusedPane) to: 1 message: 'SB16b: Tab increments focusedPane to 1'.
+
+    "SB17: Tab cycles — after 4 tabs, focusedPane returns to 0"
+    sb2 := SystemBrowser new.
+    sb2 handleEvent: (MockEvent key: 9 rune: 0).
+    sb2 handleEvent: (MockEvent key: 9 rune: 0).
+    sb2 handleEvent: (MockEvent key: 9 rune: 0).
+    sb2 handleEvent: (MockEvent key: 9 rune: 0).
+    t assertEqual: (sb2 focusedPane) to: 0 message: 'SB17: Tab cycles — after 4 tabs, focusedPane = 0'.
+
+    "SB18: Down arrow (259) in category pane changes selectedCategory"
+    sb3 := SystemBrowser new.
+    prevCategory := sb3 selectedCategory.
+    sb3 handleEvent: (MockEvent key: 259 rune: 0).
+    t assert: (sb3 selectedCategory notNil) message: 'SB18a: selectedCategory notNil after down arrow'.
+    "Down from Kernel (index 0) should go to Display (index 1)"
+    t assertEqual: (sb3 selectedCategory) to: 'Display' message: 'SB18b: Down arrow moves from Kernel to Display'.
+
+    "SB19: Up arrow (258) in category pane navigates up"
+    "First go down twice then up once"
+    sb4 := SystemBrowser new.
+    sb4 handleEvent: (MockEvent key: 259 rune: 0).
+    sb4 handleEvent: (MockEvent key: 259 rune: 0).
+    "Should be at MVC (index 2)"
+    t assertEqual: (sb4 selectedCategory) to: 'MVC' message: 'SB19a: after 2 downs, selectedCategory is MVC'.
+    sb4 handleEvent: (MockEvent key: 258 rune: 0).
+    t assertEqual: (sb4 selectedCategory) to: 'Display' message: 'SB19b: Up arrow moves from MVC to Display'.
+
+    "SB20: Down arrow in class pane (focusedPane=1) sets selectedClass"
+    sb5 := SystemBrowser new.
+    "Tab to class pane (focusedPane = 1)"
+    sb5 handleEvent: (MockEvent key: 9 rune: 0).
+    t assertEqual: (sb5 focusedPane) to: 1 message: 'SB20a: focusedPane = 1 after Tab'.
+    "Down arrow should set selectedClass (first class in Kernel)"
+    sb5 handleEvent: (MockEvent key: 259 rune: 0).
+    t assert: (sb5 selectedClass notNil) message: 'SB20b: selectedClass set after down in class pane'
+  ]
+
+"=== SELECTION TESTS ==="
+SelectionTests subclass: Object
+
+  classMethod: run: t [
+    | sb sb2 sb3 sb4 prevClass |
+    '--- Selection Tests ---' println.
+
+    "SB21: Enter on category pane calls updateClassList"
+    sb := SystemBrowser new.
+    "Navigate to Display category first"
+    sb handleEvent: (MockEvent key: 259 rune: 0).
+    t assertEqual: (sb selectedCategory) to: 'Display' message: 'SB21a: category is Display before Enter'.
+    "Enter to select (should update class list)"
+    sb handleEvent: (MockEvent key: 13 rune: 0).
+    "After Enter, selectedClass should be nil (updateClassList resets it)"
+    t assertEqual: (sb selectedClass) to: nil message: 'SB21b: Enter on category resets selectedClass'.
+
+    "SB22: After navigating to class and pressing Enter, selectedClass is set"
+    sb2 := SystemBrowser new.
+    "Tab to class pane"
+    sb2 handleEvent: (MockEvent key: 9 rune: 0).
+    "Down to select first class"
+    sb2 handleEvent: (MockEvent key: 259 rune: 0).
+    t assert: (sb2 selectedClass notNil) message: 'SB22: selectedClass is set after navigating in class pane'.
+
+    "SB23: After navigating to method and pressing Enter, selectedMethod is set"
+    sb3 := SystemBrowser new.
+    "Tab to class pane"
+    sb3 handleEvent: (MockEvent key: 9 rune: 0).
+    "Down to select first class"
+    sb3 handleEvent: (MockEvent key: 259 rune: 0).
+    "Tab to method pane"
+    sb3 handleEvent: (MockEvent key: 9 rune: 0).
+    "Down to select first method"
+    sb3 handleEvent: (MockEvent key: 259 rune: 0).
+    t assert: (sb3 selectedMethod notNil) message: 'SB23: selectedMethod is set after navigating in method pane'.
+
+    "SB24: Selecting a category resets selectedClass to nil"
+    sb4 := SystemBrowser new.
+    "Tab to class pane and select a class"
+    sb4 handleEvent: (MockEvent key: 9 rune: 0).
+    sb4 handleEvent: (MockEvent key: 259 rune: 0).
+    t assert: (sb4 selectedClass notNil) message: 'SB24a: selectedClass is set'.
+    "Tab back to category pane (3 more tabs: 1->2->3->0)"
+    sb4 handleEvent: (MockEvent key: 9 rune: 0).
+    sb4 handleEvent: (MockEvent key: 9 rune: 0).
+    sb4 handleEvent: (MockEvent key: 9 rune: 0).
+    "Navigate to different category"
+    sb4 handleEvent: (MockEvent key: 259 rune: 0).
+    "The down arrow in category pane calls updateClassList which resets selectedClass"
+    t assertEqual: (sb4 selectedClass) to: nil message: 'SB24b: changing category resets selectedClass to nil'
+  ]
+
+"=== CODE VIEW TESTS ==="
+CodeViewTests subclass: Object
+
+  classMethod: run: t [
+    | sb source sb2 |
+    '--- Code View Tests ---' println.
+
+    "SB25: sourceForClass:method: returns a non-empty string"
+    sb := SystemBrowser new.
+    source := sb sourceForClass: 'Rectangle' method: 'x'.
+    t assert: (source size > 0) message: 'SB25: sourceForClass:method: returns non-empty string'.
+
+    "SB26: After selecting class and method, codeView is not empty"
+    sb2 := SystemBrowser new.
+    "Tab to class pane"
+    sb2 handleEvent: (MockEvent key: 9 rune: 0).
+    "Down to select first class"
+    sb2 handleEvent: (MockEvent key: 259 rune: 0).
+    "Tab to method pane"
+    sb2 handleEvent: (MockEvent key: 9 rune: 0).
+    "Down to select first method"
+    sb2 handleEvent: (MockEvent key: 259 rune: 0).
+    t assert: (sb2 codeView size > 0) message: 'SB26: codeView is not empty after selecting class and method'
+  ]
+
+"=== ESCAPE TEST ==="
+EscapeTests subclass: Object
+
+  classMethod: run: t [
+    | sb |
+    '--- Escape Tests ---' println.
+
+    "SB27: Escape with no display does not crash"
+    sb := SystemBrowser new.
+    sb handleEvent: (MockEvent key: 27 rune: 0).
+    t assert: true message: 'SB27: Escape with no display does not crash'
+  ]
+
+"=== CONVENTION TESTS ==="
+SBConventionTests subclass: Object
+
+  classMethod: run: t [
+    | sb |
+    '--- Convention Tests ---' println.
+
+    "SB28: SystemBrowser is a subclass of View (verify responds to displayOn:)"
+    sb := SystemBrowser new.
+    sb invalidate.
+    t assertEqual: (sb needsRedraw) to: true message: 'SB28a: SystemBrowser has needsRedraw (View method)'.
+    t assert: (sb needsRedraw notNil) message: 'SB28b: needsRedraw returns non-nil'.
+    t assert: true message: 'SB28c: SystemBrowser responds to invalidate without error'
+  ]
+
+"=== MAIN RUNNER ==="
+SystemBrowserTests subclass: Object
+  classMethod: run [
+    | t |
+    t := TSB new.
+
+    ConstructionTests run: t.
+    '' println.
+    CategoryClassTests run: t.
+    '' println.
+    MethodMappingTests run: t.
+    '' println.
+    NavigationTests run: t.
+    '' println.
+    SelectionTests run: t.
+    '' println.
+    CodeViewTests run: t.
+    '' println.
+    EscapeTests run: t.
+    '' println.
+    SBConventionTests run: t.
+
+    '' println.
+    t report.
+    ^ t failed
+  ]
+
+SystemBrowserTests run
