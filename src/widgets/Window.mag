@@ -1,0 +1,94 @@
+namespace: 'Alto'
+import: 'Go'
+
+Window subclass: Object
+  instanceVars: title contentView contentController frame buffer dragState
+
+  classMethod: title: aString content: aView controller: aController frame: aRect [
+      | win |
+      win := self new.
+      win initTitle: aString content: aView controller: aController frame: aRect.
+      ^win
+  ]
+
+  classMethod: new [
+      | instance |
+      instance := super new.
+      instance initDefaults.
+      ^instance
+  ]
+
+  method: initDefaults [
+      title := ''.
+      contentView := nil.
+      contentController := nil.
+      frame := nil.
+      buffer := nil.
+      dragState := nil
+  ]
+
+  method: initTitle: aString content: aView controller: aController frame: aRect [
+      title := aString.
+      contentView := aView.
+      contentController := aController.
+      frame := aRect.
+      buffer := CellBuffer width: aRect width height: aRect height.
+      dragState := nil
+  ]
+
+  method: buffer [
+      ^buffer
+  ]
+
+  method: frame [
+      ^frame
+  ]
+
+  method: title [
+      ^title
+  ]
+
+  method: contentView [
+      ^contentView
+  ]
+
+  method: contentController [
+      ^contentController
+  ]
+
+  method: displayOn: aCellBuffer [
+      | borderRect w h titleLen closeX i ch |
+      w := frame width.
+      h := frame height.
+      borderRect := Rectangle x: 0 y: 0 width: w height: h.
+      aCellBuffer drawBox: borderRect style: nil.
+      titleLen := title size min: (w - 5).
+      i := 1.
+      [i <= titleLen] whileTrue: [
+        ch := (title at: i) value.
+        aCellBuffer putChar: ch x: i y: 1 style: nil.
+        i := i + 1
+      ].
+      closeX := w - 4.
+      aCellBuffer putChar: 91 x: closeX y: 1 style: nil.
+      aCellBuffer putChar: 88 x: closeX + 1 y: 1 style: nil.
+      aCellBuffer putChar: 93 x: closeX + 2 y: 1 style: nil.
+      contentView isNil ifTrue: [^self].
+      contentView displayOn: aCellBuffer
+  ]
+
+  method: draw [
+      buffer isNil ifTrue: [^self].
+      buffer clear.
+      self displayOn: buffer
+  ]
+
+  method: handleEvent: evt [
+      | evtType mx my closeX closeY titleBarY |
+      contentController isNil ifTrue: [^self].
+      contentController handleEvent: evt
+  ]
+
+  method: close [
+      ^self
+  ]
