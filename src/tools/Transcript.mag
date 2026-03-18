@@ -53,37 +53,39 @@ Transcript subclass: View
   ]
 
   method: handleEvent: evt [
-      | key |
-      key := evt at: #key.
-      (key = #up) ifTrue: [
-        scrollOffset := (scrollOffset - 1) max: 0.
-        self invalidate
-      ].
-      (key = #down) ifTrue: [
-        scrollOffset := (scrollOffset + 1) min: ((lines size - 1) max: 0).
-        self invalidate
-      ].
-      (key = #escape) ifTrue: [
-        display notNil ifTrue: [display removeWindow: parentWindow]
-      ]
+    | keyCode |
+    (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
+    keyCode := evt key.
+    keyCode = 258 ifTrue: [  "Up"
+      scrollOffset := (scrollOffset - 1) max: 0.
+      self invalidate
+    ].
+    keyCode = 259 ifTrue: [  "Down"
+      scrollOffset := (scrollOffset + 1) min: ((lines size - 1) max: 0).
+      self invalidate
+    ].
+    keyCode = 27 ifTrue: [  "Escape"
+      display notNil ifTrue: [display removeWindow: parentWindow]
+    ]
   ]
 
   method: displayOn: aCellBuffer [
-      | visibleHeight i lineIndex lineStr startOffset |
-      visibleHeight := aCellBuffer height.
-      startOffset := (lines size - visibleHeight) max: 0.
-      (scrollOffset < startOffset) ifTrue: [
-        startOffset := scrollOffset
+    | visibleHeight i lineIndex lineStr startOffset style |
+    visibleHeight := aCellBuffer height.
+    style := Go::V2::Style new.
+    startOffset := (lines size - visibleHeight) max: 0.
+    scrollOffset < startOffset ifTrue: [
+      startOffset := scrollOffset
+    ].
+    i := 0.
+    [i < visibleHeight] whileTrue: [
+      lineIndex := startOffset + i.
+      lineIndex < lines size ifTrue: [
+        lineStr := lines at: lineIndex.
+        aCellBuffer putString: lineStr x: 0 y: i style: style
       ].
-      i := 0.
-      [i < visibleHeight] whileTrue: [
-        lineIndex := startOffset + i.
-        (lineIndex < lines size) ifTrue: [
-          lineStr := lines at: lineIndex.
-          aCellBuffer putString: lineStr x: 0 y: i style: nil
-        ].
-        i := i + 1
-      ]
+      i := i + 1
+    ]
   ]
 
   method: parentWindow: aWindow [

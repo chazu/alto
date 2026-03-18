@@ -57,24 +57,41 @@ Window subclass: Object
   ]
 
   method: displayOn: aCellBuffer [
-      | borderRect w h titleLen closeX i ch |
-      w := frame width.
-      h := frame height.
-      borderRect := Rectangle x: 0 y: 0 width: w height: h.
-      aCellBuffer drawBox: borderRect style: nil.
-      titleLen := title size min: (w - 5).
-      i := 1.
-      [i <= titleLen] whileTrue: [
-        ch := (title at: i) value.
-        aCellBuffer putChar: ch x: i y: 1 style: nil.
-        i := i + 1
-      ].
-      closeX := w - 4.
-      aCellBuffer putChar: 91 x: closeX y: 1 style: nil.
-      aCellBuffer putChar: 88 x: closeX + 1 y: 1 style: nil.
-      aCellBuffer putChar: 93 x: closeX + 2 y: 1 style: nil.
-      contentView isNil ifTrue: [^self].
-      contentView displayOn: aCellBuffer
+    | borderRect w h titleLen closeX i ch style contentBuf cell |
+    w := frame width.
+    h := frame height.
+    style := Go::V2::Style new.
+    borderRect := Rectangle x: 0 y: 0 width: w height: h.
+    aCellBuffer drawBox: borderRect style: style.
+
+    "Title bar"
+    titleLen := title size.
+    titleLen > (w - 5) ifTrue: [titleLen := w - 5].
+    i := 0.
+    [i < titleLen] whileTrue: [
+      ch := (title at: i) value.
+      aCellBuffer putChar: ch x: i + 1 y: 0 style: style.
+      i := i + 1
+    ].
+
+    "Close box [X]"
+    closeX := w - 4.
+    aCellBuffer putChar: 91 x: closeX y: 0 style: style.
+    aCellBuffer putChar: 88 x: closeX + 1 y: 0 style: style.
+    aCellBuffer putChar: 93 x: closeX + 2 y: 0 style: style.
+
+    "Content — render into a sub-buffer offset by the border"
+    contentView isNil ifTrue: [^self].
+    contentBuf := CellBuffer width: w - 2 height: h - 2.
+    contentView displayOn: contentBuf.
+
+    "Blit content buffer into window buffer at offset (1,1)"
+    0 to: h - 3 do: [:row |
+      0 to: w - 3 do: [:col |
+        cell := contentBuf cellAt: col y: row.
+        aCellBuffer putCell: cell x: col + 1 y: row + 1
+      ]
+    ]
   ]
 
   method: draw [

@@ -60,11 +60,12 @@ Display subclass: Object
 
   method: render [
     "Composite all window buffers onto the screen buffer, then flush."
-    | style winBuf winFrame ox oy fw fh cell ch cellStyle bw bh |
+    | defaultStyle winBuf winFrame ox oy fw fh cell ch cellStyle bw bh |
     buffer clear.
 
-    "Blit each window back-to-front."
+    "Draw each window: first let it render into its own buffer, then blit."
     windows do: [:win |
+      win draw.
       winBuf  := win buffer.
       winFrame := win frame.
       ox := winFrame x.
@@ -75,7 +76,9 @@ Display subclass: Object
       0 to: fh - 1 do: [:row |
         0 to: fw - 1 do: [:col |
           cell := winBuf cellAt: col y: row.
-          buffer putCell: cell x: ox + col y: oy + row
+          cell notNil ifTrue: [
+            buffer putCell: cell x: ox + col y: oy + row
+          ]
         ]
       ]
     ].
@@ -83,15 +86,17 @@ Display subclass: Object
     "Flush the composed buffer to the terminal screen."
     bw := buffer width.
     bh := buffer height.
-    style := Go::V2::Style new.
+    defaultStyle := Go::V2::Style new.
 
     0 to: bh - 1 do: [:y |
       0 to: bw - 1 do: [:x |
         cell := buffer cellAt: x y: y.
-        ch := cell char.
-        cellStyle := cell style.
-        cellStyle isNil ifTrue: [cellStyle := style].
-        screen setContent: x _: y _: ch _: cellStyle
+        cell notNil ifTrue: [
+          ch := cell at: 'char' ifAbsent: [32].
+          cellStyle := cell at: 'style' ifAbsent: [defaultStyle].
+          cellStyle isNil ifTrue: [cellStyle := defaultStyle].
+          screen setContent: x _: y _: ch _: cellStyle
+        ]
       ]
     ].
 

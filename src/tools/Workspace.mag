@@ -5,250 +5,201 @@ Workspace subclass: View
   instanceVars: textLines cursorX cursorY scrollOffset display parentWindow
 
   classMethod: new [
-      | instance |
-      instance := super new.
-      instance initialize.
-      ^instance
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
   ]
 
   classMethod: open: aDisplay [
-      | frame ws window |
-      frame := Rectangle x: 1 y: 1 width: 60 height: 20.
-      ws := Workspace new.
-      window := Window title: 'Workspace' content: ws controller: ws frame: frame.
-      ws parentWindow: window.
-      ws display: aDisplay.
-      aDisplay addWindow: window.
-      ^ws
+    | frame ws window |
+    frame := Rectangle x: 1 y: 1 width: 60 height: 20.
+    ws := Workspace new.
+    window := Window title: 'Workspace' content: ws controller: ws frame: frame.
+    ws parentWindow: window.
+    ws display: aDisplay.
+    aDisplay addWindow: window.
+    ^ws
   ]
 
   method: initialize [
-      super initialize.
-      textLines := Array new: 0.
-      cursorX := 0.
-      cursorY := 0.
-      scrollOffset := 0.
-      display := nil.
-      parentWindow := nil
+    textLines := Array new: 0.
+    textLines := textLines copyWith: ''.
+    cursorX := 0.
+    cursorY := 0.
+    scrollOffset := 0.
+    display := nil.
+    parentWindow := nil
   ]
 
-  method: parentWindow: aWindow [
-      parentWindow := aWindow
-  ]
+  method: parentWindow: aWindow [ parentWindow := aWindow ]
+  method: display: aDisplay [ display := aDisplay ]
+  method: parentWindow [ ^parentWindow ]
+  method: textLines [ ^textLines ]
+  method: cursorX [ ^cursorX ]
+  method: cursorY [ ^cursorY ]
+  method: scrollOffset [ ^scrollOffset ]
 
-  method: display: aDisplay [
-      display := aDisplay
-  ]
-
-  method: parentWindow [
-      ^parentWindow
-  ]
-
-  method: textLines [
-      ^textLines
-  ]
-
-  method: cursorX [
-      ^cursorX
-  ]
-
-  method: cursorY [
-      ^cursorY
-  ]
-
-  method: scrollOffset [
-      ^scrollOffset
-  ]
+  "---- Event Handling ----
+   tcell EventKey: key returns integer Key constant, rune returns char code.
+   Key constants: KeyRune=256, KeyEnter=13, KeyEscape=27,
+   KeyBackspace=8, KeyBackspace2=127, KeyUp=258, KeyDown=259,
+   KeyLeft=260, KeyRight=261."
 
   method: handleEvent: evt [
-      | key ch lineStr leftPart rightPart newLines idx visibleHeight prevLine |
-      key := evt at: #key.
+    | keyCode runeVal lineStr leftPart rightPart newLines idx |
 
-      "Escape — close the workspace window"
-      (key = #escape) ifTrue: [
-          display notNil ifTrue: [
-              display removeWindow: parentWindow
-          ].
-          ^self
+    "Only handle key events"
+    (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
+
+    keyCode := evt key.
+    runeVal := evt rune.
+
+    "Escape — close"
+    keyCode = 27 ifTrue: [
+      display notNil ifTrue: [display removeWindow: parentWindow].
+      display notNil ifTrue: [display stop].
+      ^self
+    ].
+
+    "Enter — split line"
+    keyCode = 13 ifTrue: [
+      lineStr := textLines at: cursorY.
+      leftPart := lineStr copyFrom: 0 to: cursorX.
+      rightPart := lineStr copyFrom: cursorX.
+      textLines at: cursorY put: leftPart.
+      "Insert rightPart after cursorY"
+      newLines := Array new: 0.
+      idx := 0.
+      [idx < textLines size] whileTrue: [
+        newLines := newLines copyWith: (textLines at: idx).
+        idx = cursorY ifTrue: [
+          newLines := newLines copyWith: rightPart
+        ].
+        idx := idx + 1
       ].
+      textLines := newLines.
+      cursorY := cursorY + 1.
+      cursorX := 0.
+      self updateScroll.
+      self invalidate.
+      ^self
+    ].
 
-      "Enter — split current line or add first line"
-      (key = #enter) ifTrue: [
-          textLines size = 0 ifTrue: [
-              textLines := textLines copyWith: ''.
-              textLines := textLines copyWith: ''.
-              cursorY := 1.
-              cursorX := 0.
-              self updateScroll.
-              self invalidate.
-              ^self
-          ].
-          lineStr := textLines at: cursorY.
-          leftPart := lineStr copyFrom: 0 to: cursorX.
-          rightPart := lineStr copyFrom: cursorX to: lineStr size.
-          textLines at: cursorY put: leftPart.
+    "Backspace"
+    (keyCode = 8 or: [keyCode = 127]) ifTrue: [
+      cursorX > 0 ifTrue: [
+        lineStr := textLines at: cursorY.
+        leftPart := lineStr copyFrom: 0 to: cursorX - 1.
+        rightPart := lineStr copyFrom: cursorX.
+        textLines at: cursorY put: (leftPart, rightPart).
+        cursorX := cursorX - 1
+      ] ifFalse: [
+        cursorY > 0 ifTrue: [
+          "Merge with previous line"
+          leftPart := textLines at: cursorY - 1.
+          rightPart := textLines at: cursorY.
+          cursorX := leftPart size.
+          textLines at: cursorY - 1 put: (leftPart, rightPart).
+          "Remove current line"
           newLines := Array new: 0.
           idx := 0.
           [idx < textLines size] whileTrue: [
-              newLines := newLines copyWith: (textLines at: idx).
-              (idx = cursorY) ifTrue: [
-                  newLines := newLines copyWith: rightPart
-              ].
-              idx := idx + 1
+            idx = cursorY ifFalse: [
+              newLines := newLines copyWith: (textLines at: idx)
+            ].
+            idx := idx + 1
           ].
           textLines := newLines.
-          cursorY := cursorY + 1.
-          cursorX := 0.
-          self updateScroll.
-          self invalidate.
-          ^self
+          cursorY := cursorY - 1
+        ]
       ].
+      self updateScroll.
+      self invalidate.
+      ^self
+    ].
 
-      "Backspace — delete char before cursor or merge lines"
-      (key = #backspace) ifTrue: [
-          textLines size = 0 ifTrue: [^self].
-          (cursorX > 0) ifTrue: [
-              lineStr := textLines at: cursorY.
-              leftPart := lineStr copyFrom: 0 to: cursorX - 1.
-              rightPart := lineStr copyFrom: cursorX to: lineStr size.
-              textLines at: cursorY put: leftPart , rightPart.
-              cursorX := cursorX - 1
-          ] ifFalse: [
-              (cursorY > 0) ifTrue: [
-                  prevLine := textLines at: cursorY - 1.
-                  lineStr := textLines at: cursorY.
-                  cursorX := prevLine size.
-                  textLines at: cursorY - 1 put: prevLine , lineStr.
-                  newLines := Array new: 0.
-                  idx := 0.
-                  [idx < textLines size] whileTrue: [
-                      (idx = cursorY) ifFalse: [
-                          newLines := newLines copyWith: (textLines at: idx)
-                      ].
-                      idx := idx + 1
-                  ].
-                  textLines := newLines.
-                  cursorY := cursorY - 1
-              ]
-          ].
-          self updateScroll.
-          self invalidate.
-          ^self
-      ].
+    "Arrow keys"
+    keyCode = 258 ifTrue: [  "Up"
+      cursorY > 0 ifTrue: [cursorY := cursorY - 1].
+      lineStr := textLines at: cursorY.
+      cursorX > lineStr size ifTrue: [cursorX := lineStr size].
+      self updateScroll. self invalidate. ^self
+    ].
+    keyCode = 259 ifTrue: [  "Down"
+      cursorY < (textLines size - 1) ifTrue: [cursorY := cursorY + 1].
+      lineStr := textLines at: cursorY.
+      cursorX > lineStr size ifTrue: [cursorX := lineStr size].
+      self updateScroll. self invalidate. ^self
+    ].
+    keyCode = 260 ifTrue: [  "Left"
+      cursorX > 0 ifTrue: [cursorX := cursorX - 1].
+      self invalidate. ^self
+    ].
+    keyCode = 261 ifTrue: [  "Right"
+      lineStr := textLines at: cursorY.
+      cursorX < lineStr size ifTrue: [cursorX := cursorX + 1].
+      self invalidate. ^self
+    ].
 
-      "Arrow Up"
-      (key = #up) ifTrue: [
-          cursorY := (cursorY - 1) max: 0.
-          textLines size > 0 ifTrue: [
-              lineStr := textLines at: cursorY.
-              cursorX := cursorX min: lineStr size
-          ].
-          self updateScroll.
-          self invalidate.
-          ^self
-      ].
-
-      "Arrow Down"
-      (key = #down) ifTrue: [
-          textLines size > 0 ifTrue: [
-              cursorY := (cursorY + 1) min: textLines size - 1.
-              lineStr := textLines at: cursorY.
-              cursorX := cursorX min: lineStr size
-          ].
-          self updateScroll.
-          self invalidate.
-          ^self
-      ].
-
-      "Arrow Left"
-      (key = #left) ifTrue: [
-          cursorX := (cursorX - 1) max: 0.
-          self invalidate.
-          ^self
-      ].
-
-      "Arrow Right"
-      (key = #right) ifTrue: [
-          textLines size > 0 ifTrue: [
-              lineStr := textLines at: cursorY.
-              cursorX := (cursorX + 1) min: lineStr size
-          ].
-          self invalidate.
-          ^self
-      ].
-
-      "Printable character — insert at cursor"
-      (key = #rune) ifTrue: [
-          ch := evt at: #rune.
-          textLines size = 0 ifTrue: [
-              textLines := textLines copyWith: ''
-          ].
-          lineStr := textLines at: cursorY.
-          leftPart := lineStr copyFrom: 0 to: cursorX.
-          rightPart := lineStr copyFrom: cursorX to: lineStr size.
-          textLines at: cursorY put: leftPart , (Character value: ch) asString , rightPart.
-          cursorX := cursorX + 1.
-          self updateScroll.
-          self invalidate.
-          ^self
-      ]
+    "Printable character (KeyRune = 256)"
+    keyCode = 256 ifTrue: [
+      lineStr := textLines at: cursorY.
+      leftPart := lineStr copyFrom: 0 to: cursorX.
+      rightPart := lineStr copyFrom: cursorX.
+      textLines at: cursorY put: (leftPart, (Character value: runeVal) asString, rightPart).
+      cursorX := cursorX + 1.
+      self updateScroll.
+      self invalidate.
+      ^self
+    ]
   ]
 
   method: updateScroll [
-      | visibleHeight |
-      visibleHeight := 20.
-      parentWindow notNil ifTrue: [
-          parentWindow frame notNil ifTrue: [
-              visibleHeight := parentWindow frame height - 3
-          ]
-      ].
-      (cursorY < scrollOffset) ifTrue: [
-          scrollOffset := cursorY
-      ].
-      (cursorY >= (scrollOffset + visibleHeight)) ifTrue: [
-          scrollOffset := cursorY - visibleHeight + 1
+    | visibleHeight |
+    visibleHeight := 18.
+    parentWindow notNil ifTrue: [
+      parentWindow frame notNil ifTrue: [
+        visibleHeight := parentWindow frame height - 3
       ]
+    ].
+    cursorY < scrollOffset ifTrue: [
+      scrollOffset := cursorY
+    ].
+    cursorY >= (scrollOffset + visibleHeight) ifTrue: [
+      scrollOffset := cursorY - visibleHeight + 1
+    ]
   ]
 
   method: displayOn: aCellBuffer [
-      | visibleHeight i lineIndex lineStr j charCode reverseStyle normalStyle |
-      visibleHeight := aCellBuffer height.
-      reverseStyle := Dictionary new.
-      reverseStyle at: #attrs put: #reverse.
-      normalStyle := Dictionary new.
-      normalStyle at: #attrs put: nil.
+    | visibleHeight i lineIndex lineStr j charCode normalStyle reverseStyle style |
+    visibleHeight := aCellBuffer height.
+    normalStyle := Go::V2::Style new.
+    reverseStyle := (Go::V2::Style new) reverse: true.
 
-      "Handle empty buffer — show cursor at origin"
-      textLines size = 0 ifTrue: [
-          aCellBuffer putChar: 32 x: 0 y: 0 style: reverseStyle.
-          ^self
+    i := 0.
+    [i < visibleHeight] whileTrue: [
+      lineIndex := scrollOffset + i.
+      lineIndex < textLines size ifTrue: [
+        lineStr := textLines at: lineIndex.
+        j := 0.
+        [j < lineStr size] whileTrue: [
+          charCode := (lineStr at: j) value.
+          style := (lineIndex = cursorY and: [j = cursorX])
+            ifTrue: [reverseStyle]
+            ifFalse: [normalStyle].
+          aCellBuffer putChar: charCode x: j y: i style: style.
+          j := j + 1
+        ].
+        "Cursor past end of line"
+        (lineIndex = cursorY and: [cursorX >= lineStr size]) ifTrue: [
+          aCellBuffer putChar: 32 x: cursorX y: i style: reverseStyle
+        ]
+      ] ifFalse: [
+        lineIndex = cursorY ifTrue: [
+          aCellBuffer putChar: 32 x: 0 y: i style: reverseStyle
+        ]
       ].
-
-      i := 0.
-      [i < visibleHeight] whileTrue: [
-          lineIndex := scrollOffset + i.
-          (lineIndex < textLines size) ifTrue: [
-              lineStr := textLines at: lineIndex.
-              j := 0.
-              [j < lineStr size] whileTrue: [
-                  charCode := (lineStr at: j) value.
-                  ((lineIndex = cursorY) and: [j = cursorX]) ifTrue: [
-                      aCellBuffer putChar: charCode x: j y: i style: reverseStyle
-                  ] ifFalse: [
-                      aCellBuffer putChar: charCode x: j y: i style: normalStyle
-                  ].
-                  j := j + 1
-              ].
-              "Cursor past end of line — render reverse space"
-              ((lineIndex = cursorY) and: [cursorX >= lineStr size]) ifTrue: [
-                  aCellBuffer putChar: 32 x: cursorX y: i style: reverseStyle
-              ]
-          ] ifFalse: [
-              "Empty line below text — show cursor if on this line"
-              (lineIndex = cursorY) ifTrue: [
-                  aCellBuffer putChar: 32 x: 0 y: i style: reverseStyle
-              ]
-          ].
-          i := i + 1
-      ]
+      i := i + 1
+    ]
   ]
