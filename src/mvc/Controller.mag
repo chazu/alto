@@ -1,0 +1,46 @@
+namespace: 'Alto'
+import: 'Go'
+
+Controller subclass: Object
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^ instance
+  ]
+
+  method: initialize [
+    model := nil.
+    view := nil.
+    active := false
+  ]
+
+  method: model: m view: v [
+    model := m.
+    view := v.
+    ^ self
+  ]
+
+  method: model [
+    ^ model
+  ]
+
+  method: view [
+    ^ view
+  ]
+
+  method: handleEvent: anEvent [
+    ^ self
+  ]
+
+  method: isActive [
+    ^ active
+  ]
+
+  method: activate [
+    active := true
+  ]
+
+  method: deactivate [
+    active := false
+  ]
