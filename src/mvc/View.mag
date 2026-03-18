@@ -1,7 +1,9 @@
 namespace: 'Alto'
 import: 'Go'
 
-View subclass: Object
+View subclass: Object [
+  | model bounds buffer needsRedraw |
+
   classMethod: new [
     | instance |
     instance := super new.
@@ -70,3 +72,4 @@ View subclass: Object
   method: needsRedraw: aBoolean [
     needsRedraw := aBoolean
   ]
+]

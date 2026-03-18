@@ -1,7 +1,9 @@
 namespace: 'Alto'
 import: 'Go'
 
-Controller subclass: Object
+Controller subclass: Object [
+  | model view active |
+
   classMethod: new [
     | instance |
     instance := super new.
@@ -44,3 +46,4 @@ Controller subclass: Object
   method: deactivate [
     active := false
   ]
+]
