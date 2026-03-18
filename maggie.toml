@@ -4,8 +4,22 @@ namespace = "Alto"
 version = "0.1.0"
 
 [source]
-dirs = ["src"]
+dirs = ["wrap/tcell", "wrap/terminal", "src"]
 entry = "Main.start"
 
 [go-wrap]
-packages = ["github.com/gdamore/tcell/v2"]
+output = "wrap"
+
+[[go-wrap.packages]]
+import = "github.com/gdamore/tcell/v2"
+include = [
+  "NewEventKey", "NewEventMouse", "NewEventResize",
+  "NewRGBColor", "NewHexColor", "PaletteColor", "GetColor",
+  "ColorBlack", "ColorWhite", "ColorRed", "ColorGreen", "ColorBlue",
+  "ColorYellow", "ColorMagenta", "ColorCyan",
+  "Style", "EventKey", "EventMouse", "EventResize",
+  "CellBuffer",
+]
+
+[[go-wrap.packages]]
+import = "alto/go/terminal"

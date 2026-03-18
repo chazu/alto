@@ -1,0 +1,26 @@
+namespace: 'Alto'
+import: 'Go'
+
+Main subclass: Object
+  classMethod: start [
+    | screen event |
+    'Creating screen...' println.
+    screen := Go::Terminal newScreen.
+    'Screen created, initializing...' println.
+    screen init.
+    screen enableMouse.
+    screen clear.
+
+    "Draw 'Alto' at position 10,5"
+    screen setContent: 10 _: 5 _: 65 _: (Go::V2::Style new).
+    screen setContent: 11 _: 5 _: 108 _: (Go::V2::Style new).
+    screen setContent: 12 _: 5 _: 116 _: (Go::V2::Style new).
+    screen setContent: 13 _: 5 _: 111 _: (Go::V2::Style new).
+    screen show.
+
+    "Wait for any key"
+    event := screen pollEvent.
+
+    screen fini.
+    'Alto demo complete.' println
+  ]
