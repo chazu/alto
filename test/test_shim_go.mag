@@ -1,0 +1,12 @@
+namespace: 'Go'
+
+"Mock Go::Terminal for headless testing."
+Terminal subclass: Object
+
+  classMethod: newStyle [
+    ^nil
+  ]
+
+  classMethod: newScreen [
+    ^nil
+  ]

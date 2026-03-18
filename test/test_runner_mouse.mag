@@ -1,0 +1,7 @@
+namespace: 'Alto'
+import: 'Go'
+
+TestMain subclass: Object
+  classMethod: start [
+    MouseSupportTests run
+  ]

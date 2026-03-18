@@ -1,0 +1,6 @@
+namespace: 'Go::V2'
+
+"Stub event classes for isKindOf: type checking in headless tests."
+
+EventMouse subclass: Object
+EventKey subclass: Object
