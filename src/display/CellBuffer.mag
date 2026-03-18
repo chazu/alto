@@ -18,7 +18,7 @@ CellBuffer subclass: Object
     | sz i cell |
     width := w.
     height := h.
-    defaultStyle := Go::V2::Style new.
+    defaultStyle := Go::Terminal newStyle.
     sz := w * h.
     cells := Array new: sz.
     i := 0.

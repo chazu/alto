@@ -2,7 +2,9 @@
 namespace: 'Go'
 
 Terminal subclass: Object
+  classMethod: defaultStyle [ <primitive> ]
   classMethod: newScreen [ <primitive> ]
+  classMethod: newStyle [ <primitive> ]
 
 Screen subclass: Object
   method: clear [ <primitive> ]

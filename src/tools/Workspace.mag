@@ -174,8 +174,8 @@ Workspace subclass: View
   method: displayOn: aCellBuffer [
     | visibleHeight i lineIndex lineStr j charCode normalStyle reverseStyle style |
     visibleHeight := aCellBuffer height.
-    normalStyle := Go::V2::Style new.
-    reverseStyle := (Go::V2::Style new) reverse: true.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true.
 
     i := 0.
     [i < visibleHeight] whileTrue: [

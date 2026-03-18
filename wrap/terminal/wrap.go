@@ -19,9 +19,21 @@ func RegisterPrimitives(v *vm.VM) {
 	nsClass := v.RegisterGoType("Go::Terminal", reflect.TypeOf((*struct{})(nil)))
 	_ = nsClass
 
+	nsClass.AddClassMethod(v.Selectors, "defaultStyle", vm.NewPrimitiveMethod("defaultStyle", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		result := pkg.DefaultStyle()
+		return v.GoToValue(result)
+	}))
+
 	nsClass.AddClassMethod(v.Selectors, "newScreen", vm.NewPrimitiveMethod("newScreen", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)
 		result := pkg.NewScreen()
+		return v.GoToValue(result)
+	}))
+
+	nsClass.AddClassMethod(v.Selectors, "newStyle", vm.NewPrimitiveMethod("newStyle", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		result := pkg.NewStyle()
 		return v.GoToValue(result)
 	}))
 

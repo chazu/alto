@@ -123,3 +123,13 @@ func (s *Screen) ShowCursor(x, y int) {
 func (s *Screen) HideCursor() {
 	s.screen.HideCursor()
 }
+
+// DefaultStyle returns the default (zero-value) tcell Style.
+func DefaultStyle() tcell.Style {
+	return tcell.StyleDefault
+}
+
+// NewStyle returns a fresh default Style (same as DefaultStyle).
+func NewStyle() tcell.Style {
+	return tcell.StyleDefault
+}

@@ -60,7 +60,7 @@ Window subclass: Object
     | borderRect w h titleLen closeX i ch style contentBuf cell |
     w := frame width.
     h := frame height.
-    style := Go::V2::Style new.
+    style := Go::Terminal newStyle.
     borderRect := Rectangle x: 0 y: 0 width: w height: h.
     aCellBuffer drawBox: borderRect style: style.
 

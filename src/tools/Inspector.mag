@@ -12,16 +12,17 @@ Inspector subclass: View
   ]
 
   classMethod: open: anObject on: aDisplay [
-    | frame inspector window keys vals i key |
+    | frame inspector window keys vals i key allKeys |
     frame := Rectangle x: 1 y: 1 width: 60 height: 20.
     inspector := Inspector new.
     inspector privateTarget: anObject.
     keys := Array new: 0.
     vals := Array new: 0.
     (anObject isKindOf: Dictionary) ifTrue: [
+      allKeys := anObject keys.
       i := 0.
-      [i < anObject keys size] whileTrue: [
-        key := anObject keys at: i.
+      [i < allKeys size] whileTrue: [
+        key := allKeys at: i.
         keys := keys copyWith: key.
         vals := vals copyWith: (anObject at: key) printString.
         i := i + 1
@@ -59,6 +60,7 @@ Inspector subclass: View
   method: privateValueView: aView [ valueView := aView ]
   method: parentWindow: aWindow [ parentWindow := aWindow ]
   method: display: aDisplay [ display := aDisplay ]
+  method: display [ ^display ]
   method: target [ ^target ]
   method: fieldNames [ ^fieldNames ]
   method: fieldValues [ ^fieldValues ]
@@ -78,7 +80,7 @@ Inspector subclass: View
   ]
 
   method: handleEvent: evt [
-    | keyCode idx key val |
+    | keyCode idx key val visibleHeight |
     (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
     keyCode := evt key.
 
@@ -114,6 +116,7 @@ Inspector subclass: View
       focusOnList ifTrue: [
         selectedIndex > 0 ifTrue: [
           selectedIndex := selectedIndex - 1.
+          selectedIndex < scrollOffset ifTrue: [scrollOffset := selectedIndex].
           selectedIndex < fieldValues size ifTrue: [
             valueView text: (fieldValues at: selectedIndex)
           ].
@@ -129,6 +132,13 @@ Inspector subclass: View
         fieldNames size > 0 ifTrue: [
           selectedIndex < (fieldNames size - 1) ifTrue: [
             selectedIndex := selectedIndex + 1.
+            visibleHeight := 18.
+            parentWindow notNil ifTrue: [
+              parentWindow frame notNil ifTrue: [visibleHeight := parentWindow frame height - 2]
+            ].
+            selectedIndex >= (scrollOffset + visibleHeight) ifTrue: [
+              scrollOffset := selectedIndex - visibleHeight + 1
+            ].
             selectedIndex < fieldValues size ifTrue: [
               valueView text: (fieldValues at: selectedIndex)
             ].
@@ -143,8 +153,8 @@ Inspector subclass: View
   method: displayOn: aCellBuffer [
     | listWidth visibleCount i itemIndex fieldStr valStr idx style normalStyle reverseStyle bufWidth bufHeight j charCode |
     listWidth := 20.
-    normalStyle := Go::V2::Style new.
-    reverseStyle := (Go::V2::Style new) reverse: true.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true.
     bufWidth := aCellBuffer width.
     bufHeight := aCellBuffer height.
 

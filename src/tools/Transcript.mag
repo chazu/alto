@@ -72,7 +72,7 @@ Transcript subclass: View
   method: displayOn: aCellBuffer [
     | visibleHeight i lineIndex lineStr startOffset style |
     visibleHeight := aCellBuffer height.
-    style := Go::V2::Style new.
+    style := Go::Terminal newStyle.
     startOffset := (lines size - visibleHeight) max: 0.
     scrollOffset < startOffset ifTrue: [
       startOffset := scrollOffset

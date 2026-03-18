@@ -86,7 +86,7 @@ Display subclass: Object
     "Flush the composed buffer to the terminal screen."
     bw := buffer width.
     bh := buffer height.
-    defaultStyle := Go::V2::Style new.
+    defaultStyle := Go::Terminal newStyle.
 
     0 to: bh - 1 do: [:y |
       0 to: bw - 1 do: [:x |

@@ -200,33 +200,36 @@ SystemBrowser subclass: View
   ]
 
   method: selectCategory [
-    self updateClassList
+    self updateClassList.
+    self invalidate
   ]
 
   method: selectClass [
-    | classes idx |
-    classes := self classesForCategory: selectedCategory.
-    idx := classList selectedIndex.
-    (idx >= 0 and: [idx < classes size]) ifTrue: [
-      selectedClass := classes at: idx.
-      self updateMethodList
-    ]
+    selectedClass isNil ifTrue: [
+      "No class selected yet — pick first one"
+      | classes |
+      classes := self classesForCategory: selectedCategory.
+      classes size > 0 ifTrue: [selectedClass := classes at: 0]
+    ].
+    self updateMethodList.
+    self invalidate
   ]
 
   method: selectMethod [
-    | methods idx |
     selectedClass isNil ifTrue: [^self].
-    methods := self methodsForClass: selectedClass.
-    idx := methodList selectedIndex.
-    (idx >= 0 and: [idx < methods size]) ifTrue: [
-      selectedMethod := methods at: idx.
-      self updateCodeView
-    ]
+    selectedMethod isNil ifTrue: [
+      "No method selected yet — pick first one"
+      | methods |
+      methods := self methodsForClass: selectedClass.
+      methods size > 0 ifTrue: [selectedMethod := methods at: 0]
+    ].
+    self updateCodeView.
+    self invalidate
   ]
 
   method: displayOn: aCellBuffer [
     | paneWidth paneHeight catBuf classBuf methodBuf codeBuf style categories classes methods |
-    style := Go::V2::Style new.
+    style := Go::Terminal newStyle.
     paneWidth := aCellBuffer width // 3.
     paneHeight := 10.
 
@@ -259,8 +262,8 @@ SystemBrowser subclass: View
 
   method: renderList: anArray selectedItem: aSelection into: aCellBuffer focused: isFocused [
     | i itemStr normalStyle reverseStyle style |
-    normalStyle := Go::V2::Style new.
-    reverseStyle := (Go::V2::Style new) reverse: true.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true.
     i := 0.
     [i < anArray size and: [i < aCellBuffer height]] whileTrue: [
       itemStr := anArray at: i.
@@ -272,7 +275,7 @@ SystemBrowser subclass: View
 
   method: renderCode: aString into: aCellBuffer [
     | style |
-    style := Go::V2::Style new.
+    style := Go::Terminal newStyle.
     aString isNil ifTrue: [^self].
     aCellBuffer putString: aString x: 0 y: 0 style: style
   ]
