@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 Window subclass: Object
-  instanceVars: title contentView contentController frame buffer dragState
+  instanceVars: title contentView contentController frame buffer dragState display
 
   classMethod: title: aString content: aView controller: aController frame: aRect [
       | win |
@@ -100,12 +100,36 @@ Window subclass: Object
       self displayOn: buffer
   ]
 
+  method: display [
+      ^display
+  ]
+
+  method: display: aDisplay [
+      display := aDisplay
+  ]
+
   method: handleEvent: evt [
-      | evtType mx my closeX closeY titleBarY |
+      | pos mx my |
+      (evt isKindOf: Go::V2::EventMouse) ifTrue: [
+          pos := evt position.
+          mx := pos at: 0.
+          my := pos at: 1.
+          my = 0 ifTrue: [
+              mx >= (frame width - 4) ifTrue: [
+                  ^self close
+              ].
+              ^self
+          ].
+          contentController notNil ifTrue: [
+              contentController handleEvent: evt
+          ].
+          ^self
+      ].
       contentController isNil ifTrue: [^self].
       contentController handleEvent: evt
   ]
 
   method: close [
+      display notNil ifTrue: [display removeWindow: self].
       ^self
   ]
