@@ -1,0 +1,292 @@
+namespace: 'Alto'
+import: 'Go'
+
+SystemBrowser subclass: View
+  instanceVars: categoryList classList methodList codeView display parentWindow selectedCategory selectedClass selectedMethod focusedPane
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  classMethod: open: aDisplay [
+    | frame browser window |
+    frame := Rectangle x: 0 y: 0 width: 80 height: 30.
+    browser := SystemBrowser new.
+    browser display: aDisplay.
+    window := Window title: 'System Browser' content: browser controller: browser frame: frame.
+    browser parentWindow: window.
+    aDisplay addWindow: window.
+    ^browser
+  ]
+
+  method: initialize [
+    | categories |
+    super initialize.
+    categories := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+    categoryList := ListView items: categories onSelect: nil.
+    classList := ListView items: #() onSelect: nil.
+    methodList := ListView items: #() onSelect: nil.
+    codeView := ''.
+    selectedCategory := 'Kernel'.
+    selectedClass := nil.
+    selectedMethod := nil.
+    focusedPane := 0.
+    display := nil.
+    parentWindow := nil.
+    self updateClassList
+  ]
+
+  method: classesForCategory: aCategoryName [
+    aCategoryName = 'Kernel' ifTrue: [^#('Rectangle' 'CellBuffer')].
+    aCategoryName = 'Display' ifTrue: [^#('Display')].
+    aCategoryName = 'MVC' ifTrue: [^#('Model' 'View' 'Controller')].
+    aCategoryName = 'Widgets' ifTrue: [^#('Window' 'Label' 'ListView')].
+    aCategoryName = 'Tools' ifTrue: [^#('Workspace' 'Transcript' 'SystemBrowser' 'Inspector')].
+    ^#()
+  ]
+
+  method: methodsForClass: aClassName [
+    aClassName isNil ifTrue: [^#()].
+    aClassName = 'Rectangle' ifTrue: [^#('x:y:width:height:' 'x' 'y' 'width' 'height' 'containsPointX:y:')].
+    aClassName = 'CellBuffer' ifTrue: [^#('width:height:' 'putChar:x:y:style:' 'putString:x:y:style:' 'clear' 'cellAt:y:' 'width' 'height')].
+    aClassName = 'Display' ifTrue: [^#('new' 'addWindow:' 'removeWindow:' 'render' 'run' 'stop')].
+    aClassName = 'Model' ifTrue: [^#('new' 'addDependent:' 'removeDependent:' 'changed' 'changed:')].
+    aClassName = 'View' ifTrue: [^#('new' 'initialize' 'displayOn:' 'invalidate' 'model:')].
+    aClassName = 'Controller' ifTrue: [^#('new' 'initialize' 'handleEvent:' 'model:' 'view:')].
+    aClassName = 'Window' ifTrue: [^#('title:content:controller:frame:' 'draw' 'displayOn:' 'handleEvent:' 'close' 'frame' 'title')].
+    aClassName = 'Label' ifTrue: [^#('text:' 'displayOn:')].
+    aClassName = 'ListView' ifTrue: [^#('items:onSelect:' 'items:' 'displayOn:' 'handleEvent:' 'selectedItem' 'selectedIndex')].
+    aClassName = 'Workspace' ifTrue: [^#('new' 'open:' 'initialize' 'handleEvent:' 'displayOn:' 'textLines' 'cursorX' 'cursorY')].
+    aClassName = 'Transcript' ifTrue: [^#('current' 'open:' 'show:' 'appendLine:' 'handleEvent:' 'displayOn:')].
+    aClassName = 'SystemBrowser' ifTrue: [^#('new' 'open:' 'initialize' 'handleEvent:' 'displayOn:')].
+    aClassName = 'Inspector' ifTrue: [^#('inspect:on:' 'handleEvent:' 'displayOn:')].
+    ^#()
+  ]
+
+  method: sourceForClass: aClassName method: aMethodName [
+    ^aClassName, ' >> ', aMethodName, ' [', '  "source not available"', ']'
+  ]
+
+  method: updateClassList [
+    | classes |
+    classes := self classesForCategory: selectedCategory.
+    classList items: classes.
+    selectedClass := nil.
+    selectedMethod := nil.
+    methodList items: #().
+    codeView := ''
+  ]
+
+  method: updateMethodList [
+    | methods |
+    selectedClass isNil ifTrue: [^self].
+    methods := self methodsForClass: selectedClass.
+    methodList items: methods.
+    selectedMethod := nil.
+    codeView := ''
+  ]
+
+  method: updateCodeView [
+    selectedClass isNil ifTrue: [^self].
+    selectedMethod isNil ifTrue: [^self].
+    codeView := self sourceForClass: selectedClass method: selectedMethod
+  ]
+
+  method: display: aDisplay [ display := aDisplay ]
+  method: parentWindow: aWindow [ parentWindow := aWindow ]
+  method: parentWindow [ ^parentWindow ]
+  method: display [ ^display ]
+  method: categoryList [ ^categoryList ]
+  method: classList [ ^classList ]
+  method: methodList [ ^methodList ]
+  method: codeView [ ^codeView ]
+  method: selectedCategory [ ^selectedCategory ]
+  method: selectedClass [ ^selectedClass ]
+  method: selectedMethod [ ^selectedMethod ]
+  method: focusedPane [ ^focusedPane ]
+
+  method: handleEvent: evt [
+    | keyCode runeVal |
+    (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
+    keyCode := evt key.
+    runeVal := evt rune.
+
+    "Escape — close"
+    keyCode = 27 ifTrue: [
+      display notNil ifTrue: [display removeWindow: parentWindow].
+      ^self
+    ].
+
+    "Tab — cycle focus"
+    keyCode = 9 ifTrue: [
+      focusedPane := (focusedPane + 1) \\ 4.
+      self invalidate.
+      ^self
+    ].
+
+    "Arrow keys — delegate to focused pane"
+    (keyCode = 258 or: [keyCode = 259]) ifTrue: [
+      focusedPane = 0 ifTrue: [self handleCategoryArrow: keyCode].
+      focusedPane = 1 ifTrue: [self handleClassArrow: keyCode].
+      focusedPane = 2 ifTrue: [self handleMethodArrow: keyCode].
+      self invalidate.
+      ^self
+    ].
+
+    "Enter — select in focused pane"
+    keyCode = 13 ifTrue: [
+      focusedPane = 0 ifTrue: [self selectCategory].
+      focusedPane = 1 ifTrue: [self selectClass].
+      focusedPane = 2 ifTrue: [self selectMethod].
+      self invalidate.
+      ^self
+    ]
+  ]
+
+  method: handleCategoryArrow: keyCode [
+    | items idx |
+    items := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+    idx := self indexOfItem: selectedCategory inArray: items.
+    keyCode = 258 ifTrue: [idx := (idx - 1) max: 0].
+    keyCode = 259 ifTrue: [idx := (idx + 1) min: items size - 1].
+    selectedCategory := items at: idx.
+    self updateClassList
+  ]
+
+  method: handleClassArrow: keyCode [
+    | classes idx |
+    classes := self classesForCategory: selectedCategory.
+    classes size = 0 ifTrue: [^self].
+    selectedClass isNil ifTrue: [
+      selectedClass := classes at: 0.
+      self updateMethodList.
+      ^self
+    ].
+    idx := self indexOfItem: selectedClass inArray: classes.
+    keyCode = 258 ifTrue: [idx := (idx - 1) max: 0].
+    keyCode = 259 ifTrue: [idx := (idx + 1) min: classes size - 1].
+    selectedClass := classes at: idx.
+    self updateMethodList
+  ]
+
+  method: handleMethodArrow: keyCode [
+    | methods idx |
+    selectedClass isNil ifTrue: [^self].
+    methods := self methodsForClass: selectedClass.
+    methods size = 0 ifTrue: [^self].
+    selectedMethod isNil ifTrue: [
+      selectedMethod := methods at: 0.
+      self updateCodeView.
+      ^self
+    ].
+    idx := self indexOfItem: selectedMethod inArray: methods.
+    keyCode = 258 ifTrue: [idx := (idx - 1) max: 0].
+    keyCode = 259 ifTrue: [idx := (idx + 1) min: methods size - 1].
+    selectedMethod := methods at: idx.
+    self updateCodeView
+  ]
+
+  method: indexOfItem: anItem inArray: anArray [
+    | i |
+    i := 0.
+    [i < anArray size] whileTrue: [
+      (anArray at: i) = anItem ifTrue: [^i].
+      i := i + 1
+    ].
+    ^0
+  ]
+
+  method: selectCategory [
+    self updateClassList
+  ]
+
+  method: selectClass [
+    | classes idx |
+    classes := self classesForCategory: selectedCategory.
+    idx := classList selectedIndex.
+    (idx >= 0 and: [idx < classes size]) ifTrue: [
+      selectedClass := classes at: idx.
+      self updateMethodList
+    ]
+  ]
+
+  method: selectMethod [
+    | methods idx |
+    selectedClass isNil ifTrue: [^self].
+    methods := self methodsForClass: selectedClass.
+    idx := methodList selectedIndex.
+    (idx >= 0 and: [idx < methods size]) ifTrue: [
+      selectedMethod := methods at: idx.
+      self updateCodeView
+    ]
+  ]
+
+  method: displayOn: aCellBuffer [
+    | paneWidth paneHeight catBuf classBuf methodBuf codeBuf style categories classes methods |
+    style := Go::V2::Style new.
+    paneWidth := aCellBuffer width // 3.
+    paneHeight := 10.
+
+    "Render category list"
+    catBuf := CellBuffer width: paneWidth height: paneHeight.
+    categories := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+    self renderList: categories selectedItem: selectedCategory into: catBuf focused: (focusedPane = 0).
+
+    "Render class list"
+    classBuf := CellBuffer width: paneWidth height: paneHeight.
+    classes := self classesForCategory: selectedCategory.
+    self renderList: classes selectedItem: selectedClass into: classBuf focused: (focusedPane = 1).
+
+    "Render method list"
+    methodBuf := CellBuffer width: paneWidth height: paneHeight.
+    methods := self methodsForClass: selectedClass.
+    selectedClass isNil ifTrue: [methods := #()].
+    self renderList: methods selectedItem: selectedMethod into: methodBuf focused: (focusedPane = 2).
+
+    "Blit the 3 panes into the main buffer"
+    self blitBuffer: catBuf into: aCellBuffer atX: 0 y: 0.
+    self blitBuffer: classBuf into: aCellBuffer atX: paneWidth y: 0.
+    self blitBuffer: methodBuf into: aCellBuffer atX: (paneWidth * 2) y: 0.
+
+    "Bottom pane: code view"
+    codeBuf := CellBuffer width: aCellBuffer width height: (aCellBuffer height - paneHeight).
+    self renderCode: codeView into: codeBuf.
+    self blitBuffer: codeBuf into: aCellBuffer atX: 0 y: paneHeight
+  ]
+
+  method: renderList: anArray selectedItem: aSelection into: aCellBuffer focused: isFocused [
+    | i itemStr normalStyle reverseStyle style |
+    normalStyle := Go::V2::Style new.
+    reverseStyle := (Go::V2::Style new) reverse: true.
+    i := 0.
+    [i < anArray size and: [i < aCellBuffer height]] whileTrue: [
+      itemStr := anArray at: i.
+      style := (itemStr = aSelection) ifTrue: [reverseStyle] ifFalse: [normalStyle].
+      aCellBuffer putString: itemStr x: 0 y: i style: style.
+      i := i + 1
+    ]
+  ]
+
+  method: renderCode: aString into: aCellBuffer [
+    | style |
+    style := Go::V2::Style new.
+    aString isNil ifTrue: [^self].
+    aCellBuffer putString: aString x: 0 y: 0 style: style
+  ]
+
+  method: blitBuffer: srcBuf into: destBuf atX: offsetX y: offsetY [
+    | row col cell |
+    row := 0.
+    [row < srcBuf height] whileTrue: [
+      col := 0.
+      [col < srcBuf width] whileTrue: [
+        cell := srcBuf cellAt: col y: row.
+        destBuf putCell: cell x: (col + offsetX) y: (row + offsetY).
+        col := col + 1
+      ].
+      row := row + 1
+    ]
+  ]
