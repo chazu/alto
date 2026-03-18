@@ -62,6 +62,10 @@ View subclass: Object
       needsRedraw := aBoolean
   ]
 
+  method: handleMouseLocalX: x y: y buttons: btn [
+      ^self
+  ]
+
   classMethod: new [
       | instance |
       instance := super new.

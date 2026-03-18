@@ -108,52 +108,50 @@ SystemBrowser subclass: View
   method: selectedMethod [ ^selectedMethod ]
   method: focusedPane [ ^focusedPane ]
 
-  method: handleEvent: evt [
-    | keyCode runeVal pos mx my btn paneWidth idx items classes methods |
+  method: handleMouseLocalX: x y: y buttons: btn [
+    | paneWidth idx catItems classes methods |
+    btn = 1 ifFalse: [^self].
+    paneWidth := 26.
+    parentWindow notNil ifTrue: [
+      paneWidth := (parentWindow frame width - 2) // 3
+    ].
 
-    "Mouse click handling"
-    (evt isKindOf: Go::V2::EventMouse) ifTrue: [
-      pos := evt position.
-      mx := pos at: 0.
-      my := pos at: 1.
-      btn := evt buttons.
-      btn = 1 ifFalse: [^self].
-      paneWidth := 80 // 3.
-
-      mx < paneWidth ifTrue: [
-        focusedPane := 0.
-        idx := my.
-        items := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
-        idx < items size ifTrue: [
-          selectedCategory := items at: idx.
-          self updateClassList
+    x < paneWidth ifTrue: [
+      focusedPane := 0.
+      idx := y.
+      catItems := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+      idx < catItems size ifTrue: [
+        selectedCategory := catItems at: idx.
+        self updateClassList
+      ]
+    ] ifFalse: [
+      x < (paneWidth * 2) ifTrue: [
+        focusedPane := 1.
+        idx := y.
+        classes := self classesForCategory: selectedCategory.
+        idx < classes size ifTrue: [
+          selectedClass := classes at: idx.
+          self updateMethodList
         ]
       ] ifFalse: [
-        mx < (paneWidth * 2) ifTrue: [
-          focusedPane := 1.
-          idx := my.
-          classes := self classesForCategory: selectedCategory.
-          idx < classes size ifTrue: [
-            selectedClass := classes at: idx.
-            self updateMethodList
+        x < (paneWidth * 3) ifTrue: [
+          focusedPane := 2.
+          idx := y.
+          methods := self methodsForClass: selectedClass.
+          idx < methods size ifTrue: [
+            selectedMethod := methods at: idx.
+            self updateCodeView
           ]
         ] ifFalse: [
-          mx < (paneWidth * 3) ifTrue: [
-            focusedPane := 2.
-            idx := my.
-            methods := self methodsForClass: selectedClass.
-            idx < methods size ifTrue: [
-              selectedMethod := methods at: idx.
-              self updateCodeView
-            ]
-          ] ifFalse: [
-            focusedPane := 3
-          ]
+          focusedPane := 3
         ]
-      ].
-      self invalidate.
-      ^self
+      ]
     ].
+    self invalidate
+  ]
+
+  method: handleEvent: evt [
+    | keyCode runeVal |
 
     (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
     keyCode := evt key.

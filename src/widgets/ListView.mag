@@ -55,24 +55,19 @@ ListView subclass: View
     ]
   ]
 
-  method: handleEvent: evt [
-    | keyCode pos my btn clickedIndex |
+  method: handleMouseLocalX: x y: y buttons: btn [
+    | clickedIndex |
+    btn = 1 ifFalse: [^self].
+    clickedIndex := scrollOffset + y.
+    (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
+      selectedIndex := clickedIndex.
+      self invalidate.
+      onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem]
+    ]
+  ]
 
-    "Mouse click-to-select"
-    (evt isKindOf: Go::V2::EventMouse) ifTrue: [
-      pos := evt position.
-      my := pos at: 1.
-      btn := evt buttons.
-      btn = 1 ifTrue: [
-        clickedIndex := scrollOffset + my.
-        (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
-          selectedIndex := clickedIndex.
-          self invalidate.
-          onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem]
-        ]
-      ].
-      ^self
-    ].
+  method: handleEvent: evt [
+    | keyCode |
 
     (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
     keyCode := evt key.
