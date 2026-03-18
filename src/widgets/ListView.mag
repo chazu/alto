@@ -1,0 +1,93 @@
+namespace: 'Alto'
+import: 'Go'
+
+ListView subclass: View
+  instanceVars: items selectedIndex scrollOffset onSelectBlock
+
+  method: initialize [
+      super initialize.
+      items := #().
+      selectedIndex := 0.
+      scrollOffset := 0.
+      onSelectBlock := nil
+  ]
+
+  method: privateItems: anArray [
+      items := anArray
+  ]
+
+  method: privateOnSelect: aBlock [
+      onSelectBlock := aBlock
+  ]
+
+  method: displayOn: aCellBuffer [
+      | visibleCount i itemIndex itemStr rowStyle |
+      visibleCount := aCellBuffer height.
+      i := 0.
+      [i < visibleCount] whileTrue: [
+        itemIndex := scrollOffset + i.
+        (itemIndex < items size) ifTrue: [
+          itemStr := items at: itemIndex + 1.
+          (itemIndex = selectedIndex) ifTrue: [
+            rowStyle := Dictionary new.
+            rowStyle at: #attrs put: #reverse
+          ] ifFalse: [
+            rowStyle := nil
+          ].
+          aCellBuffer putString: itemStr x: 0 y: i style: rowStyle
+        ].
+        i := i + 1
+      ]
+  ]
+
+  method: handleEvent: evt [
+      | key |
+      key := evt at: #key.
+      (key = #up) ifTrue: [
+        selectedIndex := selectedIndex - 1.
+        (selectedIndex < 0) ifTrue: [selectedIndex := 0].
+        (selectedIndex < scrollOffset) ifTrue: [scrollOffset := selectedIndex].
+        self invalidate
+      ].
+      (key = #down) ifTrue: [
+        selectedIndex := selectedIndex + 1.
+        (selectedIndex >= items size) ifTrue: [selectedIndex := items size - 1].
+        buffer notNil ifTrue: [
+          (selectedIndex >= (scrollOffset + buffer height)) ifTrue: [
+            scrollOffset := selectedIndex - buffer height + 1
+          ]
+        ].
+        self invalidate
+      ].
+      (key = #enter) ifTrue: [
+        onSelectBlock notNil ifTrue: [onSelectBlock value: (self selectedItem)]
+      ]
+  ]
+
+  method: selectedItem [
+      ^items at: selectedIndex + 1
+  ]
+
+  method: items: newItems [
+      items := newItems.
+      selectedIndex := 0.
+      scrollOffset := 0.
+      self invalidate
+  ]
+
+  method: selectedIndex [
+      ^selectedIndex
+  ]
+
+  method: items [
+      ^items
+  ]
+
+  classMethod: items: anArray onSelect: aBlock [
+      | instance |
+      instance := super new.
+      instance initialize.
+      instance privateItems: anArray.
+      instance privateOnSelect: aBlock.
+      ^instance
+  ]
