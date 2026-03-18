@@ -1,0 +1,107 @@
+namespace: 'Alto'
+import: 'Go'
+
+Transcript subclass: View
+  instanceVars: lines maxLines scrollOffset display parentWindow
+  classVars: Current
+
+  classMethod: new [
+      | instance |
+      instance := super new.
+      instance initialize.
+      ^instance
+  ]
+
+  classMethod: current [
+      Current isNil ifTrue: [Current := self new].
+      ^Current
+  ]
+
+  classMethod: show: aString [
+      self current appendLine: aString
+  ]
+
+  classMethod: open: aDisplay [
+      | frame transcript window |
+      frame := Rectangle x: 1 y: 22 width: 60 height: 10.
+      transcript := self current.
+      transcript display: aDisplay.
+      window := Window title: 'Transcript' content: transcript controller: transcript frame: frame.
+      transcript parentWindow: window.
+      aDisplay addWindow: window.
+      ^transcript
+  ]
+
+  method: initialize [
+      super initialize.
+      lines := Array new: 0.
+      maxLines := 1000.
+      scrollOffset := 0.
+      display := nil.
+      parentWindow := nil
+  ]
+
+  method: appendLine: aString [
+      | trimStart |
+      lines := lines copyWith: aString.
+      (lines size > maxLines) ifTrue: [
+        trimStart := lines size - maxLines + 1.
+        lines := lines copyFrom: trimStart to: lines size
+      ].
+      scrollOffset := (lines size - 1) max: 0.
+      self invalidate
+  ]
+
+  method: handleEvent: evt [
+      | key |
+      key := evt at: #key.
+      (key = #up) ifTrue: [
+        scrollOffset := (scrollOffset - 1) max: 0.
+        self invalidate
+      ].
+      (key = #down) ifTrue: [
+        scrollOffset := (scrollOffset + 1) min: ((lines size - 1) max: 0).
+        self invalidate
+      ].
+      (key = #escape) ifTrue: [
+        display notNil ifTrue: [display removeWindow: parentWindow]
+      ]
+  ]
+
+  method: displayOn: aCellBuffer [
+      | visibleHeight i lineIndex lineStr startOffset |
+      visibleHeight := aCellBuffer height.
+      startOffset := (lines size - visibleHeight) max: 0.
+      (scrollOffset < startOffset) ifTrue: [
+        startOffset := scrollOffset
+      ].
+      i := 0.
+      [i < visibleHeight] whileTrue: [
+        lineIndex := startOffset + i.
+        (lineIndex < lines size) ifTrue: [
+          lineStr := lines at: lineIndex + 1.
+          aCellBuffer putString: lineStr x: 0 y: i style: nil
+        ].
+        i := i + 1
+      ]
+  ]
+
+  method: parentWindow: aWindow [
+      parentWindow := aWindow
+  ]
+
+  method: display: aDisplay [
+      display := aDisplay
+  ]
+
+  method: lines [
+      ^lines
+  ]
+
+  method: maxLines [
+      ^maxLines
+  ]
+
+  method: scrollOffset [
+      ^scrollOffset
+  ]
