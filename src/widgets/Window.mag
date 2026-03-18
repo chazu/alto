@@ -109,26 +109,9 @@ Window subclass: Object
   ]
 
   method: handleEvent: evt [
-      | pos mx my btn |
-      (evt isKindOf: Go::V2::EventMouse) ifTrue: [
-          pos := evt position.
-          mx := (pos at: 0) - frame x.
-          my := (pos at: 1) - frame y.
-          btn := evt buttons.
-          btn = 1 ifFalse: [^self].
-          my = 0 ifTrue: [
-              mx >= (frame width - 4) ifTrue: [
-                  ^self close
-              ].
-              ^self
-          ].
-          contentController notNil ifTrue: [
-              contentController handleMouseLocalX: mx - 1 y: my - 1 buttons: btn
-          ].
-          ^self
-      ].
-      contentController isNil ifTrue: [^self].
-      contentController handleEvent: evt
+    "Delegate all events to contentController."
+    contentController isNil ifTrue: [^self].
+    contentController handleEvent: evt
   ]
 
   method: close [

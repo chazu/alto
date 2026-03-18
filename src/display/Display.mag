@@ -107,35 +107,14 @@ Display subclass: Object
 
   method: run [
     "Main event loop — render, poll, dispatch."
-    | event pos mx my i win targetWin |
+    | event |
     running := true.
     [running] whileTrue: [
       self render.
       event := screen pollEvent.
-      (event isKindOf: Go::V2::EventMouse) ifTrue: [
-        pos := event position.
-        mx := pos at: 0.
-        my := pos at: 1.
-        targetWin := nil.
-        i := windows size - 1.
-        [i >= 0] whileTrue: [
-          win := windows at: i.
-          (win frame containsPointX: mx y: my) ifTrue: [
-            targetWin := win.
-            i := -1
-          ].
-          i := i - 1
-        ].
-        targetWin notNil ifTrue: [
-          (targetWin = (windows at: windows size - 1)) ifFalse: [
-            self bringToFront: targetWin
-          ].
-          targetWin handleEvent: event
-        ]
-      ] ifFalse: [
-        windows size > 0 ifTrue: [
-          (windows at: windows size - 1) handleEvent: event
-        ]
+      "Dispatch all events to the frontmost window"
+      windows size > 0 ifTrue: [
+        (windows at: windows size - 1) handleEvent: event
       ]
     ].
     screen fini

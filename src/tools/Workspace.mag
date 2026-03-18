@@ -50,8 +50,7 @@ Workspace subclass: View
     | keyCode runeVal lineStr leftPart rightPart newLines idx |
 
     "Only handle key events"
-    (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
-
+    (evt className = 'Go::V2::EventKey') ifFalse: [^self].
     keyCode := evt key.
     runeVal := evt rune.
 
@@ -120,13 +119,13 @@ Workspace subclass: View
     ].
 
     "Arrow keys"
-    keyCode = 258 ifTrue: [  "Up"
+    keyCode = 257 ifTrue: [  "Up"
       cursorY > 0 ifTrue: [cursorY := cursorY - 1].
       lineStr := textLines at: cursorY.
       cursorX > lineStr size ifTrue: [cursorX := lineStr size].
       self updateScroll. self invalidate. ^self
     ].
-    keyCode = 259 ifTrue: [  "Down"
+    keyCode = 258 ifTrue: [  "Down"
       cursorY < (textLines size - 1) ifTrue: [cursorY := cursorY + 1].
       lineStr := textLines at: cursorY.
       cursorX > lineStr size ifTrue: [cursorX := lineStr size].
@@ -136,7 +135,7 @@ Workspace subclass: View
       cursorX > 0 ifTrue: [cursorX := cursorX - 1].
       self invalidate. ^self
     ].
-    keyCode = 261 ifTrue: [  "Right"
+    keyCode = 259 ifTrue: [  "Right"
       lineStr := textLines at: cursorY.
       cursorX < lineStr size ifTrue: [cursorX := cursorX + 1].
       self invalidate. ^self

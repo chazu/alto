@@ -69,11 +69,11 @@ ListView subclass: View
   method: handleEvent: evt [
     | keyCode |
 
-    (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
+    (evt className = 'Go::V2::EventKey') ifFalse: [^self].
     keyCode := evt key.
 
     "Up arrow"
-    keyCode = 258 ifTrue: [
+    keyCode = 257 ifTrue: [
       selectedIndex > 0 ifTrue: [selectedIndex := selectedIndex - 1].
       selectedIndex < scrollOffset ifTrue: [scrollOffset := selectedIndex].
       self invalidate.
@@ -81,7 +81,7 @@ ListView subclass: View
     ].
 
     "Down arrow"
-    keyCode = 259 ifTrue: [
+    keyCode = 258 ifTrue: [
       selectedIndex < (items size - 1) ifTrue: [selectedIndex := selectedIndex + 1].
       buffer notNil ifTrue: [
         selectedIndex >= (scrollOffset + buffer height) ifTrue: [

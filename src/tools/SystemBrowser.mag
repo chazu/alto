@@ -153,7 +153,7 @@ SystemBrowser subclass: View
   method: handleEvent: evt [
     | keyCode runeVal |
 
-    (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
+    (evt className = 'Go::V2::EventKey') ifFalse: [^self].
     keyCode := evt key.
     runeVal := evt rune.
 
@@ -171,7 +171,7 @@ SystemBrowser subclass: View
     ].
 
     "Arrow keys — delegate to focused pane"
-    (keyCode = 258 or: [keyCode = 259]) ifTrue: [
+    (keyCode = 257 or: [keyCode = 258]) ifTrue: [
       focusedPane = 0 ifTrue: [self handleCategoryArrow: keyCode].
       focusedPane = 1 ifTrue: [self handleClassArrow: keyCode].
       focusedPane = 2 ifTrue: [self handleMethodArrow: keyCode].
@@ -193,8 +193,8 @@ SystemBrowser subclass: View
     | items idx |
     items := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
     idx := self indexOfItem: selectedCategory inArray: items.
-    keyCode = 258 ifTrue: [idx := (idx - 1) max: 0].
-    keyCode = 259 ifTrue: [idx := (idx + 1) min: items size - 1].
+    keyCode = 257 ifTrue: [idx := (idx - 1) max: 0].
+    keyCode = 258 ifTrue: [idx := (idx + 1) min: items size - 1].
     selectedCategory := items at: idx.
     self updateClassList
   ]
@@ -209,8 +209,8 @@ SystemBrowser subclass: View
       ^self
     ].
     idx := self indexOfItem: selectedClass inArray: classes.
-    keyCode = 258 ifTrue: [idx := (idx - 1) max: 0].
-    keyCode = 259 ifTrue: [idx := (idx + 1) min: classes size - 1].
+    keyCode = 257 ifTrue: [idx := (idx - 1) max: 0].
+    keyCode = 258 ifTrue: [idx := (idx + 1) min: classes size - 1].
     selectedClass := classes at: idx.
     self updateMethodList
   ]
@@ -226,8 +226,8 @@ SystemBrowser subclass: View
       ^self
     ].
     idx := self indexOfItem: selectedMethod inArray: methods.
-    keyCode = 258 ifTrue: [idx := (idx - 1) max: 0].
-    keyCode = 259 ifTrue: [idx := (idx + 1) min: methods size - 1].
+    keyCode = 257 ifTrue: [idx := (idx - 1) max: 0].
+    keyCode = 258 ifTrue: [idx := (idx + 1) min: methods size - 1].
     selectedMethod := methods at: idx.
     self updateCodeView
   ]

@@ -81,7 +81,7 @@ Inspector subclass: View
 
   method: handleEvent: evt [
     | keyCode idx key val visibleHeight |
-    (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
+    (evt className = 'Go::V2::EventKey') ifFalse: [^self].
     keyCode := evt key.
 
     "Escape — close"
@@ -112,7 +112,7 @@ Inspector subclass: View
     ].
 
     "Up arrow"
-    keyCode = 258 ifTrue: [
+    keyCode = 257 ifTrue: [
       focusOnList ifTrue: [
         selectedIndex > 0 ifTrue: [
           selectedIndex := selectedIndex - 1.
@@ -127,7 +127,7 @@ Inspector subclass: View
     ].
 
     "Down arrow"
-    keyCode = 259 ifTrue: [
+    keyCode = 258 ifTrue: [
       focusOnList ifTrue: [
         fieldNames size > 0 ifTrue: [
           selectedIndex < (fieldNames size - 1) ifTrue: [

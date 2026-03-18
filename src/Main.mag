@@ -1,17 +1,14 @@
 namespace: 'Alto'
 import: 'Go'
 
-"Main — Alto entry point.
-
- Creates a Display, opens the Workspace and Transcript tools,
- then enters the display event loop."
+"Main — Alto entry point."
 
 Main subclass: Object
   classMethod: start [
     | display |
     display := Display new.
-    Workspace open: display.
     Transcript open: display.
     Transcript show: 'Alto started.'.
+    Workspace open: display.
     display run
   ]
