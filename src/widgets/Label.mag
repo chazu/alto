@@ -1,0 +1,52 @@
+namespace: 'Alto'
+import: 'Go'
+
+Label subclass: View
+  instanceVars: text style
+
+  method: initialize [
+      super initialize.
+      text := ''.
+      style := nil
+  ]
+
+  method: privateText: aString [
+      text := aString
+  ]
+
+  method: displayOn: aCellBuffer [
+      aCellBuffer putString: text x: 0 y: 0 style: style
+  ]
+
+  method: text: newText [
+      text := newText.
+      self invalidate
+  ]
+
+  method: text [
+      ^text
+  ]
+
+  method: style: aStyle [
+      style := aStyle.
+      self invalidate
+  ]
+
+  method: style [
+      ^style
+  ]
+
+  classMethod: new [
+      | instance |
+      instance := super new.
+      instance initialize.
+      ^instance
+  ]
+
+  classMethod: text: aString [
+      | instance |
+      instance := super new.
+      instance initialize.
+      instance privateText: aString.
+      ^instance
+  ]
