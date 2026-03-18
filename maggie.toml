@@ -1,0 +1,11 @@
+[project]
+name = "alto"
+namespace = "Alto"
+version = "0.1.0"
+
+[source]
+dirs = ["src"]
+entry = "Main.start"
+
+[go-wrap]
+packages = ["github.com/gdamore/tcell/v2"]
