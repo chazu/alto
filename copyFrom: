@@ -1,0 +1,73 @@
+String (subclass of Object)
+
+An immutable sequence of characters.
+
+Strings are created with single-quote literals: 'hello'. Concatenate
+with the comma operator. Compare with =, <, >, <=, >=. Indices are
+0-based.
+
+```test
+'hello' size >>> 5
+'hello', ' world' >>> 'hello world'
+'hello' at: 0 >>> $h
+```
+
+```example
+"Build a greeting"
+name := 'Maggie'.
+'Hello, ', name, '!'
+```
+
+Instance methods:
+  =
+  >
+  asFloat
+  printString
+  println
+  isLetter
+  isAlphanumeric
+  >=
+  primEquals:
+  isWhitespace
+  asLowercase
+  splitRegex:
+  primSize
+  primConcat:
+  primAsSymbol
+  primCopyFrom:to:
+  primIsWhitespace
+  primTrimBoth
+  isDigit
+  indexOf:
+  asSymbol
+  primAt:
+  primIncludes:
+  primAsUppercase
+  primIsLetter
+  primDo:
+  at:
+  do:
+  <=
+  asString
+  primLessThan:
+  primIndexOf:
+  isEmpty
+  asUppercase
+  split:
+  ,
+  size
+  primIsDigit
+  print
+  primSplit:
+  notEmpty
+  copyFrom:to:
+  startsWith:
+  replaceAll:with:
+  <
+  primAsLowercase
+  asInteger
+  includes:
+  trimBoth
+  matchesRegex:
+  copyFrom:
+  endsWith:
