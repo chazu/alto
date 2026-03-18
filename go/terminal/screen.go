@@ -64,19 +64,19 @@ func (s *Screen) PostEvent(ev tcell.Event) {
 }
 
 // SetContent sets a cell at x,y with the given rune and style.
-func (s *Screen) SetContent(x, y int, mainc rune, style tcell.Style) {
-	s.screen.SetContent(x, y, mainc, nil, style)
+func (s *Screen) SetContent(x, y int, mainc rune, style *Style) {
+	s.screen.SetContent(x, y, mainc, nil, style.S)
 }
 
 // GetContent returns the rune and style at x,y.
-func (s *Screen) GetContent(x, y int) (rune, tcell.Style) {
+func (s *Screen) GetContent(x, y int) (rune, *Style) {
 	mainc, _, style, _ := s.screen.GetContent(x, y)
-	return mainc, style
+	return mainc, &Style{S: style}
 }
 
 // SetStyle sets the default style for the screen.
-func (s *Screen) SetStyle(style tcell.Style) {
-	s.screen.SetStyle(style)
+func (s *Screen) SetStyle(style *Style) {
+	s.screen.SetStyle(style.S)
 }
 
 // EnableMouse enables mouse event reporting.
@@ -105,8 +105,8 @@ func (s *Screen) HasMouse() bool {
 }
 
 // Fill fills the entire screen with the given rune and style.
-func (s *Screen) Fill(r rune, style tcell.Style) {
-	s.screen.Fill(r, style)
+func (s *Screen) Fill(r rune, style *Style) {
+	s.screen.Fill(r, style.S)
 }
 
 // SetCursorStyle sets the cursor style.
@@ -124,12 +124,12 @@ func (s *Screen) HideCursor() {
 	s.screen.HideCursor()
 }
 
-// DefaultStyle returns the default (zero-value) tcell Style.
-func DefaultStyle() tcell.Style {
-	return tcell.StyleDefault
+// DefaultStyle returns the default (zero-value) Style.
+func DefaultStyle() *Style {
+	return &Style{S: tcell.StyleDefault}
 }
 
 // NewStyle returns a fresh default Style (same as DefaultStyle).
-func NewStyle() tcell.Style {
-	return tcell.StyleDefault
+func NewStyle() *Style {
+	return NewWrappedStyle()
 }

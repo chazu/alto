@@ -5,6 +5,7 @@ Terminal subclass: Object
   classMethod: defaultStyle [ <primitive> ]
   classMethod: newScreen [ <primitive> ]
   classMethod: newStyle [ <primitive> ]
+  classMethod: newWrappedStyle [ <primitive> ]
 
 Screen subclass: Object
   method: clear [ <primitive> ]
@@ -27,4 +28,12 @@ Screen subclass: Object
   method: showCursor: x _: y [ <primitive> ]
   method: size [ <primitive> ]
   method: sync [ <primitive> ]
+
+Style subclass: Object
+  method: background: c [ <primitive> ]
+  method: bold: on [ <primitive> ]
+  method: dim: on [ <primitive> ]
+  method: foreground: c [ <primitive> ]
+  method: italic: on [ <primitive> ]
+  method: reverse: on [ <primitive> ]
 
