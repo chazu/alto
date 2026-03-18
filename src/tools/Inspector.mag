@@ -1,0 +1,193 @@
+namespace: 'Alto'
+import: 'Go'
+
+Inspector subclass: View
+  instanceVars: target fieldNames fieldValues selectedIndex scrollOffset valueView display parentWindow focusOnList
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  classMethod: open: anObject on: aDisplay [
+    | frame inspector window keys vals i key |
+    frame := Rectangle x: 1 y: 1 width: 60 height: 20.
+    inspector := Inspector new.
+    inspector privateTarget: anObject.
+    keys := Array new: 0.
+    vals := Array new: 0.
+    (anObject isKindOf: Dictionary) ifTrue: [
+      i := 0.
+      [i < anObject keys size] whileTrue: [
+        key := anObject keys at: i.
+        keys := keys copyWith: key.
+        vals := vals copyWith: (anObject at: key) printString.
+        i := i + 1
+      ]
+    ].
+    inspector privateFieldNames: keys.
+    inspector privateFieldValues: vals.
+    inspector privateValueView: (Label text: '').
+    window := Window title: ('Inspector: ', anObject class name) content: inspector controller: inspector frame: frame.
+    inspector parentWindow: window.
+    inspector display: aDisplay.
+    aDisplay addWindow: window.
+    keys size > 0 ifTrue: [
+      inspector valueView text: (vals at: 0)
+    ].
+    ^inspector
+  ]
+
+  method: initialize [
+    super initialize.
+    target := nil.
+    fieldNames := Array new: 0.
+    fieldValues := Array new: 0.
+    selectedIndex := 0.
+    scrollOffset := 0.
+    valueView := nil.
+    display := nil.
+    parentWindow := nil.
+    focusOnList := true
+  ]
+
+  method: privateTarget: anObject [ target := anObject ]
+  method: privateFieldNames: anArray [ fieldNames := anArray ]
+  method: privateFieldValues: anArray [ fieldValues := anArray ]
+  method: privateValueView: aView [ valueView := aView ]
+  method: parentWindow: aWindow [ parentWindow := aWindow ]
+  method: display: aDisplay [ display := aDisplay ]
+  method: target [ ^target ]
+  method: fieldNames [ ^fieldNames ]
+  method: fieldValues [ ^fieldValues ]
+  method: selectedIndex [ ^selectedIndex ]
+  method: scrollOffset [ ^scrollOffset ]
+  method: valueView [ ^valueView ]
+  method: parentWindow [ ^parentWindow ]
+  method: focusOnList [ ^focusOnList ]
+
+  method: onFieldSelected: item [
+    | idx |
+    idx := selectedIndex.
+    idx < fieldValues size ifTrue: [
+      valueView text: (fieldValues at: idx)
+    ].
+    self invalidate
+  ]
+
+  method: handleEvent: evt [
+    | keyCode idx key val |
+    (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
+    keyCode := evt key.
+
+    "Escape — close"
+    keyCode = 27 ifTrue: [
+      display notNil ifTrue: [display removeWindow: parentWindow].
+      ^self
+    ].
+
+    "Tab — toggle focus"
+    keyCode = 9 ifTrue: [
+      focusOnList := focusOnList not.
+      self invalidate.
+      ^self
+    ].
+
+    "Enter — drill down into Dictionary value"
+    keyCode = 13 ifTrue: [
+      focusOnList ifTrue: [
+        selectedIndex < fieldValues size ifTrue: [
+          key := fieldNames at: selectedIndex.
+          val := target at: key.
+          (val isKindOf: Dictionary) ifTrue: [
+            Inspector open: val on: display
+          ]
+        ]
+      ].
+      ^self
+    ].
+
+    "Up arrow"
+    keyCode = 258 ifTrue: [
+      focusOnList ifTrue: [
+        selectedIndex > 0 ifTrue: [
+          selectedIndex := selectedIndex - 1.
+          selectedIndex < fieldValues size ifTrue: [
+            valueView text: (fieldValues at: selectedIndex)
+          ].
+          self invalidate
+        ]
+      ].
+      ^self
+    ].
+
+    "Down arrow"
+    keyCode = 259 ifTrue: [
+      focusOnList ifTrue: [
+        fieldNames size > 0 ifTrue: [
+          selectedIndex < (fieldNames size - 1) ifTrue: [
+            selectedIndex := selectedIndex + 1.
+            selectedIndex < fieldValues size ifTrue: [
+              valueView text: (fieldValues at: selectedIndex)
+            ].
+            self invalidate
+          ]
+        ]
+      ].
+      ^self
+    ]
+  ]
+
+  method: displayOn: aCellBuffer [
+    | listWidth visibleCount i itemIndex fieldStr valStr idx style normalStyle reverseStyle bufWidth bufHeight j charCode |
+    listWidth := 20.
+    normalStyle := Go::V2::Style new.
+    reverseStyle := (Go::V2::Style new) reverse: true.
+    bufWidth := aCellBuffer width.
+    bufHeight := aCellBuffer height.
+
+    "Draw vertical separator"
+    i := 0.
+    [i < bufHeight] whileTrue: [
+      aCellBuffer putChar: 9474 x: listWidth y: i style: normalStyle.
+      i := i + 1
+    ].
+
+    "Left pane: field names with selection highlight"
+    visibleCount := bufHeight.
+    i := 0.
+    [i < visibleCount] whileTrue: [
+      itemIndex := scrollOffset + i.
+      itemIndex < fieldNames size ifTrue: [
+        fieldStr := fieldNames at: itemIndex.
+        style := (itemIndex = selectedIndex and: [focusOnList])
+          ifTrue: [reverseStyle]
+          ifFalse: [normalStyle].
+        j := 0.
+        [j < fieldStr size and: [j < listWidth]] whileTrue: [
+          charCode := (fieldStr at: j) value.
+          aCellBuffer putChar: charCode x: j y: i style: style.
+          j := j + 1
+        ].
+        "Fill remaining width with style for selection bar"
+        [j < listWidth] whileTrue: [
+          aCellBuffer putChar: 32 x: j y: i style: style.
+          j := j + 1
+        ]
+      ].
+      i := i + 1
+    ].
+
+    "Right pane: selected value text"
+    selectedIndex < fieldValues size ifTrue: [
+      valStr := fieldValues at: selectedIndex.
+      j := 0.
+      [j < valStr size and: [j + listWidth + 1 < bufWidth]] whileTrue: [
+        charCode := (valStr at: j) value.
+        aCellBuffer putChar: charCode x: j + listWidth + 1 y: 0 style: normalStyle.
+        j := j + 1
+      ]
+    ]
+  ]
