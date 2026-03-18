@@ -186,7 +186,7 @@ Workspace subclass: View
           lineStr := textLines at: cursorY + 1.
           leftPart := lineStr copyFrom: 1 to: cursorX.
           rightPart := lineStr copyFrom: cursorX + 1 to: lineStr size.
-          textLines at: cursorY + 1 put: leftPart , (String with: ch) , rightPart.
+          textLines at: cursorY + 1 put: leftPart , ch asString , rightPart.
           cursorX := cursorX + 1.
           self updateScroll.
           self invalidate.
@@ -215,7 +215,8 @@ Workspace subclass: View
       visibleHeight := aCellBuffer height.
       reverseStyle := Dictionary new.
       reverseStyle at: #attrs put: #reverse.
-      normalStyle := nil.
+      normalStyle := Dictionary new.
+      normalStyle at: #attrs put: nil.
 
       "Handle empty buffer — show cursor at origin"
       textLines size = 0 ifTrue: [
