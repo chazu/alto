@@ -1,0 +1,241 @@
+"Window Widget — Comprehensive test suite.
+ Tests construction, rendering, event handling, and protocol."
+
+"Mock controller that records handleEvent: calls."
+MockController subclass: Object
+  instanceVars: events
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance init.
+    ^ instance
+  ]
+
+  method: init [
+    events := Array new
+  ]
+
+  method: handleEvent: evt [
+    events := events copyWith: evt
+  ]
+
+  method: events [
+    ^ events
+  ]
+
+  method: eventCount [
+    ^ events size
+  ]
+
+"Simple test runner."
+T subclass: Object
+  instanceVars: passed failed failures
+
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^ r
+  ]
+
+  method: init [
+    passed := 0.
+    failed := 0.
+    failures := Array new
+  ]
+
+  method: assert: condition message: msg [
+    condition ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg) println
+    ]
+  ]
+
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg, ' (got: ', actual printString, ' expected: ', expected printString, ')') println
+    ]
+  ]
+
+  method: report [
+    '=== Test Results ===' println.
+    ('Passed: ', passed printString) println.
+    ('Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [
+      'Failures:' println.
+      failures do: [:f | ('  - ', f) println]
+    ].
+    (failed = 0)
+      ifTrue: [ 'ALL TESTS PASSED' println ]
+      ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+
+  method: failed [
+    ^ failed
+  ]
+
+"=== CONSTRUCTION TESTS ==="
+WindowConstructionTests subclass: Object
+
+  classMethod: run: t [
+    | frame view ctrl win win2 buf |
+    '--- Window Construction Tests ---' println.
+
+    frame := Alto::Rectangle x: 0 y: 0 width: 20 height: 10.
+    view := Alto::View new.
+    ctrl := Alto::Controller new.
+    win := Alto::Window title: 'Test' content: view controller: ctrl frame: frame.
+
+    "1. Window title:content:controller:frame: creates non-nil instance"
+    t assert: (win notNil) message: 'W1: Window title:content:controller:frame: returns non-nil'.
+
+    "2. title accessor returns the title string"
+    t assertEqual: (win title) to: 'Test' message: 'W2: title accessor returns title string'.
+
+    "3. frame accessor returns the Rectangle"
+    t assertEqual: (win frame) to: frame message: 'W3: frame accessor returns the Rectangle'.
+
+    "4. buffer accessor returns a non-nil CellBuffer"
+    buf := win buffer.
+    t assert: (buf notNil) message: 'W4: buffer accessor returns non-nil CellBuffer'.
+
+    "5. buffer dimensions match frame dimensions"
+    t assertEqual: (buf width) to: 20 message: 'W5: buffer width matches frame width'.
+    t assertEqual: (buf height) to: 10 message: 'W6: buffer height matches frame height'.
+
+    "6. contentView accessor returns the provided view"
+    t assertEqual: (win contentView) to: view message: 'W7: contentView returns provided view'.
+
+    "7. contentController accessor returns the provided controller"
+    t assertEqual: (win contentController) to: ctrl message: 'W8: contentController returns provided controller'.
+
+    "8. Window new creates instance with defaults"
+    win2 := Alto::Window new.
+    t assert: (win2 notNil) message: 'W9: Window new returns non-nil'.
+    t assertEqual: (win2 contentView) to: nil message: 'W10: Window new contentView is nil'.
+    t assertEqual: (win2 frame) to: nil message: 'W11: Window new frame is nil'.
+    t assertEqual: (win2 contentController) to: nil message: 'W12: Window new contentController is nil'.
+    t assertEqual: (win2 title) to: nil message: 'W13: Window new title is nil'.
+  ]
+
+"=== RENDERING TESTS ==="
+WindowRenderingTests subclass: Object
+
+  classMethod: run: t [
+    | frame win buf cell w h cell2 cell3 cell4 cell5 cell6 cell7 cellCb cellCx cellCe cellTh cellTi |
+    '--- Window Rendering Tests ---' println.
+
+    w := 20.
+    h := 10.
+    frame := Alto::Rectangle x: 0 y: 0 width: w height: h.
+    win := Alto::Window title: 'Hi' content: nil controller: nil frame: frame.
+    win draw.
+    buf := win buffer.
+
+    "1. After draw, buffer is not nil"
+    t assert: (buf notNil) message: 'R1: after draw buffer is not nil'.
+
+    "2. Top-left corner has char 9484"
+    cell := buf cellAt: 0 y: 0.
+    t assertEqual: (cell at: #char) to: 9484 message: 'R2: top-left corner char is 9484'.
+
+    "3. Top-right corner has char 9488"
+    cell2 := buf cellAt: (w - 1) y: 0.
+    t assertEqual: (cell2 at: #char) to: 9488 message: 'R3: top-right corner char is 9488'.
+
+    "4. Bottom-left corner has char 9492"
+    cell3 := buf cellAt: 0 y: (h - 1).
+    t assertEqual: (cell3 at: #char) to: 9492 message: 'R4: bottom-left corner char is 9492'.
+
+    "5. Bottom-right corner has char 9496"
+    cell4 := buf cellAt: (w - 1) y: (h - 1).
+    t assertEqual: (cell4 at: #char) to: 9496 message: 'R5: bottom-right corner char is 9496'.
+
+    "6. Top edge (between corners) has char 9472 (horizontal line)"
+    cell5 := buf cellAt: 5 y: 0.
+    t assertEqual: (cell5 at: #char) to: 9472 message: 'R6: top edge char is 9472 horizontal line'.
+
+    "7. Left edge (between corners) has char 9474 (vertical line)"
+    cell6 := buf cellAt: 0 y: 3.
+    t assertEqual: (cell6 at: #char) to: 9474 message: 'R7: left edge char is 9474 vertical line'.
+
+    "8. Close box [X] chars at expected positions on title bar row"
+    cellCb := buf cellAt: (w - 4) y: 1.
+    t assertEqual: (cellCb at: #char) to: 91 message: 'R8a: close box [ at (w-4, 1) is 91'.
+
+    cellCx := buf cellAt: (w - 3) y: 1.
+    t assertEqual: (cellCx at: #char) to: 88 message: 'R8b: close box X at (w-3, 1) is 88'.
+
+    cellCe := buf cellAt: (w - 2) y: 1.
+    t assertEqual: (cellCe at: #char) to: 93 message: 'R8c: close box ] at (w-2, 1) is 93'.
+
+    "9. Title text chars at expected positions (x=1, y=1)"
+    cellTh := buf cellAt: 1 y: 1.
+    t assertEqual: (cellTh at: #char) to: 72 message: 'R9a: title H at (1,1) is 72'.
+
+    cellTi := buf cellAt: 2 y: 1.
+    t assertEqual: (cellTi at: #char) to: 105 message: 'R9b: title i at (2,1) is 105'.
+  ]
+
+"=== EVENT HANDLING TESTS ==="
+WindowEventTests subclass: Object
+
+  classMethod: run: t [
+    | frame win1 mock win2 |
+    '--- Window Event Handling Tests ---' println.
+
+    "1. handleEvent: with nil controller does not crash"
+    frame := Alto::Rectangle x: 0 y: 0 width: 10 height: 5.
+    win1 := Alto::Window title: 'Evt' content: nil controller: nil frame: frame.
+    win1 handleEvent: #click.
+    t assert: true message: 'E1: handleEvent with nil controller does not crash'.
+
+    "2. handleEvent: delegates to contentController"
+    mock := MockController new.
+    win2 := Alto::Window title: 'Evt' content: nil controller: mock frame: frame.
+    win2 handleEvent: #mouseDown.
+    win2 handleEvent: #keyPress.
+    t assertEqual: (mock eventCount) to: 2 message: 'E2: handleEvent delegates to contentController'.
+    t assertEqual: (mock events first) to: #mouseDown message: 'E3: first event is mouseDown'.
+    t assertEqual: (mock events last) to: #keyPress message: 'E4: second event is keyPress'.
+  ]
+
+"=== PROTOCOL TESTS ==="
+WindowProtocolTests subclass: Object
+
+  classMethod: run: t [
+    | frame win buf |
+    '--- Window Protocol Tests ---' println.
+
+    frame := Alto::Rectangle x: 0 y: 0 width: 15 height: 8.
+    win := Alto::Window title: 'Proto' content: nil controller: nil frame: frame.
+
+    "1. buffer returns CellBuffer (same one set during construction)"
+    buf := win buffer.
+    t assert: (buf notNil) message: 'P1: buffer returns non-nil CellBuffer'.
+    t assertEqual: (win buffer) to: buf message: 'P2: buffer returns same CellBuffer instance'.
+
+    "2. frame returns Rectangle (same one set during construction)"
+    t assertEqual: (win frame) to: frame message: 'P3: frame returns same Rectangle instance'.
+  ]
+
+"=== MAIN RUNNER ==="
+WindowTests subclass: Object
+  classMethod: run [
+    | t |
+    t := T new.
+    WindowConstructionTests run: t.
+    WindowRenderingTests run: t.
+    WindowEventTests run: t.
+    WindowProtocolTests run: t.
+    t report.
+    ^ t failed
+  ]
