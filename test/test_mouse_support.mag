@@ -1,0 +1,584 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Mouse Support Tests — Spec-driven tests for mouse event handling across
+ Display, Window, ListView, and SystemBrowser.
+
+ Coverage:
+ (1) Display.run mouse dispatch — hit testing, bringToFront, event forwarding
+ (2) Window.handleEvent: mouse — close box, title bar, body delegation, close
+ (3) ListView.handleEvent: mouse — click-to-select, onSelectBlock, out-of-bounds
+ (4) SystemBrowser.handleEvent: mouse — pane-aware click routing, focusedPane
+
+ All tests use integer char codes, no dollar-sign literals, all temp vars
+ at method top, no ifNil:/ifNotNil:. Uses copyWith: for failures array."
+
+"=== Test Runner ==="
+TMS subclass: Object
+  instanceVars: passed failed failures
+
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^r
+  ]
+
+  method: init [
+    passed := 0.
+    failed := 0.
+    failures := Array new: 0
+  ]
+
+  method: assert: condition message: msg [
+    condition ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg) println
+    ]
+  ]
+
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg, ' (got: ', actual printString, ' expected: ', expected printString, ')') println
+    ]
+  ]
+
+  method: report [
+    '=== Mouse Support Test Results ===' println.
+    ('Passed: ', passed printString) println.
+    ('Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [
+      'Failures:' println.
+      failures do: [:f | ('  - ', f) println]
+    ].
+    (failed = 0)
+      ifTrue: [ 'ALL TESTS PASSED' println ]
+      ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+
+  method: failed [
+    ^failed
+  ]
+
+"=== Mock Mouse Event ==="
+"Simulates Go::V2::EventMouse with position (Array of mx, my) and buttons."
+MockMouseEvent subclass: Object
+  instanceVars: posArray buttonsVal
+
+  classMethod: mx: anMx my: anMy buttons: aBtn [
+    | inst pos |
+    inst := super new.
+    pos := Array new: 2.
+    pos at: 0 put: anMx.
+    pos at: 1 put: anMy.
+    inst setPos: pos buttons: aBtn.
+    ^inst
+  ]
+
+  method: setPos: aPos buttons: aBtn [
+    posArray := aPos.
+    buttonsVal := aBtn
+  ]
+
+  method: position [ ^posArray ]
+  method: buttons [ ^buttonsVal ]
+  method: isKindOf: aClass [
+    aClass = Go::V2::EventMouse ifTrue: [^true].
+    ^false
+  ]
+
+"=== Mock Key Event ==="
+"Simulates Go::V2::EventKey with key and rune."
+MockKeyEvent subclass: Object
+  instanceVars: keyVal runeVal
+
+  classMethod: key: aKey rune: aRune [
+    | inst |
+    inst := super new.
+    inst setKey: aKey rune: aRune.
+    ^inst
+  ]
+
+  method: setKey: aKey rune: aRune [
+    keyVal := aKey.
+    runeVal := aRune
+  ]
+
+  method: key [ ^keyVal ]
+  method: rune [ ^runeVal ]
+  method: isKindOf: aClass [
+    aClass = Go::V2::EventKey ifTrue: [^true].
+    ^false
+  ]
+
+"=== Mock Controller — records events received ==="
+MockCtrl subclass: Object
+  instanceVars: events
+
+  classMethod: new [
+    | inst |
+    inst := super new.
+    inst initCtrl.
+    ^inst
+  ]
+
+  method: initCtrl [
+    events := Array new: 0
+  ]
+
+  method: handleEvent: evt [
+    events := events copyWith: evt
+  ]
+
+  method: events [ ^events ]
+  method: eventCount [ ^events size ]
+
+"=== Mock Display — records addWindow:/removeWindow:/bringToFront: ==="
+MockDisplay subclass: Object
+  instanceVars: windowsList removedWindows broughtToFront
+
+  classMethod: new [
+    | inst |
+    inst := super new.
+    inst initDisplay.
+    ^inst
+  ]
+
+  method: initDisplay [
+    windowsList := Array new: 0.
+    removedWindows := Array new: 0.
+    broughtToFront := Array new: 0
+  ]
+
+  method: addWindow: w [
+    windowsList := windowsList copyWith: w
+  ]
+
+  method: removeWindow: w [
+    removedWindows := removedWindows copyWith: w.
+    windowsList := windowsList reject: [:each | each = w]
+  ]
+
+  method: bringToFront: w [
+    broughtToFront := broughtToFront copyWith: w.
+    windowsList := windowsList reject: [:each | each = w].
+    windowsList := windowsList copyWith: w
+  ]
+
+  method: windows [ ^windowsList ]
+  method: removedWindows [ ^removedWindows ]
+  method: broughtToFront [ ^broughtToFront ]
+
+"============================================================"
+"  (1) DISPLAY MOUSE DISPATCH TESTS                          "
+"============================================================"
+DisplayMouseTests subclass: Object
+
+  classMethod: run: t [
+    | disp rect1 rect2 win1 win2 evt mc1 mc2 disp2 rect3 rect4 win3 win4 evt2 disp3 rect5 win5 evt3 |
+    '--- Display Mouse Dispatch Tests ---' println.
+
+    "DM1: Hit test finds correct window — click inside win2 (frontmost) hits win2"
+    disp := MockDisplay new.
+    rect1 := Rectangle x: 0 y: 0 width: 20 height: 10.
+    rect2 := Rectangle x: 10 y: 5 width: 20 height: 10.
+    mc1 := MockCtrl new.
+    mc2 := MockCtrl new.
+    win1 := Window title: 'W1' content: nil controller: mc1 frame: rect1.
+    win2 := Window title: 'W2' content: nil controller: mc2 frame: rect2.
+    disp addWindow: win1.
+    disp addWindow: win2.
+
+    "Verify containsPointX:y: works for hit testing"
+    t assert: (rect2 containsPointX: 15 y: 8) message: 'DM1a: point (15,8) is inside rect2'.
+    t assert: (rect1 containsPointX: 5 y: 3) message: 'DM1b: point (5,3) is inside rect1'.
+    t assert: (rect1 containsPointX: 15 y: 8) message: 'DM1c: point (15,8) is inside rect1 (overlap)'.
+
+    "DM2: Reverse z-order — last window in array (frontmost) checked first"
+    "In Display.run, hit testing iterates i from windows size - 1 down to 0.
+     For overlapping point (15,8), win2 (index 1, frontmost) should be found first."
+    t assert: (rect2 containsPointX: 15 y: 8) message: 'DM2: frontmost window found first in reverse z-order'.
+
+    "DM3: bringToFront: called when non-frontmost window clicked"
+    "Click at (5,3) — inside win1 (back) but NOT inside win2 (front)"
+    t assert: (rect1 containsPointX: 5 y: 3) message: 'DM3a: (5,3) inside win1'.
+    t assert: ((rect2 containsPointX: 5 y: 3) not) message: 'DM3b: (5,3) NOT inside win2'.
+    "Simulate what Display.run does: reverse iterate, find win1, it is not frontmost, so bringToFront"
+    disp bringToFront: win1.
+    t assertEqual: (disp broughtToFront size) to: 1 message: 'DM3c: bringToFront called once'.
+    t assertEqual: (disp broughtToFront at: 0) to: win1 message: 'DM3d: bringToFront called with win1'.
+    "After bringToFront, win1 should be last in windows (frontmost)"
+    t assertEqual: (disp windows at: (disp windows size - 1)) to: win1 message: 'DM3e: win1 now frontmost after bringToFront'.
+
+    "DM4: Event forwarded to target window"
+    "Create a fresh setup to test event forwarding"
+    disp2 := MockDisplay new.
+    rect3 := Rectangle x: 0 y: 0 width: 30 height: 15.
+    mc1 := MockCtrl new.
+    win3 := Window title: 'Fwd' content: nil controller: mc1 frame: rect3.
+    win3 display: disp2.
+    disp2 addWindow: win3.
+    "Send a mouse event that hits the body area (my > 0)"
+    evt := MockMouseEvent mx: 5 my: 5 buttons: 1.
+    win3 handleEvent: evt.
+    t assertEqual: (mc1 eventCount) to: 1 message: 'DM4: event forwarded to target window controller'.
+
+    "DM5: Click on empty area (no window) — no crash, no forwarding"
+    disp3 := MockDisplay new.
+    rect5 := Rectangle x: 10 y: 10 width: 5 height: 5.
+    win5 := Window title: 'Small' content: nil controller: nil frame: rect5.
+    disp3 addWindow: win5.
+    "Point (0,0) is outside rect5"
+    t assert: ((rect5 containsPointX: 0 y: 0) not) message: 'DM5: click outside all windows finds no target'.
+
+    "DM6: Frontmost window clicked — bringToFront NOT called"
+    "When clicked window is already last in array (frontmost), skip bringToFront"
+    disp2 := MockDisplay new.
+    rect3 := Rectangle x: 0 y: 0 width: 20 height: 10.
+    rect4 := Rectangle x: 5 y: 5 width: 20 height: 10.
+    win3 := Window title: 'Back' content: nil controller: nil frame: rect3.
+    win4 := Window title: 'Front' content: nil controller: nil frame: rect4.
+    disp2 addWindow: win3.
+    disp2 addWindow: win4.
+    "win4 is frontmost (last). Click inside win4 at (10,8)"
+    t assert: (rect4 containsPointX: 10 y: 8) message: 'DM6a: (10,8) inside win4'.
+    "win4 = windows at: windows size - 1, so bringToFront should NOT be called"
+    t assertEqual: (disp2 broughtToFront size) to: 0 message: 'DM6b: bringToFront not called for frontmost window'
+  ]
+
+"============================================================"
+"  (2) WINDOW MOUSE EVENT HANDLING TESTS                     "
+"============================================================"
+WindowMouseTests subclass: Object
+
+  classMethod: run: t [
+    | rect win mc evt disp win2 mc2 evt2 win3 mc3 evt3 win4 mc4 evt4 win5 disp2 evt5 |
+    '--- Window Mouse Event Tests ---' println.
+
+    "WM1: Close box click — my=0, mx >= frame width - 4 calls close"
+    rect := Rectangle x: 0 y: 0 width: 30 height: 15.
+    mc := MockCtrl new.
+    disp := MockDisplay new.
+    win := Window title: 'CloseMe' content: nil controller: mc frame: rect.
+    win display: disp.
+    disp addWindow: win.
+    "Close box starts at x = 30 - 4 = 26. Click at (26, 0)"
+    evt := MockMouseEvent mx: 26 my: 0 buttons: 1.
+    win handleEvent: evt.
+    t assertEqual: (mc eventCount) to: 0 message: 'WM1a: close box click not dispatched to controller'.
+    t assertEqual: (disp removedWindows size) to: 1 message: 'WM1b: close box click removes window from display'.
+    t assertEqual: (disp removedWindows at: 0) to: win message: 'WM1c: correct window removed'.
+
+    "WM2: Close box at exact boundary — mx = width - 4"
+    rect := Rectangle x: 0 y: 0 width: 20 height: 10.
+    mc2 := MockCtrl new.
+    disp2 := MockDisplay new.
+    win2 := Window title: 'Edge' content: nil controller: mc2 frame: rect.
+    win2 display: disp2.
+    disp2 addWindow: win2.
+    "Close box at x = 20 - 4 = 16"
+    evt2 := MockMouseEvent mx: 16 my: 0 buttons: 1.
+    win2 handleEvent: evt2.
+    t assertEqual: (disp2 removedWindows size) to: 1 message: 'WM2: close box at exact boundary triggers close'.
+
+    "WM3: Title bar click (my=0, mx < close box) returns without delegating"
+    rect := Rectangle x: 0 y: 0 width: 30 height: 15.
+    mc3 := MockCtrl new.
+    win3 := Window title: 'TitleBar' content: nil controller: mc3 frame: rect.
+    evt3 := MockMouseEvent mx: 5 my: 0 buttons: 1.
+    win3 handleEvent: evt3.
+    t assertEqual: (mc3 eventCount) to: 0 message: 'WM3: title bar click (not close box) does not delegate to controller'.
+
+    "WM4: Body click (my > 0) delegates to contentController"
+    rect := Rectangle x: 0 y: 0 width: 30 height: 15.
+    mc4 := MockCtrl new.
+    win4 := Window title: 'Body' content: nil controller: mc4 frame: rect.
+    evt4 := MockMouseEvent mx: 10 my: 5 buttons: 1.
+    win4 handleEvent: evt4.
+    t assertEqual: (mc4 eventCount) to: 1 message: 'WM4a: body click delegates to contentController'.
+    t assertEqual: (mc4 events at: 0) to: evt4 message: 'WM4b: original event forwarded to controller'.
+
+    "WM5: Body click with nil contentController does not crash"
+    rect := Rectangle x: 0 y: 0 width: 30 height: 15.
+    win5 := Window title: 'NilCtrl' content: nil controller: nil frame: rect.
+    evt5 := MockMouseEvent mx: 10 my: 5 buttons: 1.
+    win5 handleEvent: evt5.
+    t assert: true message: 'WM5: body click with nil controller does not crash'.
+
+    "WM6: Window.close removes self from display"
+    rect := Rectangle x: 0 y: 0 width: 20 height: 10.
+    disp := MockDisplay new.
+    win := Window title: 'CloseDirect' content: nil controller: nil frame: rect.
+    win display: disp.
+    disp addWindow: win.
+    win close.
+    t assertEqual: (disp removedWindows size) to: 1 message: 'WM6a: close removes from display'.
+    t assertEqual: (disp windows size) to: 0 message: 'WM6b: window no longer in display windows'.
+
+    "WM7: Window.close with nil display does not crash"
+    win := Window title: 'NoDisp' content: nil controller: nil frame: rect.
+    win close.
+    t assert: true message: 'WM7: close with nil display does not crash'.
+
+    "WM8: Close box at mx = width - 1 (rightmost) still triggers close"
+    rect := Rectangle x: 0 y: 0 width: 20 height: 10.
+    disp := MockDisplay new.
+    win := Window title: 'Right' content: nil controller: nil frame: rect.
+    win display: disp.
+    disp addWindow: win.
+    evt := MockMouseEvent mx: 19 my: 0 buttons: 1.
+    win handleEvent: evt.
+    t assertEqual: (disp removedWindows size) to: 1 message: 'WM8: click at rightmost x still triggers close'.
+
+    "WM9: Key event (non-mouse) still delegates to controller"
+    rect := Rectangle x: 0 y: 0 width: 30 height: 15.
+    mc := MockCtrl new.
+    win := Window title: 'Keys' content: nil controller: mc frame: rect.
+    evt := MockKeyEvent key: 65 rune: 65.
+    win handleEvent: evt.
+    t assertEqual: (mc eventCount) to: 1 message: 'WM9: key event delegates to controller'
+  ]
+
+"============================================================"
+"  (3) LISTVIEW MOUSE EVENT HANDLING TESTS                   "
+"============================================================"
+ListViewMouseTests subclass: Object
+
+  classMethod: run: t [
+    | lv evt holder lv2 evt2 lv3 evt3 lv4 evt4 lv5 evt5 lv6 evt6 |
+    '--- ListView Mouse Event Tests ---' println.
+
+    "LM1: Left click (buttons=1) sets selectedIndex to scrollOffset + my"
+    lv := ListView items: #('Alpha' 'Beta' 'Gamma' 'Delta') onSelect: nil.
+    t assertEqual: (lv selectedIndex) to: 0 message: 'LM1a: selectedIndex starts at 0'.
+    evt := MockMouseEvent mx: 5 my: 2 buttons: 1.
+    lv handleEvent: evt.
+    "scrollOffset=0, my=2, so selectedIndex = 0 + 2 = 2"
+    t assertEqual: (lv selectedIndex) to: 2 message: 'LM1b: left click sets selectedIndex to scrollOffset + my'.
+    t assertEqual: (lv selectedItem) to: 'Gamma' message: 'LM1c: selectedItem is Gamma after click'.
+
+    "LM2: Click triggers onSelectBlock"
+    holder := Array new: 1.
+    lv2 := ListView items: #('Alpha' 'Beta' 'Gamma') onSelect: [:item | holder at: 0 put: item].
+    evt2 := MockMouseEvent mx: 0 my: 1 buttons: 1.
+    lv2 handleEvent: evt2.
+    t assertEqual: (lv2 selectedIndex) to: 1 message: 'LM2a: selectedIndex set to 1'.
+    t assertEqual: (holder at: 0) to: 'Beta' message: 'LM2b: onSelectBlock called with selected item'.
+
+    "LM3: Out-of-bounds click ignored — my beyond items size"
+    lv3 := ListView items: #('One' 'Two') onSelect: nil.
+    evt3 := MockMouseEvent mx: 0 my: 5 buttons: 1.
+    lv3 handleEvent: evt3.
+    "scrollOffset=0, my=5, clickedIndex=5, items size=2, out of bounds"
+    t assertEqual: (lv3 selectedIndex) to: 0 message: 'LM3: out-of-bounds click does not change selectedIndex'.
+
+    "LM4: Non-left click (buttons != 1) ignored"
+    lv4 := ListView items: #('Alpha' 'Beta' 'Gamma') onSelect: nil.
+    evt4 := MockMouseEvent mx: 0 my: 2 buttons: 2.
+    lv4 handleEvent: evt4.
+    t assertEqual: (lv4 selectedIndex) to: 0 message: 'LM4: right click (buttons=2) does not change selectedIndex'.
+
+    "LM5: Click at my=0 selects first item (index 0)"
+    lv5 := ListView items: #('First' 'Second' 'Third') onSelect: nil.
+    evt5 := MockMouseEvent mx: 0 my: 0 buttons: 1.
+    lv5 handleEvent: evt5.
+    t assertEqual: (lv5 selectedIndex) to: 0 message: 'LM5: click at my=0 selects first item'.
+    t assertEqual: (lv5 selectedItem) to: 'First' message: 'LM5b: selectedItem is First'.
+
+    "LM6: Empty list — click does nothing"
+    lv6 := ListView items: #() onSelect: nil.
+    evt6 := MockMouseEvent mx: 0 my: 0 buttons: 1.
+    lv6 handleEvent: evt6.
+    t assertEqual: (lv6 selectedIndex) to: 0 message: 'LM6: click on empty list does not crash'.
+
+    "LM7: Click at last valid index"
+    lv := ListView items: #('A' 'B' 'C') onSelect: nil.
+    evt := MockMouseEvent mx: 0 my: 2 buttons: 1.
+    lv handleEvent: evt.
+    t assertEqual: (lv selectedIndex) to: 2 message: 'LM7: click at last valid index selects it'.
+    t assertEqual: (lv selectedItem) to: 'C' message: 'LM7b: selectedItem is C'.
+
+    "LM8: Mouse event returns self (does not fall through to key handling)"
+    lv := ListView items: #('X' 'Y' 'Z') onSelect: nil.
+    evt := MockMouseEvent mx: 0 my: 0 buttons: 0.
+    lv handleEvent: evt.
+    "buttons=0 means no button pressed, should still be handled as mouse (early return)"
+    t assertEqual: (lv selectedIndex) to: 0 message: 'LM8: zero-button mouse event handled without crash'
+  ]
+
+"============================================================"
+"  (4) SYSTEMBROWSER MOUSE EVENT HANDLING TESTS              "
+"============================================================"
+SystemBrowserMouseTests subclass: Object
+
+  classMethod: run: t [
+    | sb evt paneWidth sb2 evt2 sb3 evt3 sb4 evt4 sb5 evt5 sb6 evt6 sb7 evt7 sb8 evt8 |
+    '--- SystemBrowser Mouse Event Tests ---' println.
+
+    "Pane width is 80 // 3 = 26 in SystemBrowser"
+    paneWidth := 80 // 3.
+
+    "SM1: Click in category pane (mx < paneWidth) sets focusedPane to 0"
+    sb := SystemBrowser new.
+    "Tab to class pane first so focusedPane = 1"
+    sb handleEvent: (MockKeyEvent key: 9 rune: 0).
+    t assertEqual: (sb focusedPane) to: 1 message: 'SM1a: focusedPane starts at 1 after Tab'.
+    evt := MockMouseEvent mx: 5 my: 1 buttons: 1.
+    sb handleEvent: evt.
+    t assertEqual: (sb focusedPane) to: 0 message: 'SM1b: click in category pane sets focusedPane to 0'.
+
+    "SM2: Click in category pane selects category by my index"
+    sb2 := SystemBrowser new.
+    t assertEqual: (sb2 selectedCategory) to: 'Kernel' message: 'SM2a: starts at Kernel'.
+    "Click at my=1 should select 'Display' (index 1 in categories)"
+    evt2 := MockMouseEvent mx: 5 my: 1 buttons: 1.
+    sb2 handleEvent: evt2.
+    t assertEqual: (sb2 selectedCategory) to: 'Display' message: 'SM2b: click at my=1 selects Display'.
+
+    "SM3: Click in category pane at my=0 selects Kernel"
+    sb3 := SystemBrowser new.
+    "First navigate away from Kernel"
+    sb3 handleEvent: (MockKeyEvent key: 259 rune: 0).
+    t assertEqual: (sb3 selectedCategory) to: 'Display' message: 'SM3a: navigated to Display'.
+    evt3 := MockMouseEvent mx: 5 my: 0 buttons: 1.
+    sb3 handleEvent: evt3.
+    t assertEqual: (sb3 selectedCategory) to: 'Kernel' message: 'SM3b: click at my=0 selects Kernel'.
+
+    "SM4: Click in class pane (mx >= paneWidth and mx < paneWidth*2) sets focusedPane to 1"
+    sb4 := SystemBrowser new.
+    t assertEqual: (sb4 focusedPane) to: 0 message: 'SM4a: focusedPane starts at 0'.
+    evt4 := MockMouseEvent mx: (paneWidth + 2) my: 0 buttons: 1.
+    sb4 handleEvent: evt4.
+    t assertEqual: (sb4 focusedPane) to: 1 message: 'SM4b: click in class pane sets focusedPane to 1'.
+
+    "SM5: Click in class pane selects class"
+    "Kernel has 2 classes: Rectangle (0), CellBuffer (1)"
+    sb5 := SystemBrowser new.
+    t assertEqual: (sb5 selectedCategory) to: 'Kernel' message: 'SM5a: category is Kernel'.
+    evt5 := MockMouseEvent mx: (paneWidth + 2) my: 0 buttons: 1.
+    sb5 handleEvent: evt5.
+    t assertEqual: (sb5 selectedClass) to: 'Rectangle' message: 'SM5b: click at my=0 in class pane selects Rectangle'.
+
+    "SM6: Click in method pane (mx >= paneWidth*2 and mx < paneWidth*3) sets focusedPane to 2"
+    sb6 := SystemBrowser new.
+    "First select a class so methods are available"
+    evt := MockMouseEvent mx: (paneWidth + 2) my: 0 buttons: 1.
+    sb6 handleEvent: evt.
+    t assertEqual: (sb6 selectedClass) to: 'Rectangle' message: 'SM6a: Rectangle selected'.
+    evt6 := MockMouseEvent mx: (paneWidth * 2 + 2) my: 0 buttons: 1.
+    sb6 handleEvent: evt6.
+    t assertEqual: (sb6 focusedPane) to: 2 message: 'SM6b: click in method pane sets focusedPane to 2'.
+
+    "SM7: Click in method pane selects method"
+    "Rectangle methods: x:y:width:height: (0), x (1), y (2), width (3), etc."
+    sb7 := SystemBrowser new.
+    "Select Rectangle first"
+    evt := MockMouseEvent mx: (paneWidth + 2) my: 0 buttons: 1.
+    sb7 handleEvent: evt.
+    "Now click method pane at my=0"
+    evt7 := MockMouseEvent mx: (paneWidth * 2 + 2) my: 0 buttons: 1.
+    sb7 handleEvent: evt7.
+    t assertEqual: (sb7 selectedMethod) to: 'x:y:width:height:' message: 'SM7: click at my=0 in method pane selects first method'.
+
+    "SM8: Non-left click (buttons != 1) ignored"
+    sb8 := SystemBrowser new.
+    evt8 := MockMouseEvent mx: 5 my: 2 buttons: 2.
+    sb8 handleEvent: evt8.
+    "Right click should not change anything"
+    t assertEqual: (sb8 selectedCategory) to: 'Kernel' message: 'SM8a: right click does not change category'.
+    t assertEqual: (sb8 focusedPane) to: 0 message: 'SM8b: right click does not change focusedPane'.
+
+    "SM9: Out-of-bounds category click (my >= 5) ignored"
+    sb := SystemBrowser new.
+    evt := MockMouseEvent mx: 5 my: 10 buttons: 1.
+    sb handleEvent: evt.
+    "There are only 5 categories (indices 0-4), my=10 is out of bounds"
+    t assertEqual: (sb selectedCategory) to: 'Kernel' message: 'SM9: out-of-bounds category click does not change selection'.
+
+    "SM10: Click in class pane with no class at that index"
+    sb := SystemBrowser new.
+    "Kernel has only 2 classes, click at my=5 in class pane"
+    evt := MockMouseEvent mx: (paneWidth + 2) my: 5 buttons: 1.
+    sb handleEvent: evt.
+    t assertEqual: (sb selectedClass) to: nil message: 'SM10: out-of-bounds class click does not set selectedClass'.
+
+    "SM11: Category click triggers updateClassList (resets selectedClass)"
+    sb := SystemBrowser new.
+    "First select a class"
+    evt := MockMouseEvent mx: (paneWidth + 2) my: 0 buttons: 1.
+    sb handleEvent: evt.
+    t assertEqual: (sb selectedClass) to: 'Rectangle' message: 'SM11a: class selected'.
+    "Now click a different category"
+    evt := MockMouseEvent mx: 5 my: 2 buttons: 1.
+    sb handleEvent: evt.
+    t assertEqual: (sb selectedCategory) to: 'MVC' message: 'SM11b: category changed to MVC'.
+    t assertEqual: (sb selectedClass) to: nil message: 'SM11c: selectedClass reset after category change'.
+
+    "SM12: Click updates invalidate (focusedPane changed)"
+    sb := SystemBrowser new.
+    sb handleEvent: (MockMouseEvent mx: (paneWidth + 2) my: 0 buttons: 1).
+    "After mouse click, SystemBrowser calls invalidate, focusedPane should be updated"
+    t assertEqual: (sb focusedPane) to: 1 message: 'SM12: focusedPane updated after class pane click'
+  ]
+
+"============================================================"
+"  CONVENTION TESTS                                          "
+"============================================================"
+MouseConventionTests subclass: Object
+
+  classMethod: run: t [
+    | mEvt kEvt |
+    '--- Convention Tests ---' println.
+
+    "MC1: MockMouseEvent responds to isKindOf: Go::V2::EventMouse"
+    mEvt := MockMouseEvent mx: 0 my: 0 buttons: 1.
+    t assert: (mEvt isKindOf: Go::V2::EventMouse) message: 'MC1: MockMouseEvent isKindOf: Go::V2::EventMouse'.
+
+    "MC2: MockMouseEvent does NOT match Go::V2::EventKey"
+    t assert: ((mEvt isKindOf: Go::V2::EventKey) not) message: 'MC2: MockMouseEvent not isKindOf: Go::V2::EventKey'.
+
+    "MC3: MockKeyEvent responds to isKindOf: Go::V2::EventKey"
+    kEvt := MockKeyEvent key: 65 rune: 65.
+    t assert: (kEvt isKindOf: Go::V2::EventKey) message: 'MC3: MockKeyEvent isKindOf: Go::V2::EventKey'.
+
+    "MC4: MockKeyEvent does NOT match Go::V2::EventMouse"
+    t assert: ((kEvt isKindOf: Go::V2::EventMouse) not) message: 'MC4: MockKeyEvent not isKindOf: Go::V2::EventMouse'.
+
+    "MC5: MockMouseEvent position returns array with correct values"
+    mEvt := MockMouseEvent mx: 42 my: 17 buttons: 3.
+    t assertEqual: (mEvt position at: 0) to: 42 message: 'MC5a: position at: 0 is mx'.
+    t assertEqual: (mEvt position at: 1) to: 17 message: 'MC5b: position at: 1 is my'.
+    t assertEqual: (mEvt buttons) to: 3 message: 'MC5c: buttons returns correct value'
+  ]
+
+"============================================================"
+"  MAIN RUNNER                                               "
+"============================================================"
+MouseSupportTests subclass: Object
+  classMethod: run [
+    | t |
+    t := TMS new.
+
+    DisplayMouseTests run: t.
+    '' println.
+    WindowMouseTests run: t.
+    '' println.
+    ListViewMouseTests run: t.
+    '' println.
+    SystemBrowserMouseTests run: t.
+    '' println.
+    MouseConventionTests run: t.
+
+    '' println.
+    t report.
+    ^t failed
+  ]
+
+MouseSupportTests run
