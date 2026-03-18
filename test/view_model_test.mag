@@ -1,0 +1,63 @@
+"View-Model interaction tests"
+
+TestRunner2 subclass: Object [
+  | passed failed failures |
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^ r
+  ]
+  method: init [
+    passed := 0. failed := 0. failures := Array new
+  ]
+  method: assert: condition message: msg [
+    condition ifTrue: [ passed := passed + 1 ]
+      ifFalse: [ failed := failed + 1. failures := failures copyWith: msg. ('FAIL: ', msg) println ]
+  ]
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [ passed := passed + 1 ]
+      ifFalse: [ failed := failed + 1. failures := failures copyWith: msg. ('FAIL: ', msg) println ]
+  ]
+  method: report [
+    ('Passed: ', passed printString, ' Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [ failures do: [:f | ('  - ', f) println ] ].
+    (failed = 0) ifTrue: [ 'ALL TESTS PASSED' println ] ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+]
+
+ViewModelTest subclass: Object [
+  classMethod: run [
+    | t v vm vm2 vm3 v4 |
+    t := TestRunner2 new.
+
+    "model: sets model and registers as dependent"
+    v := Alto::View new.
+    vm := Alto::Model new.
+    v model: vm.
+    t assertEqual: (v model) to: vm message: 'model: stores model'.
+    t assertEqual: (vm dependents size) to: 1 message: 'model: registers view as dependent'.
+
+    "model: with new model unregisters from old"
+    vm2 := Alto::Model new.
+    v model: vm2.
+    t assertEqual: (v model) to: vm2 message: 'model: switches to new model'.
+    t assertEqual: (vm dependents size) to: 0 message: 'model: unregisters from old model'.
+    t assertEqual: (vm2 dependents size) to: 1 message: 'model: registers with new model'.
+
+    "model: nil unregisters"
+    v model: nil.
+    t assertEqual: (v model) to: nil message: 'model: nil clears model'.
+    t assertEqual: (vm2 dependents size) to: 0 message: 'model: nil unregisters from model'.
+
+    "Model changed: triggers View needsRedraw via dependency"
+    vm3 := Alto::Model new.
+    v4 := Alto::View new.
+    v4 needsRedraw: false.
+    v4 model: vm3.
+    vm3 changed: #data.
+    t assertEqual: (v4 needsRedraw) to: true message: 'Model changed: triggers View needsRedraw'.
+
+    t report
+  ]
+]

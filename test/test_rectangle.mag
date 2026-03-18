@@ -1,0 +1,78 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Tests for Rectangle class — verifies construction, accessors, intersection.
+ NOTE: containsPointX:y: tests are skipped due to and: chaining bug in Rectangle.mag."
+
+RectangleTest subclass: Object
+  classMethod: run [
+    | r r2 r3 r4 ext inter inter2 selfInter passed failed |
+    passed := 0.
+    failed := 0.
+
+    "--- Test: Constructor and getters ---"
+    r := Rectangle x: 5 y: 10 width: 20 height: 15.
+    (r x = 5) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: Rectangle x: getter should return 5' println. failed := failed + 1 ].
+    (r y = 10) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: Rectangle y: getter should return 10' println. failed := failed + 1 ].
+    (r width = 20) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: Rectangle width: getter should return 20' println. failed := failed + 1 ].
+    (r height = 15) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: Rectangle height: getter should return 15' println. failed := failed + 1 ].
+
+    "--- Test: Derived accessors right and bottom ---"
+    (r right = 25) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: right should be x+width=25' println. failed := failed + 1 ].
+    (r bottom = 25) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: bottom should be y+height=25' println. failed := failed + 1 ].
+
+    "--- Test: extent returns {width. height} ---"
+    ext := r extent.
+    ((ext at: 0) = 20) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: extent[0] should be width 20' println. failed := failed + 1 ].
+    ((ext at: 1) = 15) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: extent[1] should be height 15' println. failed := failed + 1 ].
+
+    "--- SKIPPED: containsPointX:y: tests ---"
+    "containsPointX:y: uses chained and: which compiles to and:and:and: (not a valid message)."
+    "This is a known bug. Reporting as observation instead of running."
+    'SKIP: containsPointX:y: tests (and: chaining bug)' println.
+    failed := failed + 4.
+
+    "--- Test: intersect with overlapping rect ---"
+    r2 := Rectangle x: 15 y: 20 width: 20 height: 15.
+    inter := r intersect: r2.
+    inter isNil ifTrue: [
+      'FAIL: intersection of overlapping rects should not be nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (inter x = 15) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: intersection x should be 15' println. failed := failed + 1 ].
+      (inter y = 20) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: intersection y should be 20' println. failed := failed + 1 ].
+      (inter width = 10) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: intersection width should be 10' println. failed := failed + 1 ].
+      (inter height = 5) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: intersection height should be 5' println. failed := failed + 1 ].
+    ].
+
+    "--- Test: intersect with non-overlapping rect returns nil ---"
+    r3 := Rectangle x: 100 y: 100 width: 5 height: 5.
+    inter2 := r intersect: r3.
+    inter2 isNil ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: non-overlapping intersect should be nil' println. failed := failed + 1 ].
+
+    "--- Test: setters work ---"
+    r4 := Rectangle x: 0 y: 0 width: 10 height: 10.
+    r4 x: 3.
+    r4 y: 4.
+    r4 width: 50.
+    r4 height: 60.
+    (r4 x = 3) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: x: setter did not set to 3' println. failed := failed + 1 ].
+    (r4 y = 4) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: y: setter did not set to 4' println. failed := failed + 1 ].
+    (r4 width = 50) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: width: setter did not set to 50' println. failed := failed + 1 ].
+    (r4 height = 60) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: height: setter did not set to 60' println. failed := failed + 1 ].
+
+    "--- Test: intersect with self gives same rect ---"
+    selfInter := r intersect: r.
+    selfInter isNil ifTrue: [
+      'FAIL: rect intersect self should not be nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (selfInter x = r x) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: self-intersect x mismatch' println. failed := failed + 1 ].
+      (selfInter y = r y) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: self-intersect y mismatch' println. failed := failed + 1 ].
+      (selfInter width = r width) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: self-intersect width mismatch' println. failed := failed + 1 ].
+      (selfInter height = r height) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: self-intersect height mismatch' println. failed := failed + 1 ].
+    ].
+
+    '--- Rectangle Test Results ---' println.
+    passed printString print. ' passed, ' print. failed printString print. ' failed' println.
+    (failed > 0) ifTrue: [ 'RECTANGLE: SOME TESTS FAILED' println ] ifFalse: [ 'RECTANGLE: ALL TESTS PASSED' println ].
+    ^ failed
+  ]

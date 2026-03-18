@@ -5,15 +5,11 @@ import: 'Go'
 
  Demonstrates the Display compositor by drawing a box directly onto the
  display's CellBuffer and rendering a single frame before waiting for
- a keypress.
-
- Once Window classes are available this will be replaced with proper
- window-based composition.
-"
+ a keypress."
 
 Main subclass: Object
   classMethod: start [
-    | display buf w h style |
+    | display buf w h style boxW boxH boxX boxY textX textY bw bh screen cell ch cellStyle |
     'Creating display...' println.
     display := Display new.
     buf := display buffer.
@@ -21,7 +17,6 @@ Main subclass: Object
     h := buf height.
 
     "Draw a border box in the center of the screen."
-    | boxW boxH boxX boxY |
     boxW := 30.
     boxH := 10.
     boxX := (w - boxW) / 2.
@@ -33,44 +28,41 @@ Main subclass: Object
 
     "Top and bottom edges."
     0 to: boxW - 1 do: [:i |
-      buf putChar: $- x: boxX + i y: boxY         style: style.
-      buf putChar: $- x: boxX + i y: boxY + boxH - 1 style: style
+      buf putChar: 45 x: boxX + i y: boxY         style: style.
+      buf putChar: 45 x: boxX + i y: boxY + boxH - 1 style: style
     ].
 
     "Left and right edges."
     0 to: boxH - 1 do: [:i |
-      buf putChar: $| x: boxX         y: boxY + i style: style.
-      buf putChar: $| x: boxX + boxW - 1 y: boxY + i style: style
+      buf putChar: 124 x: boxX         y: boxY + i style: style.
+      buf putChar: 124 x: boxX + boxW - 1 y: boxY + i style: style
     ].
 
     "Corners."
-    buf putChar: $+ x: boxX             y: boxY             style: style.
-    buf putChar: $+ x: boxX + boxW - 1  y: boxY             style: style.
-    buf putChar: $+ x: boxX             y: boxY + boxH - 1  style: style.
-    buf putChar: $+ x: boxX + boxW - 1  y: boxY + boxH - 1  style: style.
+    buf putChar: 43 x: boxX             y: boxY             style: style.
+    buf putChar: 43 x: boxX + boxW - 1  y: boxY             style: style.
+    buf putChar: 43 x: boxX             y: boxY + boxH - 1  style: style.
+    buf putChar: 43 x: boxX + boxW - 1  y: boxY + boxH - 1  style: style.
 
     "Write 'Alto' centered inside the box."
-    | textX textY |
-    textX := boxX + (boxW - 4) / 2.
+    textX := boxX + ((boxW - 4) / 2).
     textY := boxY + (boxH / 2).
-    buf putChar: 65  x: textX     y: textY style: style.  "A"
-    buf putChar: 108 x: textX + 1 y: textY style: style.  "l"
-    buf putChar: 116 x: textX + 2 y: textY style: style.  "t"
-    buf putChar: 111 x: textX + 3 y: textY style: style.  "o"
+    buf putChar: 65  x: textX     y: textY style: style.
+    buf putChar: 108 x: textX + 1 y: textY style: style.
+    buf putChar: 116 x: textX + 2 y: textY style: style.
+    buf putChar: 111 x: textX + 3 y: textY style: style.
 
-    "Render the buffer to terminal (no windows, just direct buffer draw)."
-    | bw bh screen |
+    "Render the buffer to terminal."
     screen := display screen.
     bw := buf width.
     bh := buf height.
 
     0 to: bh - 1 do: [:y |
       0 to: bw - 1 do: [:x |
-        | cell ch cellStyle |
         cell := buf cellAt: x y: y.
         ch := cell char.
         cellStyle := cell style.
-        cellStyle ifNil: [ cellStyle := Go::V2::Style new ].
+        cellStyle isNil ifTrue: [cellStyle := Go::V2::Style new].
         screen setContent: x _: y _: ch _: cellStyle
       ]
     ].

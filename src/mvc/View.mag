@@ -1,79 +1,70 @@
 namespace: 'Alto'
 import: 'Go'
 
-"View — base view class with model binding, CellBuffer rendering, and redraw cycle."
-
 View subclass: Object
   instanceVars: model bounds buffer needsRedraw
 
-  classMethod: new [
-    | instance |
-    instance := super new.
-    instance initialize.
-    ^ instance
-  ]
-
   method: initialize [
-    model := nil.
-    bounds := nil.
-    buffer := nil.
-    needsRedraw := true
+      model := nil.
+      bounds := nil.
+      buffer := nil.
+      needsRedraw := true
   ]
 
   method: model: aModel [
-    model notNil ifTrue: [
-      model removeDependent: self
-    ].
-    model := aModel.
-    aModel notNil ifTrue: [
-      aModel addDependent: self
-    ]
+      model notNil ifTrue: [model removeDependent: self].
+      model := aModel.
+      aModel notNil ifTrue: [aModel addDependent: self]
   ]
 
   method: model [
-    ^ model
+      ^model
   ]
 
   method: bounds: aRect [
-    bounds := aRect.
-    aRect notNil ifTrue: [
-      buffer := CellBuffer width: aRect width height: aRect height
-    ].
-    self invalidate
+      bounds := aRect.
+      aRect notNil ifTrue: [buffer := CellBuffer width: aRect width height: aRect height].
+      self invalidate
   ]
 
   method: bounds [
-    ^ bounds
+      ^bounds
   ]
 
   method: buffer [
-    ^ buffer
+      ^buffer
   ]
 
   method: displayOn: aCellBuffer [
-    "Subclasses override this method to render into the buffer."
-    ^ self
+      ^self
   ]
 
   method: invalidate [
-    needsRedraw := true
+      needsRedraw := true
   ]
 
   method: update: aspect [
-    self invalidate
+      self invalidate
   ]
 
   method: draw [
-    (needsRedraw and: [buffer notNil]) ifTrue: [
-      self displayOn: buffer.
-      needsRedraw := false
-    ]
+      (needsRedraw and: [buffer notNil]) ifTrue: [
+        self displayOn: buffer.
+        needsRedraw := false
+      ]
   ]
 
   method: needsRedraw [
-    ^ needsRedraw
+      ^needsRedraw
   ]
 
   method: needsRedraw: aBoolean [
-    needsRedraw := aBoolean
+      needsRedraw := aBoolean
+  ]
+
+  classMethod: new [
+      | instance |
+      instance := super new.
+      instance initialize.
+      ^instance
   ]

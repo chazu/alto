@@ -1,0 +1,109 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Tests for Display class — structural tests.
+ Display cannot be instantiated (requires terminal), so we test components.
+ Known bugs: Display.mag has parse errors (mid-method locals), Array new has no add:."
+
+"Mock window for testing compositing logic"
+MockWindow subclass: Object
+  instanceVars: name buf frame
+
+  classMethod: name: aName [
+    | w |
+    w := self new.
+    w initName: aName.
+    ^ w
+  ]
+
+  method: initName: aName [
+    name := aName.
+    buf := CellBuffer width: 10 height: 5.
+    frame := Rectangle x: 0 y: 0 width: 10 height: 5.
+  ]
+
+  method: name [ ^ name ]
+  method: buffer [ ^ buf ]
+  method: frame [ ^ frame ]
+  method: handleEvent: evt [ "no-op" ]
+
+DisplayTest subclass: Object
+  classMethod: run [
+    | passed failed buf w1 w2 w3 screenBuf win winBuf winFrame ox oy fw fh cell screen2 win1Buf win2Buf |
+    passed := 0.
+    failed := 0.
+
+    "--- Test: CellBuffer can be created at display-typical sizes ---"
+    buf := CellBuffer width: 80 height: 24.
+    (buf width = 80) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: CellBuffer for display should be 80 wide' println. failed := failed + 1 ].
+    (buf height = 24) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: CellBuffer for display should be 24 tall' println. failed := failed + 1 ].
+
+    "--- Test: MockWindow buffer/frame protocol (what Display>>render depends on) ---"
+    w1 := MockWindow name: 'win1'.
+    ((w1 buffer) isKindOf: CellBuffer) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: MockWindow buffer should be a CellBuffer' println. failed := failed + 1 ].
+    ((w1 frame) isKindOf: Rectangle) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: MockWindow frame should be a Rectangle' println. failed := failed + 1 ].
+
+    "--- Test: Array new does not support add: (Display bug) ---"
+    'SKIP: Display window management tests (Array new does not support add:)' println.
+    failed := failed + 4.
+
+    "--- Test: Display.mag has parse errors (mid-method locals) ---"
+    'SKIP: Display.mag cannot be loaded (parse errors at lines 102, 128 - mid-method locals)' println.
+    failed := failed + 1.
+
+    "--- Test: Buffer compositing simulation ---"
+    "Simulates what Display>>render should do when it works"
+    screenBuf := CellBuffer width: 20 height: 10.
+    win := MockWindow name: 'test'.
+    winBuf := win buffer.
+    winFrame := win frame.
+    winBuf putChar: 65 x: 0 y: 0 style: nil.
+    winBuf putChar: 66 x: 1 y: 0 style: nil.
+
+    ox := winFrame x.
+    oy := winFrame y.
+    fw := winFrame width.
+    fh := winFrame height.
+    0 to: fh - 1 do: [:row |
+      0 to: fw - 1 do: [:col |
+        cell := winBuf cellAt: col y: row.
+        cell ifNotNil: [
+          screenBuf putChar: (cell at: #char) x: ox + col y: oy + row style: nil.
+        ].
+      ].
+    ].
+
+    ((screenBuf cellAt: 0 y: 0) at: #char) = 65 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: composited cell (0,0) should be 65 (A)' println. failed := failed + 1 ].
+    ((screenBuf cellAt: 1 y: 0) at: #char) = 66 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: composited cell (1,0) should be 66 (B)' println. failed := failed + 1 ].
+
+    "--- Test: Z-order compositing (later window overwrites) ---"
+    screen2 := CellBuffer width: 20 height: 10.
+    w2 := MockWindow name: 'back'.
+    w3 := MockWindow name: 'front'.
+    win1Buf := w2 buffer.
+    win2Buf := w3 buffer.
+    win1Buf putChar: 65 x: 0 y: 0 style: nil.
+    win2Buf putChar: 90 x: 0 y: 0 style: nil.
+
+    "Blit back window first, then front"
+    0 to: 4 do: [:row |
+      0 to: 9 do: [:col |
+        cell := win1Buf cellAt: col y: row.
+        cell ifNotNil: [ screen2 putChar: (cell at: #char) x: col y: row style: nil ].
+      ].
+    ].
+    0 to: 4 do: [:row |
+      0 to: 9 do: [:col |
+        cell := win2Buf cellAt: col y: row.
+        cell ifNotNil: [ screen2 putChar: (cell at: #char) x: col y: row style: nil ].
+      ].
+    ].
+
+    "Front window (Z) should overwrite back window (A) at same position"
+    ((screen2 cellAt: 0 y: 0) at: #char) = 90 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: z-order: front window should overwrite back at (0,0), expected 90 (Z)' println. failed := failed + 1 ].
+
+    '--- Display Test Results ---' println.
+    passed printString print. ' passed, ' print. failed printString print. ' failed' println.
+    (failed > 0) ifTrue: [ 'DISPLAY: SOME TESTS FAILED' println ] ifFalse: [ 'DISPLAY: ALL TESTS PASSED' println ].
+    ^ failed
+  ]

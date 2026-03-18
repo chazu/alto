@@ -1,0 +1,275 @@
+"MVC Framework Base Classes — Test Suite
+
+Tests the spec:
+  1. Model — dependency/change notification
+  2. View — model registration, invalidation, draw
+  3. Controller — model/view storage, active state, handleEvent
+"
+
+"A mock dependent that records update: calls for testing Model notifications."
+MockDependent subclass: Object [
+  | updates |
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initUpdates.
+    ^ instance
+  ]
+
+  method: initUpdates [
+    updates := Array new
+  ]
+
+  method: update: aspect [
+    updates := updates copyWith: aspect
+  ]
+
+  method: updates [
+    ^ updates
+  ]
+
+  method: updateCount [
+    ^ updates size
+  ]
+]
+
+"A mock event for testing Controller handleEvent:"
+MockEvent subclass: Object [
+  | type |
+
+  classMethod: type: aType [
+    | e |
+    e := super new.
+    e setType: aType.
+    ^ e
+  ]
+
+  method: setType: aType [
+    type := aType
+  ]
+
+  method: type [
+    ^ type
+  ]
+]
+
+"Simple test runner — prints PASS/FAIL for each assertion."
+TestRunner subclass: Object [
+  | passed failed failures |
+
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^ r
+  ]
+
+  method: init [
+    passed := 0.
+    failed := 0.
+    failures := Array new
+  ]
+
+  method: assert: condition message: msg [
+    condition ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg) println
+    ]
+  ]
+
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg) println
+    ]
+  ]
+
+  method: report [
+    '=== Test Results ===' println.
+    ('Passed: ', passed printString) println.
+    ('Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [
+      'Failures:' println.
+      failures do: [:f | ('  - ', f) println ]
+    ].
+    (failed = 0)
+      ifTrue: [ 'ALL TESTS PASSED' println ]
+      ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+
+  method: failed [
+    ^ failed
+  ]
+
+  method: failures [
+    ^ failures
+  ]
+]
+
+MVCTest subclass: Object [
+
+  "=== Model Tests ==="
+  classMethod: runModelTests: t [
+    | m dep1 dep2 dep3 m2 d1 d2 |
+    '--- Model Tests ---' println.
+
+    "Test: Model new creates an instance with empty dependents"
+    m := Alto::Model new.
+    t assert: (m notNil) message: 'Model new returns non-nil'.
+    t assertEqual: (m dependents size) to: 0 message: 'Model new has empty dependents'.
+
+    "Test: addDependent: adds a dependent"
+    dep1 := MockDependent new.
+    m addDependent: dep1.
+    t assertEqual: (m dependents size) to: 1 message: 'addDependent increases dependents size'.
+
+    "Test: addDependent: can add multiple dependents"
+    dep2 := MockDependent new.
+    m addDependent: dep2.
+    t assertEqual: (m dependents size) to: 2 message: 'addDependent second dependent'.
+
+    "Test: removeDependent: removes a dependent"
+    m removeDependent: dep1.
+    t assertEqual: (m dependents size) to: 1 message: 'removeDependent reduces dependents size'.
+
+    "Test: removeDependent: on non-existent does not crash"
+    dep3 := MockDependent new.
+    m removeDependent: dep3.
+    t assertEqual: (m dependents size) to: 1 message: 'removeDependent non-existent is safe'.
+
+    "Test: changed sends update: nil to all dependents"
+    m2 := Alto::Model new.
+    d1 := MockDependent new.
+    d2 := MockDependent new.
+    m2 addDependent: d1.
+    m2 addDependent: d2.
+    m2 changed.
+    t assertEqual: (d1 updateCount) to: 1 message: 'changed notifies first dependent'.
+    t assertEqual: (d2 updateCount) to: 1 message: 'changed notifies second dependent'.
+    t assertEqual: (d1 updates first) to: nil message: 'changed sends nil aspect to dep1'.
+    t assertEqual: (d2 updates first) to: nil message: 'changed sends nil aspect to dep2'.
+
+    "Test: changed: aspect sends update: with the aspect"
+    m2 changed: #name.
+    t assertEqual: (d1 updateCount) to: 2 message: 'changed: sends second notification'.
+    t assertEqual: (d1 updates last) to: #name message: 'changed: sends correct aspect'.
+  ]
+
+  "=== Controller Tests ==="
+  classMethod: runControllerTests: t [
+    | c cm cv evt |
+    '--- Controller Tests ---' println.
+
+    "Test: Controller new creates instance"
+    c := Alto::Controller new.
+    t assert: (c notNil) message: 'Controller new returns non-nil'.
+
+    "Test: Controller new initializes inactive"
+    t assertEqual: (c isActive) to: false message: 'Controller new is inactive'.
+
+    "Test: Controller model and view are nil initially"
+    t assertEqual: (c model) to: nil message: 'Controller model starts nil'.
+    t assertEqual: (c view) to: nil message: 'Controller view starts nil'.
+
+    "Test: model:view: stores references"
+    cm := Alto::Model new.
+    cv := 'fake-view'.
+    c model: cm view: cv.
+    t assertEqual: (c model) to: cm message: 'model:view: stores model'.
+    t assertEqual: (c view) to: cv message: 'model:view: stores view'.
+
+    "Test: activate sets active true"
+    c activate.
+    t assertEqual: (c isActive) to: true message: 'activate sets active'.
+
+    "Test: deactivate sets active false"
+    c deactivate.
+    t assertEqual: (c isActive) to: false message: 'deactivate clears active'.
+
+    "Test: handleEvent: does not crash (base class is no-op)"
+    evt := MockEvent type: #keypress.
+    c handleEvent: evt.
+    t assert: true message: 'handleEvent base does not crash'.
+  ]
+
+  "=== View Tests ==="
+  classMethod: runViewTests: t [
+    | v vm vm2 v2 v3 vm3 v4 v5 |
+    '--- View Tests ---' println.
+
+    "Test: View new creates instance"
+    v := Alto::View new.
+    t assert: (v notNil) message: 'View new returns non-nil'.
+
+    "Test: View new starts needing redraw"
+    t assertEqual: (v needsRedraw) to: true message: 'View new needsRedraw is true'.
+
+    "Test: View model starts nil"
+    t assertEqual: (v model) to: nil message: 'View model starts nil'.
+
+    "Test: model: sets model and registers as dependent"
+    vm := Alto::Model new.
+    v model: vm.
+    t assertEqual: (v model) to: vm message: 'model: stores model'.
+    t assertEqual: (vm dependents size) to: 1 message: 'model: registers view as dependent'.
+
+    "Test: model: with new model unregisters from old"
+    vm2 := Alto::Model new.
+    v model: vm2.
+    t assertEqual: (v model) to: vm2 message: 'model: switches to new model'.
+    t assertEqual: (vm dependents size) to: 0 message: 'model: unregisters from old model'.
+    t assertEqual: (vm2 dependents size) to: 1 message: 'model: registers with new model'.
+
+    "Test: model: nil unregisters"
+    v model: nil.
+    t assertEqual: (v model) to: nil message: 'model: nil clears model'.
+    t assertEqual: (vm2 dependents size) to: 0 message: 'model: nil unregisters from model'.
+
+    "Test: invalidate sets needsRedraw"
+    v2 := Alto::View new.
+    v2 needsRedraw: false.
+    v2 invalidate.
+    t assertEqual: (v2 needsRedraw) to: true message: 'invalidate sets needsRedraw'.
+
+    "Test: update: calls invalidate"
+    v3 := Alto::View new.
+    v3 needsRedraw: false.
+    v3 update: #something.
+    t assertEqual: (v3 needsRedraw) to: true message: 'update: triggers invalidate'.
+
+    "Test: Model changed: triggers View update: via dependency"
+    vm3 := Alto::Model new.
+    v4 := Alto::View new.
+    v4 needsRedraw: false.
+    v4 model: vm3.
+    vm3 changed: #data.
+    t assertEqual: (v4 needsRedraw) to: true message: 'Model changed: triggers View needsRedraw'.
+
+    "Test: draw clears needsRedraw flag"
+    v5 := Alto::View new.
+    t assertEqual: (v5 needsRedraw) to: true message: 'View starts needing redraw'.
+    v5 draw.
+    t assertEqual: (v5 needsRedraw) to: false message: 'draw clears needsRedraw'.
+
+    "Test: draw when not needed is a no-op"
+    v5 draw.
+    t assert: true message: 'draw when not needed does not crash'.
+    t assertEqual: (v5 needsRedraw) to: false message: 'draw when not needed keeps flag false'.
+  ]
+
+  classMethod: run [
+    | t |
+    t := TestRunner new.
+    self runModelTests: t.
+    self runControllerTests: t.
+    self runViewTests: t.
+    t report
+  ]
+]

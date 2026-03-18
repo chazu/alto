@@ -1,0 +1,70 @@
+"Controller-only test"
+
+MockEvent subclass: Object [
+  | type |
+  classMethod: type: aType [
+    | e |
+    e := super new.
+    e setType: aType.
+    ^ e
+  ]
+  method: setType: aType [ type := aType ]
+  method: type [ ^ type ]
+]
+
+TestRunner subclass: Object [
+  | passed failed failures |
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^ r
+  ]
+  method: init [
+    passed := 0. failed := 0. failures := Array new
+  ]
+  method: assert: condition message: msg [
+    condition ifTrue: [ passed := passed + 1 ]
+      ifFalse: [ failed := failed + 1. failures := failures copyWith: msg. ('FAIL: ', msg) println ]
+  ]
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [ passed := passed + 1 ]
+      ifFalse: [ failed := failed + 1. failures := failures copyWith: msg. ('FAIL: ', msg) println ]
+  ]
+  method: report [
+    ('Passed: ', passed printString, ' Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [ failures do: [:f | ('  - ', f) println ] ].
+    (failed = 0) ifTrue: [ 'ALL TESTS PASSED' println ] ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+]
+
+ControllerTest subclass: Object [
+  classMethod: run [
+    | t c cm cv evt |
+    t := TestRunner new.
+
+    c := Alto::Controller new.
+    t assert: (c notNil) message: 'Controller new returns non-nil'.
+    t assertEqual: (c isActive) to: false message: 'Controller new is inactive'.
+    t assertEqual: (c model) to: nil message: 'Controller model starts nil'.
+    t assertEqual: (c view) to: nil message: 'Controller view starts nil'.
+
+    cm := Alto::Model new.
+    cv := 'fake-view'.
+    c model: cm view: cv.
+    t assertEqual: (c model) to: cm message: 'model:view: stores model'.
+    t assertEqual: (c view) to: cv message: 'model:view: stores view'.
+
+    c activate.
+    t assertEqual: (c isActive) to: true message: 'activate sets active'.
+
+    c deactivate.
+    t assertEqual: (c isActive) to: false message: 'deactivate clears active'.
+
+    evt := MockEvent type: #keypress.
+    c handleEvent: evt.
+    t assert: true message: 'handleEvent base does not crash'.
+
+    t report
+  ]
+]

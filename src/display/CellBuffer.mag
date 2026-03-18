@@ -4,136 +4,141 @@ import: 'Go'
 CellBuffer subclass: Object
   instanceVars: cells width height
 
-  classMethod: width: w height: h [
-    | buf |
-    buf := self new.
-    buf initWidth: w height: h.
-    ^ buf
-  ]
-
   method: initWidth: w height: h [
-    | i sz |
-    width := w.
-    height := h.
-    sz := w * h.
-    cells := Array new: sz.
-    i := 1.
-    [i <= sz] whileTrue: [
-      cells at: i put: (Dictionary new at: #char put: 32; at: #fg put: nil; at: #bg put: nil; at: #attrs put: nil; yourself).
-      i := i + 1.
-    ].
+      | i sz |
+      width := w.
+      height := h.
+      sz := w * h.
+      cells := Array new: sz.
+      i := 1.
+      [i <= sz] whileTrue: [
+        cells at: i
+          put: (Dictionary new at: #char put: 32;
+           at: #fg put: nil;
+           at: #bg put: nil;
+           at: #attrs put: nil;
+           yourself).
+        i := i + 1
+      ]
   ]
 
   method: width [
-    ^ width
+      ^width
   ]
 
   method: height [
-    ^ height
+      ^height
   ]
 
   method: indexX: x y: y [
-    (x < 0) ifTrue: [ ^ nil ].
-    (x >= width) ifTrue: [ ^ nil ].
-    (y < 0) ifTrue: [ ^ nil ].
-    (y >= height) ifTrue: [ ^ nil ].
-    ^ y * width + x + 1
+      x < 0 ifTrue: [^nil].
+      x >= width ifTrue: [^nil].
+      y < 0 ifTrue: [^nil].
+      y >= height ifTrue: [^nil].
+      ^y * width + x + 1
   ]
 
   method: cellAt: x y: y [
-    | idx |
-    idx := self indexX: x y: y.
-    idx ifNil: [ ^ nil ].
-    ^ cells at: idx
+      | idx |
+      idx := self indexX: x y: y.
+      idx ifNil: [^nil].
+      ^cells at: idx
   ]
 
   method: putChar: ch x: x y: y style: style [
-    | idx cell |
-    idx := self indexX: x y: y.
-    idx ifNil: [ ^ self ].
-    cell := cells at: idx.
-    cell at: #char put: ch.
-    style ifNotNil: [
-      (style at: #fg ifAbsent: [ nil ]) ifNotNil: [ :v | cell at: #fg put: v ].
-      (style at: #bg ifAbsent: [ nil ]) ifNotNil: [ :v | cell at: #bg put: v ].
-      (style at: #attrs ifAbsent: [ nil ]) ifNotNil: [ :v | cell at: #attrs put: v ].
-    ].
+      | idx cell |
+      idx := self indexX: x y: y.
+      idx ifNil: [^self].
+      cell := cells at: idx.
+      cell at: #char put: ch.
+      style ifNotNil: [
+        (style at: #fg ifAbsent: [nil]) ifNotNil: [:v | cell at: #fg put: v].
+        (style at: #bg ifAbsent: [nil]) ifNotNil: [:v | cell at: #bg put: v].
+        (style at: #attrs ifAbsent: [nil]) ifNotNil: [:v | cell at: #attrs put: v]
+      ]
   ]
 
   method: putString: str x: x y: y style: style [
-    | i sz |
-    sz := str size.
-    i := 1.
-    [i <= sz] whileTrue: [
-      self putChar: (str at: i) charCode x: x + i - 1 y: y style: style.
-      i := i + 1.
-    ].
+      | i sz |
+      sz := str size.
+      i := 1.
+      [i <= sz] whileTrue: [
+        self putChar: (str at: i) charCode x: x + i - 1 y: y style: style.
+        i := i + 1
+      ]
   ]
 
   method: drawBox: rect style: style [
-    | rx ry rw rh i |
-    rx := rect x.
-    ry := rect y.
-    rw := rect width.
-    rh := rect height.
-
-    "Top-left corner"
-    self putChar: 9484 x: rx y: ry style: style.
-    "Top edge"
-    i := rx + 1.
-    [i < (rx + rw - 1)] whileTrue: [
-      self putChar: 9472 x: i y: ry style: style.
-      i := i + 1.
-    ].
-    "Top-right corner"
-    self putChar: 9488 x: rx + rw - 1 y: ry style: style.
-
-    "Left and right sides"
-    i := ry + 1.
-    [i < (ry + rh - 1)] whileTrue: [
-      self putChar: 9474 x: rx y: i style: style.
-      self putChar: 9474 x: rx + rw - 1 y: i style: style.
-      i := i + 1.
-    ].
-
-    "Bottom-left corner"
-    self putChar: 9492 x: rx y: ry + rh - 1 style: style.
-    "Bottom edge"
-    i := rx + 1.
-    [i < (rx + rw - 1)] whileTrue: [
-      self putChar: 9472 x: i y: ry + rh - 1 style: style.
-      i := i + 1.
-    ].
-    "Bottom-right corner"
-    self putChar: 9496 x: rx + rw - 1 y: ry + rh - 1 style: style.
+      | rx ry rw rh i |
+      rx := rect x.
+      ry := rect y.
+      rw := rect width.
+      rh := rect height.
+      self putChar: 9484 x: rx y: ry style: style.
+      i := rx + 1.
+      [i < (rx + rw - 1)] whileTrue: [
+        self putChar: 9472 x: i y: ry style: style.
+        i := i + 1
+      ].
+      self putChar: 9488 x: rx + rw - 1 y: ry style: style.
+      i := ry + 1.
+      [i < (ry + rh - 1)] whileTrue: [
+        self putChar: 9474 x: rx y: i style: style.
+        self putChar: 9474 x: rx + rw - 1 y: i style: style.
+        i := i + 1
+      ].
+      self putChar: 9492 x: rx y: ry + rh - 1 style: style.
+      i := rx + 1.
+      [i < (rx + rw - 1)] whileTrue: [
+        self putChar: 9472 x: i y: ry + rh - 1 style: style.
+        i := i + 1
+      ].
+      self putChar: 9496 x: rx + rw - 1 y: ry + rh - 1 style: style
   ]
 
   method: clear [
-    | i sz |
-    sz := cells size.
-    i := 1.
-    [i <= sz] whileTrue: [
-      cells at: i put: (Dictionary new at: #char put: 32; at: #fg put: nil; at: #bg put: nil; at: #attrs put: nil; yourself).
-      i := i + 1.
-    ].
+      | i sz |
+      sz := cells size.
+      i := 1.
+      [i <= sz] whileTrue: [
+        cells at: i
+          put: (Dictionary new at: #char put: 32;
+           at: #fg put: nil;
+           at: #bg put: nil;
+           at: #attrs put: nil;
+           yourself).
+        i := i + 1
+      ]
   ]
 
   method: clearRect: rect [
-    | rx ry rw rh cx cy idx |
-    rx := rect x.
-    ry := rect y.
-    rw := rect width.
-    rh := rect height.
-    cy := ry.
-    [cy < (ry + rh)] whileTrue: [
-      cx := rx.
-      [cx < (rx + rw)] whileTrue: [
-        idx := self indexX: cx y: cy.
-        idx ifNotNil: [
-          cells at: idx put: (Dictionary new at: #char put: 32; at: #fg put: nil; at: #bg put: nil; at: #attrs put: nil; yourself).
+      | rx ry rw rh cx cy idx |
+      rx := rect x.
+      ry := rect y.
+      rw := rect width.
+      rh := rect height.
+      cy := ry.
+      [cy < (ry + rh)] whileTrue: [
+        cx := rx.
+        [cx < (rx + rw)] whileTrue: [
+          idx := self indexX: cx y: cy.
+          idx ifNotNil: [
+            cells at: idx
+              put: (Dictionary new at: #char put: 32;
+               at: #fg put: nil;
+               at: #bg put: nil;
+               at: #attrs put: nil;
+               yourself)
+          ].
+          cx := cx + 1
         ].
-        cx := cx + 1.
-      ].
-      cy := cy + 1.
-    ].
+        cy := cy + 1
+      ]
+  ]
+
+  classMethod: width: w height: h [
+      | buf |
+      buf := self new.
+      buf initWidth: w height: h.
+      ^buf
   ]

@@ -1,0 +1,152 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Tests for CellBuffer class — verifies creation, cell access, drawing, clearing.
+ Known bugs: putString uses charCode (should be value), indexing is off-by-one."
+
+CellBufferTest subclass: Object
+  classMethod: run [
+    | buf buf2 buf3 buf4 buf5 cell r style c0 c1 c2 c3 c4 topLeft topRight bottomLeft bottomRight topEdge leftEdge rightEdge passed failed |
+    passed := 0.
+    failed := 0.
+
+    "--- Test: Construction with width: height: ---"
+    buf := CellBuffer width: 10 height: 5.
+    (buf width = 10) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: CellBuffer width should be 10' println. failed := failed + 1 ].
+    (buf height = 5) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: CellBuffer height should be 5' println. failed := failed + 1 ].
+
+    "--- Test: Initial cells are space (charcode 32) at origin ---"
+    cell := buf cellAt: 0 y: 0.
+    cell isNil ifTrue: [
+      'FAIL: cellAt: 0 y: 0 should not be nil' println. failed := failed + 1.
+    ] ifFalse: [
+      ((cell at: #char) = 32) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: initial cell char should be 32 (space)' println. failed := failed + 1 ].
+      ((cell at: #fg) isNil) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: initial cell fg should be nil' println. failed := failed + 1 ].
+      ((cell at: #bg) isNil) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: initial cell bg should be nil' println. failed := failed + 1 ].
+    ].
+
+    "--- Test: cellAt: middle of buffer ---"
+    cell := buf cellAt: 5 y: 2.
+    cell isNil ifTrue: [
+      'FAIL: cellAt: 5 y: 2 should not be nil' println. failed := failed + 1.
+    ] ifFalse: [
+      ((cell at: #char) = 32) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: middle cell should be space' println. failed := failed + 1 ].
+    ].
+
+    "--- Test: cellAt: out of bounds returns nil ---"
+    (buf cellAt: -1 y: 0) isNil ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: cellAt: -1 y: 0 should be nil' println. failed := failed + 1 ].
+    (buf cellAt: 10 y: 0) isNil ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: cellAt: 10 y: 0 should be nil (width=10, max index 9)' println. failed := failed + 1 ].
+    (buf cellAt: 0 y: -1) isNil ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: cellAt: 0 y: -1 should be nil' println. failed := failed + 1 ].
+
+    "--- Test: cellAt: bottom-right corner (spec: should work, off-by-one bug) ---"
+    (buf cellAt: 9 y: 4) isNil ifTrue: [
+      'FAIL: cellAt: 9 y: 4 is nil (off-by-one bug: last cell not initialized)' println. failed := failed + 1.
+    ] ifFalse: [
+      passed := passed + 1.
+    ].
+
+    "--- Test: putChar: writes character and style ---"
+    style := Dictionary new.
+    style at: #fg put: 'white'.
+    style at: #bg put: 'black'.
+    buf putChar: 65 x: 3 y: 2 style: style.
+    cell := buf cellAt: 3 y: 2.
+    cell isNil ifTrue: [
+      'FAIL: cell at (3,2) after putChar should not be nil' println. failed := failed + 1.
+    ] ifFalse: [
+      ((cell at: #char) = 65) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: putChar should set char to 65 (A)' println. failed := failed + 1 ].
+      ((cell at: #fg) = 'white') ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: putChar should set fg to white' println. failed := failed + 1 ].
+      ((cell at: #bg) = 'black') ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: putChar should set bg to black' println. failed := failed + 1 ].
+    ].
+
+    "--- Test: putChar: with nil style does not overwrite existing style ---"
+    buf putChar: 66 x: 3 y: 2 style: nil.
+    cell := buf cellAt: 3 y: 2.
+    ((cell at: #char) = 66) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: putChar nil style should still set char to 66 (B)' println. failed := failed + 1 ].
+    ((cell at: #fg) = 'white') ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: putChar nil style should preserve fg' println. failed := failed + 1 ].
+
+    "--- Test: putChar: out of bounds is no-op ---"
+    buf putChar: 88 x: -1 y: 0 style: nil.
+    buf putChar: 88 x: 100 y: 100 style: nil.
+    passed := passed + 1.
+
+    "--- SKIP: putString: tests (charCode bug and 1-based indexing bug) ---"
+    'SKIP: putString tests (charCode not understood + 1-based indexing bug)' println.
+    failed := failed + 5.
+
+    "--- Test: clear resets all cells to space ---"
+    buf putChar: 65 x: 0 y: 0 style: nil.
+    buf clear.
+    cell := buf cellAt: 0 y: 0.
+    ((cell at: #char) = 32) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: clear should reset char to 32 (space)' println. failed := failed + 1 ].
+    ((cell at: #fg) isNil) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: clear should reset fg to nil' println. failed := failed + 1 ].
+
+    "--- Test: clearRect: only clears within rectangle ---"
+    buf3 := CellBuffer width: 10 height: 10.
+    buf3 putChar: 65 x: 0 y: 0 style: nil.
+    buf3 putChar: 66 x: 5 y: 5 style: nil.
+    r := Rectangle x: 4 y: 4 width: 3 height: 3.
+    buf3 clearRect: r.
+    ((buf3 cellAt: 5 y: 5) at: #char) = 32 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: clearRect should clear cell at (5,5)' println. failed := failed + 1 ].
+    ((buf3 cellAt: 0 y: 0) at: #char) = 65 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: clearRect should not clear cell at (0,0)' println. failed := failed + 1 ].
+
+    "--- Test: drawBox draws Unicode box-drawing characters ---"
+    buf4 := CellBuffer width: 20 height: 10.
+    r := Rectangle x: 2 y: 1 width: 6 height: 4.
+    buf4 drawBox: r style: nil.
+
+    topLeft := buf4 cellAt: 2 y: 1.
+    topRight := buf4 cellAt: 7 y: 1.
+    bottomLeft := buf4 cellAt: 2 y: 4.
+    bottomRight := buf4 cellAt: 7 y: 4.
+    topEdge := buf4 cellAt: 3 y: 1.
+    leftEdge := buf4 cellAt: 2 y: 2.
+    rightEdge := buf4 cellAt: 7 y: 2.
+
+    topLeft isNil ifTrue: [
+      'FAIL: drawBox top-left corner cell is nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (topLeft at: #char) = 9484 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: drawBox top-left corner should be 9484' println. failed := failed + 1 ].
+    ].
+    topRight isNil ifTrue: [
+      'FAIL: drawBox top-right corner cell is nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (topRight at: #char) = 9488 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: drawBox top-right corner should be 9488' println. failed := failed + 1 ].
+    ].
+    bottomLeft isNil ifTrue: [
+      'FAIL: drawBox bottom-left corner cell is nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (bottomLeft at: #char) = 9492 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: drawBox bottom-left corner should be 9492' println. failed := failed + 1 ].
+    ].
+    bottomRight isNil ifTrue: [
+      'FAIL: drawBox bottom-right corner cell is nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (bottomRight at: #char) = 9496 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: drawBox bottom-right corner should be 9496' println. failed := failed + 1 ].
+    ].
+    topEdge isNil ifTrue: [
+      'FAIL: drawBox top edge cell is nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (topEdge at: #char) = 9472 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: drawBox top edge should be 9472' println. failed := failed + 1 ].
+    ].
+    leftEdge isNil ifTrue: [
+      'FAIL: drawBox left edge cell is nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (leftEdge at: #char) = 9474 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: drawBox left edge should be 9474' println. failed := failed + 1 ].
+    ].
+    rightEdge isNil ifTrue: [
+      'FAIL: drawBox right edge cell is nil' println. failed := failed + 1.
+    ] ifFalse: [
+      (rightEdge at: #char) = 9474 ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: drawBox right edge should be 9474' println. failed := failed + 1 ].
+    ].
+
+    "--- Test: indexing formula y*width+x ---"
+    buf5 := CellBuffer width: 10 height: 5.
+    buf5 putChar: 88 x: 3 y: 2 style: nil.
+    cell := buf5 cellAt: 3 y: 2.
+    ((cell at: #char) = 88) ifTrue: [ passed := passed + 1 ] ifFalse: [ 'FAIL: index formula y*width+x check failed' println. failed := failed + 1 ].
+
+    '--- CellBuffer Test Results ---' println.
+    passed printString print. ' passed, ' print. failed printString print. ' failed' println.
+    (failed > 0) ifTrue: [ 'CELLBUFFER: SOME TESTS FAILED' println ] ifFalse: [ 'CELLBUFFER: ALL TESTS PASSED' println ].
+    ^ failed
+  ]

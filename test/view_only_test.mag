@@ -1,0 +1,65 @@
+"View-only tests (basic state, no model interaction)"
+
+TestRunner subclass: Object [
+  | passed failed failures |
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^ r
+  ]
+  method: init [
+    passed := 0. failed := 0. failures := Array new
+  ]
+  method: assert: condition message: msg [
+    condition ifTrue: [ passed := passed + 1 ]
+      ifFalse: [ failed := failed + 1. failures := failures copyWith: msg. ('FAIL: ', msg) println ]
+  ]
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [ passed := passed + 1 ]
+      ifFalse: [ failed := failed + 1. failures := failures copyWith: msg. ('FAIL: ', msg) println ]
+  ]
+  method: report [
+    ('Passed: ', passed printString, ' Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [ failures do: [:f | ('  - ', f) println ] ].
+    (failed = 0) ifTrue: [ 'ALL TESTS PASSED' println ] ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+]
+
+ViewTest subclass: Object [
+  classMethod: run [
+    | t v v2 v3 v5 |
+    t := TestRunner new.
+
+    "View creation and initial state"
+    v := Alto::View new.
+    t assert: (v notNil) message: 'View new returns non-nil'.
+    t assertEqual: (v needsRedraw) to: true message: 'View new needsRedraw is true'.
+    t assertEqual: (v model) to: nil message: 'View model starts nil'.
+
+    "invalidate sets needsRedraw"
+    v2 := Alto::View new.
+    v2 needsRedraw: false.
+    v2 invalidate.
+    t assertEqual: (v2 needsRedraw) to: true message: 'invalidate sets needsRedraw'.
+
+    "update: calls invalidate"
+    v3 := Alto::View new.
+    v3 needsRedraw: false.
+    v3 update: #something.
+    t assertEqual: (v3 needsRedraw) to: true message: 'update: triggers invalidate'.
+
+    "draw clears needsRedraw flag"
+    v5 := Alto::View new.
+    t assertEqual: (v5 needsRedraw) to: true message: 'View starts needing redraw'.
+    v5 draw.
+    t assertEqual: (v5 needsRedraw) to: false message: 'draw clears needsRedraw'.
+
+    "draw when not needed is a no-op"
+    v5 draw.
+    t assert: true message: 'draw when not needed does not crash'.
+    t assertEqual: (v5 needsRedraw) to: false message: 'draw when not needed keeps flag false'.
+
+    t report
+  ]
+]

@@ -1,0 +1,391 @@
+"MVC Phase 3 — Comprehensive test suite for Model, View, Controller.
+ Tests behavior from the spec, not implementation details."
+
+"A mock dependent that records update: calls for testing Model notifications."
+MockDep subclass: Object
+  instanceVars: updates
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance init.
+    ^ instance
+  ]
+
+  method: init [
+    updates := Array new
+  ]
+
+  method: update: aspect [
+    updates := updates copyWith: aspect
+  ]
+
+  method: updates [
+    ^ updates
+  ]
+
+  method: updateCount [
+    ^ updates size
+  ]
+
+"Simple test runner."
+T subclass: Object
+  instanceVars: passed failed failures
+
+  classMethod: new [
+    | r |
+    r := super new.
+    r init.
+    ^ r
+  ]
+
+  method: init [
+    passed := 0.
+    failed := 0.
+    failures := Array new
+  ]
+
+  method: assert: condition message: msg [
+    condition ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg) println
+    ]
+  ]
+
+  method: assertEqual: actual to: expected message: msg [
+    (actual = expected) ifTrue: [
+      passed := passed + 1
+    ] ifFalse: [
+      failed := failed + 1.
+      failures := failures copyWith: msg.
+      ('FAIL: ', msg, ' (got: ', actual printString, ' expected: ', expected printString, ')') println
+    ]
+  ]
+
+  method: report [
+    '=== Test Results ===' println.
+    ('Passed: ', passed printString) println.
+    ('Failed: ', failed printString) println.
+    (failed > 0) ifTrue: [
+      'Failures:' println.
+      failures do: [:f | ('  - ', f) println]
+    ].
+    (failed = 0)
+      ifTrue: [ 'ALL TESTS PASSED' println ]
+      ifFalse: [ 'SOME TESTS FAILED' println ]
+  ]
+
+  method: failed [
+    ^ failed
+  ]
+
+"=== MODEL TESTS ==="
+ModelTests subclass: Object
+
+  classMethod: run: t [
+    | m dep1 dep2 dep3 dep4 m2 d1 d2 m3 m4 d3 d4 m5 d5 |
+    '--- Model Tests ---' println.
+
+    "1. Model new creates instance with empty dependents"
+    m := Alto::Model new.
+    t assert: (m notNil) message: 'M1: Model new returns non-nil'.
+    t assertEqual: (m dependents size) to: 0 message: 'M2: Model new has empty dependents'.
+
+    "2. addDependent: adds a dependent to the model"
+    dep1 := MockDep new.
+    m addDependent: dep1.
+    t assertEqual: (m dependents size) to: 1 message: 'M3: addDependent adds one dependent'.
+
+    "3. addDependent: can add multiple dependents"
+    dep2 := MockDep new.
+    dep3 := MockDep new.
+    m addDependent: dep2.
+    m addDependent: dep3.
+    t assertEqual: (m dependents size) to: 3 message: 'M4: addDependent adds multiple dependents'.
+
+    "4. removeDependent: removes a specific dependent"
+    m removeDependent: dep2.
+    t assertEqual: (m dependents size) to: 2 message: 'M5: removeDependent removes one dependent'.
+
+    "5. removeDependent: on non-existent dependent is safe"
+    dep4 := MockDep new.
+    m removeDependent: dep4.
+    t assertEqual: (m dependents size) to: 2 message: 'M6: removeDependent non-existent is safe'.
+
+    "6. changed sends update: nil to ALL dependents"
+    m2 := Alto::Model new.
+    d1 := MockDep new.
+    d2 := MockDep new.
+    m2 addDependent: d1.
+    m2 addDependent: d2.
+    m2 changed.
+    t assertEqual: (d1 updateCount) to: 1 message: 'M7: changed notifies first dependent'.
+    t assertEqual: (d2 updateCount) to: 1 message: 'M8: changed notifies second dependent'.
+    t assertEqual: (d1 updates first) to: nil message: 'M9: changed sends nil aspect to dep1'.
+    t assertEqual: (d2 updates first) to: nil message: 'M10: changed sends nil aspect to dep2'.
+
+    "7. changed: aspect sends update: with the given aspect"
+    m2 changed: #name.
+    t assertEqual: (d1 updateCount) to: 2 message: 'M11: changed: sends second notification to dep1'.
+    t assertEqual: (d2 updateCount) to: 2 message: 'M12: changed: sends second notification to dep2'.
+    t assertEqual: (d1 updates last) to: #name message: 'M13: changed: sends correct aspect to dep1'.
+    t assertEqual: (d2 updates last) to: #name message: 'M14: changed: sends correct aspect to dep2'.
+
+    "8. changed on model with no dependents does not crash"
+    m3 := Alto::Model new.
+    m3 changed.
+    t assert: true message: 'M15: changed with no dependents is safe'.
+
+    "9. changed: on model with no dependents does not crash"
+    m3 changed: #test.
+    t assert: true message: 'M16: changed: with no dependents is safe'.
+
+    "10. removeDependent: then changed does not notify removed dependent"
+    m4 := Alto::Model new.
+    d3 := MockDep new.
+    d4 := MockDep new.
+    m4 addDependent: d3.
+    m4 addDependent: d4.
+    m4 removeDependent: d3.
+    m4 changed: #removed.
+    t assertEqual: (d3 updateCount) to: 0 message: 'M17: removed dependent not notified'.
+    t assertEqual: (d4 updateCount) to: 1 message: 'M18: remaining dependent still notified'.
+
+    "11. Multiple changed calls accumulate updates"
+    m5 := Alto::Model new.
+    d5 := MockDep new.
+    m5 addDependent: d5.
+    m5 changed.
+    m5 changed: #a.
+    m5 changed: #b.
+    t assertEqual: (d5 updateCount) to: 3 message: 'M19: multiple changed calls accumulate'.
+  ]
+
+"=== VIEW TESTS ==="
+ViewTests subclass: Object
+
+  classMethod: run: t [
+    | v vm vm2 v2 v3 rect v4 v5 vm3 v6 vm4 v7 v8 v9 v10 buf |
+    '--- View Tests ---' println.
+
+    "1. View new creates instance"
+    v := Alto::View new.
+    t assert: (v notNil) message: 'V1: View new returns non-nil'.
+
+    "2. View new starts needing redraw"
+    t assertEqual: (v needsRedraw) to: true message: 'V2: View new needsRedraw is true'.
+
+    "3. View model starts nil"
+    t assertEqual: (v model) to: nil message: 'V3: View model starts nil'.
+
+    "4. View bounds starts nil"
+    t assertEqual: (v bounds) to: nil message: 'V4: View bounds starts nil'.
+
+    "5. View buffer starts nil"
+    t assertEqual: (v buffer) to: nil message: 'V5: View buffer starts nil'.
+
+    "6. model: sets model and registers view as dependent"
+    vm := Alto::Model new.
+    v model: vm.
+    t assertEqual: (v model) to: vm message: 'V6: model: stores model'.
+    t assertEqual: (vm dependents size) to: 1 message: 'V7: model: registers view as dependent'.
+
+    "7. model: with new model unregisters from old model"
+    vm2 := Alto::Model new.
+    v model: vm2.
+    t assertEqual: (v model) to: vm2 message: 'V8: model: switches to new model'.
+    t assertEqual: (vm dependents size) to: 0 message: 'V9: model: unregisters from old model'.
+    t assertEqual: (vm2 dependents size) to: 1 message: 'V10: model: registers with new model'.
+
+    "8. model: nil unregisters from current model"
+    v model: nil.
+    t assertEqual: (v model) to: nil message: 'V11: model: nil clears model'.
+    t assertEqual: (vm2 dependents size) to: 0 message: 'V12: model: nil unregisters'.
+
+    "9. bounds: sets bounds and creates buffer sized to rect"
+    v2 := Alto::View new.
+    rect := Alto::Rectangle x: 0 y: 0 width: 10 height: 5.
+    v2 bounds: rect.
+    t assertEqual: (v2 bounds) to: rect message: 'V13: bounds: stores bounds'.
+    t assert: (v2 buffer notNil) message: 'V14: bounds: creates buffer'.
+    t assertEqual: (v2 buffer width) to: 10 message: 'V15: buffer width matches rect width'.
+    t assertEqual: (v2 buffer height) to: 5 message: 'V16: buffer height matches rect height'.
+
+    "10. bounds: triggers invalidate"
+    v3 := Alto::View new.
+    v3 needsRedraw: false.
+    v3 bounds: (Alto::Rectangle x: 0 y: 0 width: 5 height: 5).
+    t assertEqual: (v3 needsRedraw) to: true message: 'V17: bounds: triggers invalidate'.
+
+    "11. invalidate sets needsRedraw true"
+    v4 := Alto::View new.
+    v4 needsRedraw: false.
+    v4 invalidate.
+    t assertEqual: (v4 needsRedraw) to: true message: 'V18: invalidate sets needsRedraw'.
+
+    "12. update: calls invalidate (marks needsRedraw)"
+    v5 := Alto::View new.
+    v5 needsRedraw: false.
+    v5 update: #something.
+    t assertEqual: (v5 needsRedraw) to: true message: 'V19: update: triggers invalidate'.
+
+    "13. Model changed: triggers View update: via observer wiring"
+    vm3 := Alto::Model new.
+    v6 := Alto::View new.
+    v6 needsRedraw: false.
+    v6 model: vm3.
+    vm3 changed: #data.
+    t assertEqual: (v6 needsRedraw) to: true message: 'V20: Model changed: triggers View needsRedraw'.
+
+    "14. Model changed (no arg) triggers View update: nil"
+    vm4 := Alto::Model new.
+    v7 := Alto::View new.
+    v7 needsRedraw: false.
+    v7 model: vm4.
+    vm4 changed.
+    t assertEqual: (v7 needsRedraw) to: true message: 'V21: Model changed triggers View needsRedraw'.
+
+    "15. draw with buffer set clears needsRedraw"
+    v8 := Alto::View new.
+    v8 bounds: (Alto::Rectangle x: 0 y: 0 width: 10 height: 5).
+    t assertEqual: (v8 needsRedraw) to: true message: 'V22: view with bounds needsRedraw'.
+    v8 draw.
+    t assertEqual: (v8 needsRedraw) to: false message: 'V23: draw clears needsRedraw'.
+
+    "16. draw when not needed is a no-op"
+    v8 draw.
+    t assertEqual: (v8 needsRedraw) to: false message: 'V24: draw when not needed keeps flag false'.
+
+    "17. draw without buffer (no bounds set) does not crash, does not clear flag"
+    v9 := Alto::View new.
+    t assertEqual: (v9 buffer) to: nil message: 'V25: buffer nil before bounds'.
+    t assertEqual: (v9 needsRedraw) to: true message: 'V26: needsRedraw true before draw'.
+    v9 draw.
+    t assertEqual: (v9 needsRedraw) to: true message: 'V27: draw with nil buffer does not clear flag'.
+
+    "18. displayOn: base does not crash (subclasses override)"
+    v10 := Alto::View new.
+    buf := Alto::CellBuffer width: 5 height: 5.
+    v10 displayOn: buf.
+    t assert: true message: 'V28: displayOn: base impl does not crash'.
+  ]
+
+"=== CONTROLLER TESTS ==="
+ControllerTests subclass: Object
+
+  classMethod: run: t [
+    | c cm cv c2 m2 |
+    '--- Controller Tests ---' println.
+
+    "1. Controller new creates instance"
+    c := Alto::Controller new.
+    t assert: (c notNil) message: 'C1: Controller new returns non-nil'.
+
+    "2. Controller new initializes inactive"
+    t assertEqual: (c isActive) to: false message: 'C2: Controller new is inactive'.
+
+    "3. Controller model and view are nil initially"
+    t assertEqual: (c model) to: nil message: 'C3: Controller model starts nil'.
+    t assertEqual: (c view) to: nil message: 'C4: Controller view starts nil'.
+
+    "4. model:view: stores references"
+    cm := Alto::Model new.
+    cv := Alto::View new.
+    c model: cm view: cv.
+    t assertEqual: (c model) to: cm message: 'C5: model:view: stores model'.
+    t assertEqual: (c view) to: cv message: 'C6: model:view: stores view'.
+
+    "5. activate sets active true"
+    c activate.
+    t assertEqual: (c isActive) to: true message: 'C7: activate sets active'.
+
+    "6. deactivate sets active false"
+    c deactivate.
+    t assertEqual: (c isActive) to: false message: 'C8: deactivate clears active'.
+
+    "7. activate/deactivate toggle"
+    c activate.
+    t assertEqual: (c isActive) to: true message: 'C9: re-activate works'.
+    c deactivate.
+    t assertEqual: (c isActive) to: false message: 'C10: re-deactivate works'.
+
+    "8. handleEvent: does not crash (base class is no-op)"
+    c handleEvent: #someEvent.
+    t assert: true message: 'C11: handleEvent base does not crash'.
+
+    "9. Multiple controllers can share same model"
+    c2 := Alto::Controller new.
+    m2 := Alto::Model new.
+    c model: m2 view: nil.
+    c2 model: m2 view: nil.
+    t assertEqual: (c model) to: m2 message: 'C12: first controller has shared model'.
+    t assertEqual: (c2 model) to: m2 message: 'C13: second controller has shared model'.
+  ]
+
+"=== MVC INTEGRATION TESTS ==="
+MVCIntegrationTests subclass: Object
+
+  classMethod: run: t [
+    | m v c m2 v1 v2 |
+    '--- MVC Integration Tests ---' println.
+
+    "1. Full MVC triad wiring"
+    m := Alto::Model new.
+    v := Alto::View new.
+    v bounds: (Alto::Rectangle x: 0 y: 0 width: 20 height: 10).
+    v model: m.
+    c := Alto::Controller new.
+    c model: m view: v.
+
+    t assertEqual: (c model) to: m message: 'I1: controller model is model'.
+    t assertEqual: (c view) to: v message: 'I2: controller view is view'.
+    t assertEqual: (v model) to: m message: 'I3: view model is model'.
+    t assertEqual: (m dependents size) to: 1 message: 'I4: model has one dependent (view)'.
+
+    "Model change triggers view invalidation"
+    v draw.
+    t assertEqual: (v needsRedraw) to: false message: 'I5: after draw, needsRedraw false'.
+    m changed: #data.
+    t assertEqual: (v needsRedraw) to: true message: 'I6: model changed invalidates view'.
+
+    "Draw cycle works after model change"
+    v draw.
+    t assertEqual: (v needsRedraw) to: false message: 'I7: draw after model change clears flag'.
+
+    "2. Two views on same model both get notified"
+    m2 := Alto::Model new.
+    v1 := Alto::View new.
+    v2 := Alto::View new.
+    v1 model: m2.
+    v2 model: m2.
+    t assertEqual: (m2 dependents size) to: 2 message: 'I8: model has two dependents'.
+    v1 needsRedraw: false.
+    v2 needsRedraw: false.
+    m2 changed: #shared.
+    t assertEqual: (v1 needsRedraw) to: true message: 'I9: first view invalidated by model'.
+    t assertEqual: (v2 needsRedraw) to: true message: 'I10: second view invalidated by model'.
+
+    "3. Removing view from model stops notification"
+    v1 needsRedraw: false.
+    v2 needsRedraw: false.
+    m2 removeDependent: v1.
+    m2 changed: #afterRemove.
+    t assertEqual: (v1 needsRedraw) to: false message: 'I11: removed view not invalidated'.
+    t assertEqual: (v2 needsRedraw) to: true message: 'I12: remaining view still invalidated'.
+  ]
+
+"=== MAIN RUNNER ==="
+Phase3Tests subclass: Object
+  classMethod: run [
+    | t |
+    t := T new.
+    ModelTests run: t.
+    ControllerTests run: t.
+    ViewTests run: t.
+    MVCIntegrationTests run: t.
+    t report.
+    ^ t failed
+  ]

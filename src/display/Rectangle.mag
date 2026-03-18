@@ -1,52 +1,74 @@
 namespace: 'Alto'
 import: 'Go'
 
-"Rectangle — axis-aligned rectangle used for layout and hit-testing."
-
 Rectangle subclass: Object
   instanceVars: x y width height
 
-  "Class constructor"
-  classMethod: x: anX y: aY width: aW height: aH [
-    | r |
-    r := self new.
-    r x: anX.
-    r y: aY.
-    r width: aW.
-    r height: aH.
-    ^ r
+  method: x [
+      ^x
   ]
 
-  "Getters"
-  method: x [ ^ x ]
-  method: y [ ^ y ]
-  method: width [ ^ width ]
-  method: height [ ^ height ]
+  method: y [
+      ^y
+  ]
 
-  "Setters"
-  method: x: aValue [ x := aValue ]
-  method: y: aValue [ y := aValue ]
-  method: width: aValue [ width := aValue ]
-  method: height: aValue [ height := aValue ]
+  method: width [
+      ^width
+  ]
 
-  "Derived accessors"
-  method: right [ ^ x + width ]
-  method: bottom [ ^ y + height ]
-  method: extent [ ^ { width. height } ]
+  method: height [
+      ^height
+  ]
 
-  "Hit-testing — returns true if the point (px, py) lies inside the rectangle."
+  method: x: aValue [
+      x := aValue
+  ]
+
+  method: y: aValue [
+      y := aValue
+  ]
+
+  method: width: aValue [
+      width := aValue
+  ]
+
+  method: height: aValue [
+      height := aValue
+  ]
+
+  method: right [
+      ^x + width
+  ]
+
+  method: bottom [
+      ^y + height
+  ]
+
+  method: extent [
+      ^{width. height}
+  ]
+
   method: containsPointX: px y: py [
-    ^ (px >= x) and: [ px < (x + width) ] and: [ py >= y ] and: [ py < (y + height) ]
+      ^px >= x and: [px < (x + width)] and: [py >= y] and: [py < (y + height)]
   ]
 
-  "Return the intersection of self and other, or nil if they do not overlap."
   method: intersect: other [
-    | maxX maxY minRight minBottom |
-    maxX := x max: other x.
-    maxY := y max: other y.
-    minRight := (x + width) min: (other x + other width).
-    minBottom := (y + height) min: (other y + other height).
-    (minRight <= maxX) ifTrue: [ ^ nil ].
-    (minBottom <= maxY) ifTrue: [ ^ nil ].
-    ^ Rectangle x: maxX y: maxY width: minRight - maxX height: minBottom - maxY
+      | maxX maxY minRight minBottom |
+      maxX := x max: other x.
+      maxY := y max: other y.
+      minRight := x + width min: other x + other width.
+      minBottom := y + height min: other y + other height.
+      minRight <= maxX ifTrue: [^nil].
+      minBottom <= maxY ifTrue: [^nil].
+      ^Rectangle x: maxX y: maxY width: minRight - maxX height: minBottom - maxY
+  ]
+
+  classMethod: x: anX y: aY width: aW height: aH [
+      | r |
+      r := self new.
+      r x: anX.
+      r y: aY.
+      r width: aW.
+      r height: aH.
+      ^r
   ]

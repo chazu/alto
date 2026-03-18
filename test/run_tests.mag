@@ -1,0 +1,35 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Test runner for Phase 2: CellBuffer and Display compositor"
+
+Phase2Tests subclass: Object
+  classMethod: run [
+    | totalFailed |
+    totalFailed := 0.
+
+    '=============================' println.
+    'Phase 2 Tests: CellBuffer & Display' println.
+    '=============================' println.
+    '' println.
+
+    'Running Rectangle tests...' println.
+    totalFailed := totalFailed + RectangleTest run.
+    '' println.
+
+    'Running CellBuffer tests...' println.
+    totalFailed := totalFailed + CellBufferTest run.
+    '' println.
+
+    'Running Display tests...' println.
+    totalFailed := totalFailed + DisplayTest run.
+    '' println.
+
+    '=============================' println.
+    (totalFailed > 0) ifTrue: [
+      'OVERALL: ' print. totalFailed printString print. ' FAILURES' println.
+    ] ifFalse: [
+      'OVERALL: ALL TESTS PASSED' println.
+    ].
+    '=============================' println.
+  ]

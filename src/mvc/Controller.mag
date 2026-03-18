@@ -1,50 +1,48 @@
 namespace: 'Alto'
 import: 'Go'
 
-"Controller — base controller for handling events in the MVC triad."
-
 Controller subclass: Object
   instanceVars: model view active
 
-  classMethod: new [
-    | instance |
-    instance := super new.
-    instance initialize.
-    ^ instance
-  ]
-
   method: initialize [
-    model := nil.
-    view := nil.
-    active := false
+      model := nil.
+      view := nil.
+      active := false
   ]
 
   method: model: m view: v [
-    model := m.
-    view := v.
-    ^ self
+      model := m.
+      view := v.
+      ^self
   ]
 
   method: model [
-    ^ model
+      ^model
   ]
 
   method: view [
-    ^ view
+      ^view
   ]
 
   method: handleEvent: anEvent [
-    ^ self
+      ^self
   ]
 
   method: isActive [
-    ^ active
+      ^active
   ]
 
   method: activate [
-    active := true
+      active := true
   ]
 
   method: deactivate [
-    active := false
+      active := false
+  ]
+
+  classMethod: new [
+      | instance |
+      instance := super new.
+      instance initialize.
+      ^instance
   ]
