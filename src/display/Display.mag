@@ -1,0 +1,139 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Display — the global compositor and event loop.
+
+ Display manages a terminal screen, an off-screen CellBuffer, and an
+ ordered collection of windows.  Each frame it composites every window
+ buffer onto the screen buffer (back-to-front) and flushes to the
+ terminal.
+
+ Window protocol (implemented by window classes in later phases):
+   - buffer   — returns the window's CellBuffer
+   - frame    — returns a Rectangle (x, y, width, height)
+   - handleEvent: evt — process a terminal event (key, mouse, resize …)
+
+ Usage:
+   | display |
+   display := Display new.
+   display addWindow: someWindow.
+   display run.
+"
+
+Display subclass: Object
+  instanceVars: screen buffer windows running
+
+  "---- class side ----"
+
+  classMethod: new [
+    | d |
+    d := super new.
+    d initDisplay.
+    ^ d
+  ]
+
+  "---- initialization ----"
+
+  method: initDisplay [
+    | screenSize w h |
+    screen := Go::Terminal newScreen.
+    screen init.
+    screen enableMouse.
+    screen clear.
+
+    screenSize := screen size.
+    w := screenSize at: 0.
+    h := screenSize at: 1.
+
+    buffer := CellBuffer width: w height: h.
+    windows := Array new.
+    running := false
+  ]
+
+  "---- window management ----"
+
+  method: addWindow: w [
+    windows add: w
+  ]
+
+  method: removeWindow: w [
+    windows remove: w
+  ]
+
+  method: bringToFront: w [
+    windows remove: w.
+    windows add: w
+  ]
+
+  "---- accessors ----"
+
+  method: screen [ ^ screen ]
+  method: buffer [ ^ buffer ]
+  method: windows [ ^ windows ]
+  method: running [ ^ running ]
+
+  "---- rendering ----"
+
+  method: render [
+    "Composite all window buffers onto the screen buffer, then flush."
+    | style |
+    buffer clear.
+
+    "Blit each window back-to-front."
+    windows do: [:win |
+      | winBuf winFrame ox oy fw fh |
+      winBuf  := win buffer.
+      winFrame := win frame.
+      ox := winFrame x.
+      oy := winFrame y.
+      fw := winFrame width.
+      fh := winFrame height.
+
+      0 to: fh - 1 do: [:row |
+        0 to: fw - 1 do: [:col |
+          | cell |
+          cell := winBuf cellAt: col y: row.
+          buffer putCell: cell x: ox + col y: oy + row
+        ]
+      ]
+    ].
+
+    "Flush the composed buffer to the terminal screen."
+    | bw bh |
+    bw := buffer width.
+    bh := buffer height.
+    style := Go::V2::Style new.
+
+    0 to: bh - 1 do: [:y |
+      0 to: bw - 1 do: [:x |
+        | cell ch cellStyle |
+        cell := buffer cellAt: x y: y.
+        ch := cell char.
+        cellStyle := cell style.
+        cellStyle ifNil: [ cellStyle := style ].
+        screen setContent: x _: y _: ch _: cellStyle
+      ]
+    ].
+
+    screen show
+  ]
+
+  "---- event loop ----"
+
+  method: run [
+    "Main event loop — render, poll, dispatch."
+    running := true.
+    [running] whileTrue: [
+      self render.
+      | event |
+      event := screen pollEvent.
+      (windows size > 0) ifTrue: [
+        (windows last) handleEvent: event
+      ]
+    ].
+    screen fini
+  ]
+
+  method: stop [
+    running := false
+  ]

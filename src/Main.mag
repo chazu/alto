@@ -1,26 +1,84 @@
 namespace: 'Alto'
 import: 'Go'
 
+"Main — Alto entry point.
+
+ Demonstrates the Display compositor by drawing a box directly onto the
+ display's CellBuffer and rendering a single frame before waiting for
+ a keypress.
+
+ Once Window classes are available this will be replaced with proper
+ window-based composition.
+"
+
 Main subclass: Object
   classMethod: start [
-    | screen event |
-    'Creating screen...' println.
-    screen := Go::Terminal newScreen.
-    'Screen created, initializing...' println.
-    screen init.
-    screen enableMouse.
-    screen clear.
+    | display buf w h style |
+    'Creating display...' println.
+    display := Display new.
+    buf := display buffer.
+    w := buf width.
+    h := buf height.
 
-    "Draw 'Alto' at position 10,5"
-    screen setContent: 10 _: 5 _: 65 _: (Go::V2::Style new).
-    screen setContent: 11 _: 5 _: 108 _: (Go::V2::Style new).
-    screen setContent: 12 _: 5 _: 116 _: (Go::V2::Style new).
-    screen setContent: 13 _: 5 _: 111 _: (Go::V2::Style new).
+    "Draw a border box in the center of the screen."
+    | boxW boxH boxX boxY |
+    boxW := 30.
+    boxH := 10.
+    boxX := (w - boxW) / 2.
+    boxY := (h - boxH) / 2.
+
+    style := Go::V2::Style new.
+    style := style foreground: (Go::V2 getColor: 'white').
+    style := style background: (Go::V2 getColor: 'navy').
+
+    "Top and bottom edges."
+    0 to: boxW - 1 do: [:i |
+      buf putChar: $- x: boxX + i y: boxY         style: style.
+      buf putChar: $- x: boxX + i y: boxY + boxH - 1 style: style
+    ].
+
+    "Left and right edges."
+    0 to: boxH - 1 do: [:i |
+      buf putChar: $| x: boxX         y: boxY + i style: style.
+      buf putChar: $| x: boxX + boxW - 1 y: boxY + i style: style
+    ].
+
+    "Corners."
+    buf putChar: $+ x: boxX             y: boxY             style: style.
+    buf putChar: $+ x: boxX + boxW - 1  y: boxY             style: style.
+    buf putChar: $+ x: boxX             y: boxY + boxH - 1  style: style.
+    buf putChar: $+ x: boxX + boxW - 1  y: boxY + boxH - 1  style: style.
+
+    "Write 'Alto' centered inside the box."
+    | textX textY |
+    textX := boxX + (boxW - 4) / 2.
+    textY := boxY + (boxH / 2).
+    buf putChar: 65  x: textX     y: textY style: style.  "A"
+    buf putChar: 108 x: textX + 1 y: textY style: style.  "l"
+    buf putChar: 116 x: textX + 2 y: textY style: style.  "t"
+    buf putChar: 111 x: textX + 3 y: textY style: style.  "o"
+
+    "Render the buffer to terminal (no windows, just direct buffer draw)."
+    | bw bh screen |
+    screen := display screen.
+    bw := buf width.
+    bh := buf height.
+
+    0 to: bh - 1 do: [:y |
+      0 to: bw - 1 do: [:x |
+        | cell ch cellStyle |
+        cell := buf cellAt: x y: y.
+        ch := cell char.
+        cellStyle := cell style.
+        cellStyle ifNil: [ cellStyle := Go::V2::Style new ].
+        screen setContent: x _: y _: ch _: cellStyle
+      ]
+    ].
     screen show.
 
-    "Wait for any key"
-    event := screen pollEvent.
+    "Wait for any key."
+    screen pollEvent.
 
     screen fini.
-    'Alto demo complete.' println
+    'Alto display demo complete.' println
   ]
