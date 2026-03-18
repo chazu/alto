@@ -1,0 +1,72 @@
+namespace: 'Alto'
+import: 'Go'
+
+View subclass: Object
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance needsRedraw: true.
+    ^ instance
+  ]
+
+  method: model: aModel [
+    model notNil ifTrue: [
+      model removeDependent: self
+    ].
+    model := aModel.
+    aModel notNil ifTrue: [
+      aModel addDependent: self
+    ]
+  ]
+
+  method: model [
+    ^ model
+  ]
+
+  method: bounds: aRect [
+    | width height |
+    bounds := aRect.
+    aRect notNil ifTrue: [
+      width := aRect width.
+      height := aRect height.
+      buffer := Go::CellBuffer new.
+      buffer resize: width _: height
+    ].
+    self invalidate
+  ]
+
+  method: bounds [
+    ^ bounds
+  ]
+
+  method: buffer [
+    ^ buffer
+  ]
+
+  method: displayOn: aCellBuffer [
+    "Subclasses override this method to render into the buffer."
+    ^ self
+  ]
+
+  method: invalidate [
+    needsRedraw := true
+  ]
+
+  method: update: aspect [
+    self invalidate
+  ]
+
+  method: draw [
+    needsRedraw ifTrue: [
+      self displayOn: buffer.
+      needsRedraw := false
+    ]
+  ]
+
+  method: needsRedraw [
+    ^ needsRedraw
+  ]
+
+  method: needsRedraw: aBoolean [
+    needsRedraw := aBoolean
+  ]
