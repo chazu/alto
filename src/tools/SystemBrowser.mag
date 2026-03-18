@@ -109,7 +109,52 @@ SystemBrowser subclass: View
   method: focusedPane [ ^focusedPane ]
 
   method: handleEvent: evt [
-    | keyCode runeVal |
+    | keyCode runeVal pos mx my btn paneWidth idx items classes methods |
+
+    "Mouse click handling"
+    (evt isKindOf: Go::V2::EventMouse) ifTrue: [
+      pos := evt position.
+      mx := pos at: 0.
+      my := pos at: 1.
+      btn := evt buttons.
+      btn = 1 ifFalse: [^self].
+      paneWidth := 80 // 3.
+
+      mx < paneWidth ifTrue: [
+        focusedPane := 0.
+        idx := my.
+        items := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+        idx < items size ifTrue: [
+          selectedCategory := items at: idx.
+          self updateClassList
+        ]
+      ] ifFalse: [
+        mx < (paneWidth * 2) ifTrue: [
+          focusedPane := 1.
+          idx := my.
+          classes := self classesForCategory: selectedCategory.
+          idx < classes size ifTrue: [
+            selectedClass := classes at: idx.
+            self updateMethodList
+          ]
+        ] ifFalse: [
+          mx < (paneWidth * 3) ifTrue: [
+            focusedPane := 2.
+            idx := my.
+            methods := self methodsForClass: selectedClass.
+            idx < methods size ifTrue: [
+              selectedMethod := methods at: idx.
+              self updateCodeView
+            ]
+          ] ifFalse: [
+            focusedPane := 3
+          ]
+        ]
+      ].
+      self invalidate.
+      ^self
+    ].
+
     (evt isKindOf: Go::V2::EventKey) ifFalse: [^self].
     keyCode := evt key.
     runeVal := evt rune.
@@ -205,10 +250,9 @@ SystemBrowser subclass: View
   ]
 
   method: selectClass [
+    | classes |
+    classes := self classesForCategory: selectedCategory.
     selectedClass isNil ifTrue: [
-      "No class selected yet — pick first one"
-      | classes |
-      classes := self classesForCategory: selectedCategory.
       classes size > 0 ifTrue: [selectedClass := classes at: 0]
     ].
     self updateMethodList.
@@ -216,11 +260,10 @@ SystemBrowser subclass: View
   ]
 
   method: selectMethod [
+    | methods |
     selectedClass isNil ifTrue: [^self].
+    methods := self methodsForClass: selectedClass.
     selectedMethod isNil ifTrue: [
-      "No method selected yet — pick first one"
-      | methods |
-      methods := self methodsForClass: selectedClass.
       methods size > 0 ifTrue: [selectedMethod := methods at: 0]
     ].
     self updateCodeView.
