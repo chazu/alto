@@ -1,0 +1,41 @@
+namespace: 'Alto'
+import: 'Go'
+
+Model subclass: Object [
+  | dependents |
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance dependents: (Array new).
+    ^ instance
+  ]
+
+  method: dependents: anArray [
+    dependents := anArray
+  ]
+
+  method: addDependent: obj [
+    dependents add: obj
+  ]
+
+  method: removeDependent: obj [
+    | idx |
+    idx := dependents indexOf: obj.
+    (idx >= 0) ifTrue: [
+      dependents removeAt: idx
+    ]
+  ]
+
+  method: changed [
+    dependents do: [:dep | dep update: nil]
+  ]
+
+  method: changed: aspect [
+    dependents do: [:dep | dep update: aspect]
+  ]
+
+  method: dependents [
+    ^ dependents
+  ]
+]
