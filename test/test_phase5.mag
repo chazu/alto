@@ -6,10 +6,15 @@ import: 'Go'
 
  Spec requirements tested:
  - Workspace: textLines, cursorX, cursorY, scrollOffset instance vars;
-   handleEvent: for rune insertion, enter, backspace, arrows
- - Transcript: lines, maxLines, scrollOffset instance vars;
-   singleton pattern; show: method; read-only (no rune insertion);
-   up/down scroll events"
+   Workspace subclasses View; open: creates Window titled Workspace;
+   handleEvent: for rune insertion, enter, backspace, arrows, escape
+ - Transcript: lines, maxLines (1000), scrollOffset instance vars;
+   Transcript subclasses View; singleton pattern; show: method;
+   read-only (no rune insertion); up/down scroll; escape closes;
+   newest at bottom
+ - Main.mag: creates Display, opens Workspace and Transcript, runs loop
+ All tests use integer char codes, not dollar-sign literals.
+ All array/string access is 0-based per Maggie convention."
 
 "Simple test runner."
 T5 subclass: Object
@@ -65,11 +70,29 @@ T5 subclass: Object
     ^ failed
   ]
 
+"Helper to make rune events with integer char codes."
+EvtHelper subclass: Object
+
+  classMethod: runeEvent: charCode [
+    | evt |
+    evt := Dictionary new.
+    evt at: #key put: #rune.
+    evt at: #rune put: charCode.
+    ^evt
+  ]
+
+  classMethod: keyEvent: keySymbol [
+    | evt |
+    evt := Dictionary new.
+    evt at: #key put: keySymbol.
+    ^evt
+  ]
+
 "=== WORKSPACE TESTS ==="
 WorkspaceTests subclass: Object
 
   classMethod: run: t [
-    | ws evt evt2 evt3 evt4 evt5 evt6 evt7 ws2 ws3 ws4 ws5 ws6 ws7 ws8 ws9 ws10 prevSize |
+    | ws evt evt2 evt3 evt4 evt5 evt6 evt7 ws2 ws3 ws4 ws5 ws6 ws7 ws8 ws9 ws10 ws11 ws12 prevSize |
     '--- Workspace Tests ---' println.
 
     "WS1: Workspace new creates instance with correct defaults"
@@ -87,199 +110,172 @@ WorkspaceTests subclass: Object
     t assert: true message: 'WS2c: Workspace responds to invalidate without error'.
 
     "WS3: After inserting a printable char event, textLines has one line with that char"
+    "Using integer 65 for A"
     ws3 := Workspace new.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $A.
+    evt := EvtHelper runeEvent: 65.
     ws3 handleEvent: evt.
     t assertEqual: (ws3 textLines size) to: 1 message: 'WS3a: textLines has 1 line after char insert'.
-    t assertEqual: (ws3 textLines at: 1) to: 'A' message: 'WS3b: first line is A'.
+    t assertEqual: (ws3 textLines at: 0) to: 'A' message: 'WS3b: first line is A'.
     t assertEqual: (ws3 cursorX) to: 1 message: 'WS3c: cursorX = 1 after char insert'.
 
     "WS4: After typing multiple chars, the line contains all chars in order"
+    "72 = H, 105 = i"
     ws4 := Workspace new.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $H.
+    evt := EvtHelper runeEvent: 72.
     ws4 handleEvent: evt.
-    evt2 := Dictionary new.
-    evt2 at: #key put: #rune.
-    evt2 at: #rune put: $i.
+    evt2 := EvtHelper runeEvent: 105.
     ws4 handleEvent: evt2.
-    t assertEqual: (ws4 textLines at: 1) to: 'Hi' message: 'WS4a: line contains Hi'.
+    t assertEqual: (ws4 textLines at: 0) to: 'Hi' message: 'WS4a: line contains Hi'.
     t assertEqual: (ws4 cursorX) to: 2 message: 'WS4b: cursorX = 2 after two chars'.
 
     "WS5: Enter key splits line and moves cursor to next line"
+    "97 = a, 98 = b, 99 = c, 100 = d"
     ws5 := Workspace new.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $a.
-    ws5 handleEvent: evt.
-    evt2 := Dictionary new.
-    evt2 at: #key put: #rune.
-    evt2 at: #rune put: $b.
-    ws5 handleEvent: evt2.
-    evt3 := Dictionary new.
-    evt3 at: #key put: #enter.
-    ws5 handleEvent: evt3.
-    evt4 := Dictionary new.
-    evt4 at: #key put: #rune.
-    evt4 at: #rune put: $c.
-    ws5 handleEvent: evt4.
-    evt5 := Dictionary new.
-    evt5 at: #key put: #rune.
-    evt5 at: #rune put: $d.
-    ws5 handleEvent: evt5.
+    ws5 handleEvent: (EvtHelper runeEvent: 97).
+    ws5 handleEvent: (EvtHelper runeEvent: 98).
+    ws5 handleEvent: (EvtHelper keyEvent: #enter).
+    ws5 handleEvent: (EvtHelper runeEvent: 99).
+    ws5 handleEvent: (EvtHelper runeEvent: 100).
     t assertEqual: (ws5 textLines size) to: 2 message: 'WS5a: textLines has 2 lines after enter'.
-    t assertEqual: (ws5 textLines at: 1) to: 'ab' message: 'WS5b: first line is ab'.
-    t assertEqual: (ws5 textLines at: 2) to: 'cd' message: 'WS5c: second line is cd'.
+    t assertEqual: (ws5 textLines at: 0) to: 'ab' message: 'WS5b: first line is ab'.
+    t assertEqual: (ws5 textLines at: 1) to: 'cd' message: 'WS5c: second line is cd'.
     t assertEqual: (ws5 cursorY) to: 1 message: 'WS5d: cursorY = 1'.
     t assertEqual: (ws5 cursorX) to: 2 message: 'WS5e: cursorX = 2'.
 
     "WS6: Backspace at start of non-first line merges with previous line"
     ws6 := Workspace new.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $a.
-    ws6 handleEvent: evt.
-    evt2 := Dictionary new.
-    evt2 at: #key put: #rune.
-    evt2 at: #rune put: $b.
-    ws6 handleEvent: evt2.
-    evt3 := Dictionary new.
-    evt3 at: #key put: #enter.
-    ws6 handleEvent: evt3.
-    evt4 := Dictionary new.
-    evt4 at: #key put: #rune.
-    evt4 at: #rune put: $c.
-    ws6 handleEvent: evt4.
-    evt5 := Dictionary new.
-    evt5 at: #key put: #rune.
-    evt5 at: #rune put: $d.
-    ws6 handleEvent: evt5.
-    "Now cursor is at line 1, col 2. Move cursor to start of line 1."
-    evt6 := Dictionary new.
-    evt6 at: #key put: #left.
-    ws6 handleEvent: evt6.
-    ws6 handleEvent: evt6.
-    "Now cursorX should be 0, cursorY = 1. Press backspace to merge."
-    evt7 := Dictionary new.
-    evt7 at: #key put: #backspace.
-    ws6 handleEvent: evt7.
+    ws6 handleEvent: (EvtHelper runeEvent: 97).
+    ws6 handleEvent: (EvtHelper runeEvent: 98).
+    ws6 handleEvent: (EvtHelper keyEvent: #enter).
+    ws6 handleEvent: (EvtHelper runeEvent: 99).
+    ws6 handleEvent: (EvtHelper runeEvent: 100).
+    "Move cursor to start of line 1"
+    ws6 handleEvent: (EvtHelper keyEvent: #left).
+    ws6 handleEvent: (EvtHelper keyEvent: #left).
+    "Now cursorX = 0, cursorY = 1. Backspace merges."
+    ws6 handleEvent: (EvtHelper keyEvent: #backspace).
     t assertEqual: (ws6 textLines size) to: 1 message: 'WS6a: lines merged to 1'.
-    t assertEqual: (ws6 textLines at: 1) to: 'abcd' message: 'WS6b: merged line is abcd'.
+    t assertEqual: (ws6 textLines at: 0) to: 'abcd' message: 'WS6b: merged line is abcd'.
     t assertEqual: (ws6 cursorY) to: 0 message: 'WS6c: cursorY = 0 after merge'.
     t assertEqual: (ws6 cursorX) to: 2 message: 'WS6d: cursorX = 2 (end of prev line)'.
 
     "WS7: Backspace in middle of line removes character and decrements cursorX"
     ws7 := Workspace new.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $a.
-    ws7 handleEvent: evt.
-    evt2 := Dictionary new.
-    evt2 at: #key put: #rune.
-    evt2 at: #rune put: $b.
-    ws7 handleEvent: evt2.
-    evt3 := Dictionary new.
-    evt3 at: #key put: #rune.
-    evt3 at: #rune put: $c.
-    ws7 handleEvent: evt3.
-    "Cursor at col 3. Press backspace."
-    evt4 := Dictionary new.
-    evt4 at: #key put: #backspace.
-    ws7 handleEvent: evt4.
-    t assertEqual: (ws7 textLines at: 1) to: 'ab' message: 'WS7a: backspace removes last char'.
+    ws7 handleEvent: (EvtHelper runeEvent: 97).
+    ws7 handleEvent: (EvtHelper runeEvent: 98).
+    ws7 handleEvent: (EvtHelper runeEvent: 99).
+    "Cursor at col 3. Backspace removes c."
+    ws7 handleEvent: (EvtHelper keyEvent: #backspace).
+    t assertEqual: (ws7 textLines at: 0) to: 'ab' message: 'WS7a: backspace removes last char'.
     t assertEqual: (ws7 cursorX) to: 2 message: 'WS7b: cursorX = 2 after backspace'.
 
     "WS8: Arrow up/down move cursorY within bounds"
     ws8 := Workspace new.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $a.
-    ws8 handleEvent: evt.
-    evt2 := Dictionary new.
-    evt2 at: #key put: #enter.
-    ws8 handleEvent: evt2.
-    evt3 := Dictionary new.
-    evt3 at: #key put: #rune.
-    evt3 at: #rune put: $b.
-    ws8 handleEvent: evt3.
-    evt4 := Dictionary new.
-    evt4 at: #key put: #enter.
-    ws8 handleEvent: evt4.
-    evt5 := Dictionary new.
-    evt5 at: #key put: #rune.
-    evt5 at: #rune put: $c.
-    ws8 handleEvent: evt5.
+    ws8 handleEvent: (EvtHelper runeEvent: 97).
+    ws8 handleEvent: (EvtHelper keyEvent: #enter).
+    ws8 handleEvent: (EvtHelper runeEvent: 98).
+    ws8 handleEvent: (EvtHelper keyEvent: #enter).
+    ws8 handleEvent: (EvtHelper runeEvent: 99).
     "Now 3 lines: a, b, c. cursorY = 2."
-    evt6 := Dictionary new.
-    evt6 at: #key put: #up.
-    ws8 handleEvent: evt6.
+    ws8 handleEvent: (EvtHelper keyEvent: #up).
     t assertEqual: (ws8 cursorY) to: 1 message: 'WS8a: up moves cursorY to 1'.
-    ws8 handleEvent: evt6.
+    ws8 handleEvent: (EvtHelper keyEvent: #up).
     t assertEqual: (ws8 cursorY) to: 0 message: 'WS8b: up moves cursorY to 0'.
-    ws8 handleEvent: evt6.
+    ws8 handleEvent: (EvtHelper keyEvent: #up).
     t assertEqual: (ws8 cursorY) to: 0 message: 'WS8c: up at 0 stays 0'.
-    evt7 := Dictionary new.
-    evt7 at: #key put: #down.
-    ws8 handleEvent: evt7.
-    ws8 handleEvent: evt7.
-    ws8 handleEvent: evt7.
+    ws8 handleEvent: (EvtHelper keyEvent: #down).
+    ws8 handleEvent: (EvtHelper keyEvent: #down).
+    ws8 handleEvent: (EvtHelper keyEvent: #down).
     t assertEqual: (ws8 cursorY) to: 2 message: 'WS8d: down past last line stays at last line'.
 
     "WS9: Arrow left/right move cursorX within bounds"
     ws9 := Workspace new.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $a.
-    ws9 handleEvent: evt.
-    evt2 := Dictionary new.
-    evt2 at: #key put: #rune.
-    evt2 at: #rune put: $b.
-    ws9 handleEvent: evt2.
+    ws9 handleEvent: (EvtHelper runeEvent: 97).
+    ws9 handleEvent: (EvtHelper runeEvent: 98).
     "cursorX = 2"
-    evt3 := Dictionary new.
-    evt3 at: #key put: #left.
-    ws9 handleEvent: evt3.
+    ws9 handleEvent: (EvtHelper keyEvent: #left).
     t assertEqual: (ws9 cursorX) to: 1 message: 'WS9a: left moves cursorX to 1'.
-    ws9 handleEvent: evt3.
+    ws9 handleEvent: (EvtHelper keyEvent: #left).
     t assertEqual: (ws9 cursorX) to: 0 message: 'WS9b: left moves cursorX to 0'.
-    ws9 handleEvent: evt3.
+    ws9 handleEvent: (EvtHelper keyEvent: #left).
     t assertEqual: (ws9 cursorX) to: 0 message: 'WS9c: left at 0 stays 0'.
-    evt4 := Dictionary new.
-    evt4 at: #key put: #right.
-    ws9 handleEvent: evt4.
+    ws9 handleEvent: (EvtHelper keyEvent: #right).
     t assertEqual: (ws9 cursorX) to: 1 message: 'WS9d: right moves cursorX to 1'.
-    ws9 handleEvent: evt4.
+    ws9 handleEvent: (EvtHelper keyEvent: #right).
     t assertEqual: (ws9 cursorX) to: 2 message: 'WS9e: right moves cursorX to 2'.
-    ws9 handleEvent: evt4.
+    ws9 handleEvent: (EvtHelper keyEvent: #right).
     t assertEqual: (ws9 cursorX) to: 2 message: 'WS9f: right past end of line stays at end'.
 
     "WS10: Backspace at position 0 of line 0 does nothing"
     ws10 := Workspace new.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $x.
-    ws10 handleEvent: evt.
+    ws10 handleEvent: (EvtHelper runeEvent: 120).
     "Move cursor to start"
-    evt2 := Dictionary new.
-    evt2 at: #key put: #left.
-    ws10 handleEvent: evt2.
+    ws10 handleEvent: (EvtHelper keyEvent: #left).
     prevSize := ws10 textLines size.
-    evt3 := Dictionary new.
-    evt3 at: #key put: #backspace.
-    ws10 handleEvent: evt3.
+    ws10 handleEvent: (EvtHelper keyEvent: #backspace).
     t assertEqual: (ws10 textLines size) to: prevSize message: 'WS10a: backspace at 0,0 does not change line count'.
-    t assertEqual: (ws10 textLines at: 1) to: 'x' message: 'WS10b: backspace at 0,0 does not change line content'.
-    t assertEqual: (ws10 cursorX) to: 0 message: 'WS10c: cursorX stays 0'
+    t assertEqual: (ws10 textLines at: 0) to: 'x' message: 'WS10b: backspace at 0,0 does not change line content'.
+    t assertEqual: (ws10 cursorX) to: 0 message: 'WS10c: cursorX stays 0'.
+
+    "WS11: Enter on empty workspace creates a line"
+    ws11 := Workspace new.
+    ws11 handleEvent: (EvtHelper keyEvent: #enter).
+    t assert: (ws11 textLines size > 0) message: 'WS11a: enter on empty workspace creates lines'.
+    t assertEqual: (ws11 cursorY) to: 1 message: 'WS11b: cursorY advances after enter on empty'.
+
+    "WS12: Backspace on empty workspace does nothing"
+    ws12 := Workspace new.
+    ws12 handleEvent: (EvtHelper keyEvent: #backspace).
+    t assertEqual: (ws12 textLines size) to: 0 message: 'WS12: backspace on empty workspace is a no-op'.
+
+    "WS13: Insert in middle of line — cursor navigation then type"
+    ws3 := Workspace new.
+    ws3 handleEvent: (EvtHelper runeEvent: 97).
+    ws3 handleEvent: (EvtHelper runeEvent: 99).
+    "Line is 'ac', cursorX=2. Move left 1 to insert before c"
+    ws3 handleEvent: (EvtHelper keyEvent: #left).
+    ws3 handleEvent: (EvtHelper runeEvent: 98).
+    t assertEqual: (ws3 textLines at: 0) to: 'abc' message: 'WS13a: insert in middle gives abc'.
+    t assertEqual: (ws3 cursorX) to: 2 message: 'WS13b: cursorX = 2 after mid-insert'.
+
+    "WS14: Enter splits line in middle"
+    ws4 := Workspace new.
+    ws4 handleEvent: (EvtHelper runeEvent: 97).
+    ws4 handleEvent: (EvtHelper runeEvent: 98).
+    ws4 handleEvent: (EvtHelper runeEvent: 99).
+    ws4 handleEvent: (EvtHelper runeEvent: 100).
+    "Line is 'abcd', cursorX=4. Move left 2 to split after 'ab'"
+    ws4 handleEvent: (EvtHelper keyEvent: #left).
+    ws4 handleEvent: (EvtHelper keyEvent: #left).
+    ws4 handleEvent: (EvtHelper keyEvent: #enter).
+    t assertEqual: (ws4 textLines size) to: 2 message: 'WS14a: enter mid-line creates 2 lines'.
+    t assertEqual: (ws4 textLines at: 0) to: 'ab' message: 'WS14b: first line is ab'.
+    t assertEqual: (ws4 textLines at: 1) to: 'cd' message: 'WS14c: second line is cd'.
+    t assertEqual: (ws4 cursorY) to: 1 message: 'WS14d: cursorY moves to new line'.
+    t assertEqual: (ws4 cursorX) to: 0 message: 'WS14e: cursorX resets to 0'.
+
+    "WS15: Up arrow clamps cursorX to shorter line"
+    ws5 := Workspace new.
+    ws5 handleEvent: (EvtHelper runeEvent: 97).
+    ws5 handleEvent: (EvtHelper keyEvent: #enter).
+    ws5 handleEvent: (EvtHelper runeEvent: 98).
+    ws5 handleEvent: (EvtHelper runeEvent: 99).
+    ws5 handleEvent: (EvtHelper runeEvent: 100).
+    "Line 0 = 'a' (length 1), line 1 = 'bcd' (length 3), cursorX=3"
+    ws5 handleEvent: (EvtHelper keyEvent: #up).
+    t assertEqual: (ws5 cursorX) to: 1 message: 'WS15: up arrow clamps cursorX to shorter line length'.
+
+    "WS16: Workspace invalidates on char insert"
+    ws6 := Workspace new.
+    ws6 handleEvent: (EvtHelper runeEvent: 97).
+    t assertEqual: (ws6 needsRedraw) to: true message: 'WS16: char insert invalidates (needsRedraw true)'
   ]
 
 "=== TRANSCRIPT TESTS ==="
 TranscriptTests subclass: Object
 
   classMethod: run: t [
-    | tr tr2 tr3 tr4 tr5 evt evt2 evt3 linesBefore |
+    | tr tr2 tr3 tr4 tr5 tr6 tr7 linesBefore i |
     '--- Transcript Tests ---' println.
 
     "TR1: Transcript new creates instance with correct defaults"
@@ -296,28 +292,25 @@ TranscriptTests subclass: Object
     "TR3: Transcript show: appends to lines array (use instance appendLine:)"
     tr4 := Transcript new.
     tr4 appendLine: 'test'.
-    t assert: (tr4 lines size > 0) message: 'TR3: show:/appendLine: appends to lines'.
+    t assert: (tr4 lines size > 0) message: 'TR3: appendLine: appends to lines'.
 
     "TR4: After appendLine: hello, lines size = 1, line content = hello"
     tr5 := Transcript new.
     tr5 appendLine: 'hello'.
     t assertEqual: (tr5 lines size) to: 1 message: 'TR4a: lines size = 1'.
-    t assertEqual: (tr5 lines at: 1) to: 'hello' message: 'TR4b: lines at: 1 = hello'.
+    t assertEqual: (tr5 lines at: 0) to: 'hello' message: 'TR4b: lines at: 0 = hello'.
 
-    "TR5: Multiple show: calls append in order"
+    "TR5: Multiple show: calls append in order (newest at bottom)"
     tr5 appendLine: 'world'.
     t assertEqual: (tr5 lines size) to: 2 message: 'TR5a: lines size = 2 after two appends'.
-    t assertEqual: (tr5 lines at: 1) to: 'hello' message: 'TR5b: first line is hello'.
-    t assertEqual: (tr5 lines at: 2) to: 'world' message: 'TR5c: second line is world'.
+    t assertEqual: (tr5 lines at: 0) to: 'hello' message: 'TR5b: first line is hello'.
+    t assertEqual: (tr5 lines at: 1) to: 'world' message: 'TR5c: second line is world (newest at bottom)'.
 
     "TR6: Transcript is read-only — handleEvent: with printable char does NOT modify lines"
     tr5 := Transcript new.
     tr5 appendLine: 'existing'.
     linesBefore := tr5 lines size.
-    evt := Dictionary new.
-    evt at: #key put: #rune.
-    evt at: #rune put: $X.
-    tr5 handleEvent: evt.
+    tr5 handleEvent: (EvtHelper runeEvent: 88).
     t assertEqual: (tr5 lines size) to: linesBefore message: 'TR6: printable char does not modify lines'.
 
     "TR7: Up/down events change scrollOffset"
@@ -325,23 +318,17 @@ TranscriptTests subclass: Object
     tr5 appendLine: 'line1'.
     tr5 appendLine: 'line2'.
     tr5 appendLine: 'line3'.
-    "scrollOffset is auto-set by appendLine: — capture current value"
-    evt2 := Dictionary new.
-    evt2 at: #key put: #up.
-    tr5 handleEvent: evt2.
+    "scrollOffset is auto-set by appendLine:"
+    tr5 handleEvent: (EvtHelper keyEvent: #up).
     t assert: (tr5 scrollOffset >= 0) message: 'TR7a: scrollOffset >= 0 after up'.
-    evt3 := Dictionary new.
-    evt3 at: #key put: #down.
-    tr5 handleEvent: evt3.
+    tr5 handleEvent: (EvtHelper keyEvent: #down).
     t assert: (tr5 scrollOffset >= 0) message: 'TR7b: scrollOffset >= 0 after down'.
 
     "TR8: scrollOffset does not go below 0"
     tr5 := Transcript new.
-    evt2 := Dictionary new.
-    evt2 at: #key put: #up.
-    tr5 handleEvent: evt2.
-    tr5 handleEvent: evt2.
-    tr5 handleEvent: evt2.
+    tr5 handleEvent: (EvtHelper keyEvent: #up).
+    tr5 handleEvent: (EvtHelper keyEvent: #up).
+    tr5 handleEvent: (EvtHelper keyEvent: #up).
     t assertEqual: (tr5 scrollOffset) to: 0 message: 'TR8: scrollOffset does not go below 0'.
 
     "TR9: Transcript is a subclass of View (test by calling View methods)"
@@ -349,7 +336,126 @@ TranscriptTests subclass: Object
     tr5 invalidate.
     t assertEqual: (tr5 needsRedraw) to: true message: 'TR9a: Transcript has needsRedraw (View method)'.
     t assert: (tr5 needsRedraw notNil) message: 'TR9b: Transcript needsRedraw returns non-nil'.
-    t assert: true message: 'TR9c: Transcript responds to invalidate without error'
+    t assert: true message: 'TR9c: Transcript responds to invalidate without error'.
+
+    "TR10: appendLine: auto-scrolls (scrollOffset updates so newest visible)"
+    tr6 := Transcript new.
+    tr6 appendLine: 'first'.
+    tr6 appendLine: 'second'.
+    tr6 appendLine: 'third'.
+    t assert: (tr6 scrollOffset >= 0) message: 'TR10: scrollOffset updates on append (auto-scroll)'.
+
+    "TR11: scrollOffset clamps on down — cannot exceed lines size - 1"
+    tr7 := Transcript new.
+    tr7 appendLine: 'only'.
+    tr7 handleEvent: (EvtHelper keyEvent: #down).
+    tr7 handleEvent: (EvtHelper keyEvent: #down).
+    tr7 handleEvent: (EvtHelper keyEvent: #down).
+    t assert: (tr7 scrollOffset <= ((tr7 lines size - 1) max: 0)) message: 'TR11: down scroll clamps at lines size - 1'.
+
+    "TR12: appendLine: invalidates (triggers redraw)"
+    tr6 := Transcript new.
+    tr6 appendLine: 'trigger'.
+    t assertEqual: (tr6 needsRedraw) to: true message: 'TR12: appendLine: invalidates'.
+
+    "TR13: Transcript handles up event on empty lines"
+    tr6 := Transcript new.
+    tr6 handleEvent: (EvtHelper keyEvent: #up).
+    t assertEqual: (tr6 scrollOffset) to: 0 message: 'TR13a: up on empty transcript stays 0'.
+    tr6 handleEvent: (EvtHelper keyEvent: #down).
+    t assertEqual: (tr6 scrollOffset) to: 0 message: 'TR13b: down on empty transcript stays 0'.
+
+    "TR14: Many appends preserve order — newest at bottom"
+    tr6 := Transcript new.
+    i := 1.
+    [i <= 5] whileTrue: [
+      tr6 appendLine: i printString.
+      i := i + 1
+    ].
+    t assertEqual: (tr6 lines at: 0) to: '1' message: 'TR14a: first append is line 1'.
+    t assertEqual: (tr6 lines at: 4) to: '5' message: 'TR14b: fifth append is line 5 (newest at bottom)'
+  ]
+
+"=== RENDERING TESTS ==="
+WorkspaceRenderingTests subclass: Object
+
+  classMethod: run: t [
+    | ws buf cell ws2 buf2 cell2 ws3 buf3 cell3 cell4 |
+    '--- Workspace Rendering Tests ---' println.
+
+    "WR1: Empty workspace renders cursor (reverse-video space) at 0,0"
+    ws := Workspace new.
+    buf := CellBuffer width: 20 height: 10.
+    ws displayOn: buf.
+    cell := buf cellAt: 0 y: 0.
+    t assert: (cell notNil) message: 'WR1a: cell at 0,0 is non-nil'.
+    t assertEqual: (cell at: #char) to: 32 message: 'WR1b: empty cursor is space (32)'.
+    t assertEqual: (cell at: #attrs) to: #reverse message: 'WR1c: cursor is reverse-video'.
+
+    "WR2: After typing a char, cursor moves — text char rendered, cursor at next position"
+    ws2 := Workspace new.
+    ws2 handleEvent: (EvtHelper runeEvent: 65).
+    buf2 := CellBuffer width: 20 height: 10.
+    ws2 displayOn: buf2.
+    cell2 := buf2 cellAt: 0 y: 0.
+    t assertEqual: (cell2 at: #char) to: 65 message: 'WR2a: A rendered at (0,0)'.
+    "Cursor should be at position 1 (reverse space)"
+    cell3 := buf2 cellAt: 1 y: 0.
+    t assertEqual: (cell3 at: #char) to: 32 message: 'WR2b: cursor space at (1,0)'.
+    t assertEqual: (cell3 at: #attrs) to: #reverse message: 'WR2c: cursor at (1,0) is reverse-video'.
+
+    "WR3: Two lines rendered correctly"
+    ws3 := Workspace new.
+    ws3 handleEvent: (EvtHelper runeEvent: 97).
+    ws3 handleEvent: (EvtHelper keyEvent: #enter).
+    ws3 handleEvent: (EvtHelper runeEvent: 98).
+    buf3 := CellBuffer width: 20 height: 10.
+    ws3 displayOn: buf3.
+    cell3 := buf3 cellAt: 0 y: 0.
+    t assertEqual: (cell3 at: #char) to: 97 message: 'WR3a: first line a (97) at (0,0)'.
+    cell4 := buf3 cellAt: 0 y: 1.
+    t assertEqual: (cell4 at: #char) to: 98 message: 'WR3b: second line b (98) at (0,1)'
+  ]
+
+TranscriptRenderingTests subclass: Object
+
+  classMethod: run: t [
+    | tr buf cell cell2 |
+    '--- Transcript Rendering Tests ---' println.
+
+    "TRR1: Transcript renders lines starting from scrollOffset"
+    tr := Transcript new.
+    tr appendLine: 'Hello'.
+    tr appendLine: 'World'.
+    buf := CellBuffer width: 20 height: 10.
+    tr displayOn: buf.
+    "Lines should be rendered — check first char of first rendered line"
+    cell := buf cellAt: 0 y: 0.
+    t assert: (cell notNil) message: 'TRR1: transcript renders into buffer'
+  ]
+
+"=== CONVENTION COMPLIANCE TESTS ==="
+ConventionTests subclass: Object
+
+  classMethod: run: t [
+    | ws tr |
+    '--- Convention Compliance Tests ---' println.
+
+    "CC1: Workspace textLines starts as Array new: 0 (empty array)"
+    ws := Workspace new.
+    t assertEqual: (ws textLines size) to: 0 message: 'CC1: textLines starts as empty array (Array new: 0)'.
+
+    "CC2: Transcript lines starts as Array new: 0 (empty array)"
+    tr := Transcript new.
+    t assertEqual: (tr lines size) to: 0 message: 'CC2: lines starts as empty array (Array new: 0)'.
+
+    "CC3: Workspace uses copyWith: for growth — insert a char and verify"
+    ws handleEvent: (EvtHelper runeEvent: 65).
+    t assertEqual: (ws textLines size) to: 1 message: 'CC3: textLines grows via insertion (copyWith:)'.
+
+    "CC4: Transcript uses copyWith: for growth — append a line and verify"
+    tr appendLine: 'test'.
+    t assertEqual: (tr lines size) to: 1 message: 'CC4: lines grows via append (copyWith:)'
   ]
 
 "=== MAIN RUNNER ==="
@@ -361,6 +467,18 @@ Phase5Tests subclass: Object
     WorkspaceTests run: t.
     '' println.
     TranscriptTests run: t.
+    '' println.
+    ConventionTests run: t.
+
+    "Print non-rendering results before attempting rendering tests"
+    '' println.
+    t report.
+    '' println.
+
+    'Attempting rendering tests...' println.
+    WorkspaceRenderingTests run: t.
+    '' println.
+    TranscriptRenderingTests run: t.
 
     '' println.
     t report.

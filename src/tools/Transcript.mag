@@ -45,7 +45,7 @@ Transcript subclass: View
       | trimStart |
       lines := lines copyWith: aString.
       (lines size > maxLines) ifTrue: [
-        trimStart := lines size - maxLines + 1.
+        trimStart := lines size - maxLines.
         lines := lines copyFrom: trimStart to: lines size
       ].
       scrollOffset := (lines size - 1) max: 0.
@@ -79,7 +79,7 @@ Transcript subclass: View
       [i < visibleHeight] whileTrue: [
         lineIndex := startOffset + i.
         (lineIndex < lines size) ifTrue: [
-          lineStr := lines at: lineIndex + 1.
+          lineStr := lines at: lineIndex.
           aCellBuffer putString: lineStr x: 0 y: i style: nil
         ].
         i := i + 1

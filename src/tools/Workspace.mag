@@ -83,15 +83,15 @@ Workspace subclass: View
               self invalidate.
               ^self
           ].
-          lineStr := textLines at: cursorY + 1.
-          leftPart := lineStr copyFrom: 1 to: cursorX.
-          rightPart := lineStr copyFrom: cursorX + 1 to: lineStr size.
-          textLines at: cursorY + 1 put: leftPart.
+          lineStr := textLines at: cursorY.
+          leftPart := lineStr copyFrom: 0 to: cursorX.
+          rightPart := lineStr copyFrom: cursorX to: lineStr size.
+          textLines at: cursorY put: leftPart.
           newLines := Array new: 0.
-          idx := 1.
-          [idx <= textLines size] whileTrue: [
+          idx := 0.
+          [idx < textLines size] whileTrue: [
               newLines := newLines copyWith: (textLines at: idx).
-              (idx = (cursorY + 1)) ifTrue: [
+              (idx = cursorY) ifTrue: [
                   newLines := newLines copyWith: rightPart
               ].
               idx := idx + 1
@@ -108,21 +108,21 @@ Workspace subclass: View
       (key = #backspace) ifTrue: [
           textLines size = 0 ifTrue: [^self].
           (cursorX > 0) ifTrue: [
-              lineStr := textLines at: cursorY + 1.
-              leftPart := lineStr copyFrom: 1 to: cursorX - 1.
-              rightPart := lineStr copyFrom: cursorX + 1 to: lineStr size.
-              textLines at: cursorY + 1 put: leftPart , rightPart.
+              lineStr := textLines at: cursorY.
+              leftPart := lineStr copyFrom: 0 to: cursorX - 1.
+              rightPart := lineStr copyFrom: cursorX to: lineStr size.
+              textLines at: cursorY put: leftPart , rightPart.
               cursorX := cursorX - 1
           ] ifFalse: [
               (cursorY > 0) ifTrue: [
-                  prevLine := textLines at: cursorY.
-                  lineStr := textLines at: cursorY + 1.
+                  prevLine := textLines at: cursorY - 1.
+                  lineStr := textLines at: cursorY.
                   cursorX := prevLine size.
-                  textLines at: cursorY put: prevLine , lineStr.
+                  textLines at: cursorY - 1 put: prevLine , lineStr.
                   newLines := Array new: 0.
-                  idx := 1.
-                  [idx <= textLines size] whileTrue: [
-                      (idx = (cursorY + 1)) ifFalse: [
+                  idx := 0.
+                  [idx < textLines size] whileTrue: [
+                      (idx = cursorY) ifFalse: [
                           newLines := newLines copyWith: (textLines at: idx)
                       ].
                       idx := idx + 1
@@ -140,7 +140,7 @@ Workspace subclass: View
       (key = #up) ifTrue: [
           cursorY := (cursorY - 1) max: 0.
           textLines size > 0 ifTrue: [
-              lineStr := textLines at: cursorY + 1.
+              lineStr := textLines at: cursorY.
               cursorX := cursorX min: lineStr size
           ].
           self updateScroll.
@@ -152,7 +152,7 @@ Workspace subclass: View
       (key = #down) ifTrue: [
           textLines size > 0 ifTrue: [
               cursorY := (cursorY + 1) min: textLines size - 1.
-              lineStr := textLines at: cursorY + 1.
+              lineStr := textLines at: cursorY.
               cursorX := cursorX min: lineStr size
           ].
           self updateScroll.
@@ -170,7 +170,7 @@ Workspace subclass: View
       "Arrow Right"
       (key = #right) ifTrue: [
           textLines size > 0 ifTrue: [
-              lineStr := textLines at: cursorY + 1.
+              lineStr := textLines at: cursorY.
               cursorX := (cursorX + 1) min: lineStr size
           ].
           self invalidate.
@@ -183,10 +183,10 @@ Workspace subclass: View
           textLines size = 0 ifTrue: [
               textLines := textLines copyWith: ''
           ].
-          lineStr := textLines at: cursorY + 1.
-          leftPart := lineStr copyFrom: 1 to: cursorX.
-          rightPart := lineStr copyFrom: cursorX + 1 to: lineStr size.
-          textLines at: cursorY + 1 put: leftPart , ch asString , rightPart.
+          lineStr := textLines at: cursorY.
+          leftPart := lineStr copyFrom: 0 to: cursorX.
+          rightPart := lineStr copyFrom: cursorX to: lineStr size.
+          textLines at: cursorY put: leftPart , (Character value: ch) asString , rightPart.
           cursorX := cursorX + 1.
           self updateScroll.
           self invalidate.
@@ -228,10 +228,10 @@ Workspace subclass: View
       [i < visibleHeight] whileTrue: [
           lineIndex := scrollOffset + i.
           (lineIndex < textLines size) ifTrue: [
-              lineStr := textLines at: lineIndex + 1.
+              lineStr := textLines at: lineIndex.
               j := 0.
               [j < lineStr size] whileTrue: [
-                  charCode := (lineStr at: j + 1) charCode.
+                  charCode := (lineStr at: j) value.
                   ((lineIndex = cursorY) and: [j = cursorX]) ifTrue: [
                       aCellBuffer putChar: charCode x: j y: i style: reverseStyle
                   ] ifFalse: [
