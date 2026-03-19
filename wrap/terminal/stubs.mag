@@ -2,6 +2,7 @@
 namespace: 'Go'
 
 Terminal subclass: Object
+  classMethod: debugLog: msg [ <primitive> ]
   classMethod: defaultStyle [ <primitive> ]
   classMethod: newScreen [ <primitive> ]
   classMethod: newStyle [ <primitive> ]

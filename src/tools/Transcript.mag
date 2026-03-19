@@ -54,7 +54,7 @@ Transcript subclass: View
 
   method: handleEvent: evt [
     | keyCode |
-    (evt className = 'Go::V2::EventKey') ifFalse: [^self].
+    (evt className asString = 'Go::V2::EventKey') ifFalse: [^self].
     keyCode := evt key.
     keyCode = 257 ifTrue: [  "Up"
       scrollOffset := (scrollOffset - 1) max: 0.

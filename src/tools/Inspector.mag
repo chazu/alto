@@ -81,7 +81,7 @@ Inspector subclass: View
 
   method: handleEvent: evt [
     | keyCode idx key val visibleHeight |
-    (evt className = 'Go::V2::EventKey') ifFalse: [^self].
+    (evt className asString = 'Go::V2::EventKey') ifFalse: [^self].
     keyCode := evt key.
 
     "Escape — close"

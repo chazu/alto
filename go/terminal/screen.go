@@ -3,8 +3,16 @@
 package terminal
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/gdamore/tcell/v2"
 )
+
+// DebugLog writes a message to stderr for debugging (bypasses terminal).
+func DebugLog(msg string) {
+	fmt.Fprintln(os.Stderr, msg)
+}
 
 // Screen wraps tcell.Screen, exposing interface methods as struct methods.
 type Screen struct {

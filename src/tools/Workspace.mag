@@ -47,12 +47,19 @@ Workspace subclass: View
    KeyLeft=260, KeyRight=261."
 
   method: handleEvent: evt [
-    | keyCode runeVal lineStr leftPart rightPart newLines idx |
+    | keyCode runeVal lineStr leftPart rightPart newLines idx evtClass isKey |
 
     "Only handle key events"
-    (evt className = 'Go::V2::EventKey') ifFalse: [^self].
+    evtClass := evt className asString.
+    isKey := evtClass = 'Go::V2::EventKey'.
+    isKey ifFalse: [^self].
     keyCode := evt key.
     runeVal := evt rune.
+    Go::Terminal debugLog: ('WS key=', keyCode printString, ' rune=', runeVal printString).
+    keyCode := evt key.
+    Go::Terminal debugLog: ('WS: key returned ', keyCode printString).
+    runeVal := evt rune.
+    Go::Terminal debugLog: ('WS key=', keyCode printString, ' rune=', runeVal printString).
 
     "Escape — close"
     keyCode = 27 ifTrue: [

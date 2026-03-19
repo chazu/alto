@@ -1,11 +1,11 @@
 namespace: 'Alto'
 import: 'Go'
 
-"CellBuffer — a 2D grid of cells for off-screen drawing.
- Each cell stores a character code (integer) and a tcell Style."
+"CellBuffer — a 2D grid of cells using flat arrays for performance.
+ Two parallel arrays: chars (integer codes) and styles (Style objects)."
 
 CellBuffer subclass: Object
-  instanceVars: cells width height defaultStyle
+  instanceVars: chars styles width height defaultStyle
 
   classMethod: width: w height: h [
     | buf |
@@ -15,54 +15,66 @@ CellBuffer subclass: Object
   ]
 
   method: initWidth: w height: h [
-    | sz i cell |
+    | sz |
     width := w.
     height := h.
     defaultStyle := Go::Terminal newStyle.
     sz := w * h.
-    cells := Array new: sz.
-    i := 0.
-    [i < sz] whileTrue: [
-      cell := Dictionary new.
-      cell at: 'char' put: 32.
-      cell at: 'style' put: defaultStyle.
-      cells at: i put: cell.
-      i := i + 1
-    ]
+    chars := Array new: sz withAll: 32.
+    styles := Array new: sz withAll: defaultStyle
   ]
 
   method: width [ ^width ]
   method: height [ ^height ]
 
   method: indexX: x y: y [
-    "Returns 0-based index into cells array, or -1 if out of bounds."
+    "Returns 0-based index, or -1 if out of bounds."
     (x < 0 or: [x >= width]) ifTrue: [^-1].
     (y < 0 or: [y >= height]) ifTrue: [^-1].
     ^y * width + x
   ]
 
-  method: cellAt: x y: y [
+  method: charAt: x y: y [
     | idx |
     idx := self indexX: x y: y.
+    idx < 0 ifTrue: [^32].
+    ^chars at: idx
+  ]
+
+  method: styleAt: x y: y [
+    | idx |
+    idx := self indexX: x y: y.
+    idx < 0 ifTrue: [^defaultStyle].
+    ^styles at: idx
+  ]
+
+  method: cellAt: x y: y [
+    "Legacy compatibility — returns a Dictionary."
+    | idx d |
+    idx := self indexX: x y: y.
     idx < 0 ifTrue: [^nil].
-    ^cells at: idx
+    d := Dictionary new.
+    d at: 'char' put: (chars at: idx).
+    d at: 'style' put: (styles at: idx).
+    ^d
   ]
 
   method: putChar: ch x: x y: y style: style [
-    | idx cell |
-    idx := self indexX: x y: y.
-    idx < 0 ifTrue: [^self].
-    cell := cells at: idx.
-    cell at: 'char' put: ch.
-    style notNil ifTrue: [cell at: 'style' put: style]
-  ]
-
-  method: putCell: aCell x: x y: y [
-    "Copy a cell dictionary to position x,y."
     | idx |
     idx := self indexX: x y: y.
     idx < 0 ifTrue: [^self].
-    aCell notNil ifTrue: [cells at: idx put: aCell]
+    chars at: idx put: ch.
+    style notNil ifTrue: [styles at: idx put: style]
+  ]
+
+  method: putCell: aCell x: x y: y [
+    | idx |
+    idx := self indexX: x y: y.
+    idx < 0 ifTrue: [^self].
+    aCell notNil ifTrue: [
+      chars at: idx put: (aCell at: 'char' ifAbsent: [32]).
+      styles at: idx put: (aCell at: 'style' ifAbsent: [defaultStyle])
+    ]
   ]
 
   method: putString: str x: x y: y style: style [
@@ -81,19 +93,16 @@ CellBuffer subclass: Object
     ry := rect y.
     rw := rect width.
     rh := rect height.
-    "Corners"
     self putChar: 9484 x: rx y: ry style: style.
     self putChar: 9488 x: rx + rw - 1 y: ry style: style.
     self putChar: 9492 x: rx y: ry + rh - 1 style: style.
     self putChar: 9496 x: rx + rw - 1 y: ry + rh - 1 style: style.
-    "Top and bottom edges"
     i := rx + 1.
     [i < (rx + rw - 1)] whileTrue: [
       self putChar: 9472 x: i y: ry style: style.
       self putChar: 9472 x: i y: ry + rh - 1 style: style.
       i := i + 1
     ].
-    "Left and right edges"
     i := ry + 1.
     [i < (ry + rh - 1)] whileTrue: [
       self putChar: 9474 x: rx y: i style: style.
@@ -103,20 +112,14 @@ CellBuffer subclass: Object
   ]
 
   method: clear [
-    | sz i cell |
-    sz := cells size.
-    i := 0.
-    [i < sz] whileTrue: [
-      cell := Dictionary new.
-      cell at: 'char' put: 32.
-      cell at: 'style' put: defaultStyle.
-      cells at: i put: cell.
-      i := i + 1
-    ]
+    | sz |
+    sz := width * height.
+    chars := Array new: sz withAll: 32.
+    styles := Array new: sz withAll: defaultStyle
   ]
 
   method: clearRect: rect [
-    | rx ry rw rh cx cy cell |
+    | rx ry rw rh cx cy |
     rx := rect x.
     ry := rect y.
     rw := rect width.
@@ -130,14 +133,4 @@ CellBuffer subclass: Object
       ].
       cy := cy + 1
     ]
-  ]
-
-  method: char: aCell [
-    "Extract char code from a cell dictionary."
-    ^aCell at: 'char' ifAbsent: [32]
-  ]
-
-  method: style: aCell [
-    "Extract style from a cell dictionary."
-    ^aCell at: 'style' ifAbsent: [defaultStyle]
   ]

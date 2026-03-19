@@ -69,7 +69,7 @@ ListView subclass: View
   method: handleEvent: evt [
     | keyCode |
 
-    (evt className = 'Go::V2::EventKey') ifFalse: [^self].
+    (evt className asString = 'Go::V2::EventKey') ifFalse: [^self].
     keyCode := evt key.
 
     "Up arrow"

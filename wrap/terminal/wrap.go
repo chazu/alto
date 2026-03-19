@@ -21,6 +21,13 @@ func RegisterPrimitives(v *vm.VM) {
 	nsClass := v.RegisterGoType("Go::Terminal", reflect.TypeOf((*struct{})(nil)))
 	_ = nsClass
 
+	nsClass.AddClassMethod(v.Selectors, "debugLog:", vm.NewPrimitiveMethod("debugLog:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		arg0 := v.ValueToGo(args[0]).(string)
+		pkg.DebugLog(arg0)
+		return vm.Nil
+	}))
+
 	nsClass.AddClassMethod(v.Selectors, "defaultStyle", vm.NewPrimitiveMethod("defaultStyle", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)
 		result := pkg.DefaultStyle()

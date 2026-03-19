@@ -59,14 +59,17 @@ Display subclass: Object
   "---- rendering ----"
 
   method: render [
-    "Composite all window buffers onto the screen buffer, then flush."
-    | defaultStyle winBuf winFrame ox oy fw fh cell ch cellStyle bw bh |
-    buffer clear.
+    "Render all windows directly to the terminal screen. No intermediate buffer."
+    | defaultStyle winBuf winFrame ox oy fw fh ch cellStyle |
+    defaultStyle := Go::Terminal newStyle.
 
-    "Draw each window: first let it render into its own buffer, then blit."
+    "Clear screen"
+    screen clear.
+
+    "Draw each window: render into its buffer, then write directly to screen."
     windows do: [:win |
       win draw.
-      winBuf  := win buffer.
+      winBuf := win buffer.
       winFrame := win frame.
       ox := winFrame x.
       oy := winFrame y.
@@ -75,27 +78,9 @@ Display subclass: Object
 
       0 to: fh - 1 do: [:row |
         0 to: fw - 1 do: [:col |
-          cell := winBuf cellAt: col y: row.
-          cell notNil ifTrue: [
-            buffer putCell: cell x: ox + col y: oy + row
-          ]
-        ]
-      ]
-    ].
-
-    "Flush the composed buffer to the terminal screen."
-    bw := buffer width.
-    bh := buffer height.
-    defaultStyle := Go::Terminal newStyle.
-
-    0 to: bh - 1 do: [:y |
-      0 to: bw - 1 do: [:x |
-        cell := buffer cellAt: x y: y.
-        cell notNil ifTrue: [
-          ch := cell at: 'char' ifAbsent: [32].
-          cellStyle := cell at: 'style' ifAbsent: [defaultStyle].
-          cellStyle isNil ifTrue: [cellStyle := defaultStyle].
-          screen setContent: x _: y _: ch _: cellStyle
+          ch := winBuf charAt: col y: row.
+          cellStyle := winBuf styleAt: col y: row.
+          screen setContent: ox + col _: oy + row _: ch _: cellStyle
         ]
       ]
     ].
@@ -107,15 +92,21 @@ Display subclass: Object
 
   method: run [
     "Main event loop — render, poll, dispatch."
-    | event |
+    | event needsRender |
     running := true.
+    needsRender := true.
     [running] whileTrue: [
-      self render.
+      needsRender ifTrue: [
+        self render.
+        needsRender := false
+      ].
       event := screen pollEvent.
-      "Dispatch all events to the frontmost window"
+      "Dispatch event to frontmost window"
       windows size > 0 ifTrue: [
         (windows at: windows size - 1) handleEvent: event
-      ]
+      ].
+      "Always re-render after an event"
+      needsRender := true
     ].
     screen fini
   ]
