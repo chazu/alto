@@ -2,11 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 "Display — the global compositor and event loop.
-
- Display manages a terminal screen, an off-screen CellBuffer, and an
- ordered collection of windows. Each frame it composites every window
- buffer onto the screen buffer (back-to-front) and flushes to the
- terminal."
+ Renders windows directly to the tcell screen."
 
 Display subclass: Object
   instanceVars: screen buffer windows running
@@ -23,7 +19,6 @@ Display subclass: Object
     screen := Go::Terminal newScreen.
     screen init.
     screen enableMouse.
-    screen clear.
 
     screenSize := screen size.
     w := screenSize at: 0.
@@ -59,14 +54,20 @@ Display subclass: Object
   "---- rendering ----"
 
   method: render [
-    "Render all windows directly to the terminal screen. No intermediate buffer."
-    | defaultStyle winBuf winFrame ox oy fw fh ch cellStyle |
+    "Render windows to screen. Uses double-buffering: render to CellBuffer,
+     then diff against previous frame and only send changed cells to tcell."
+    | prevChars prevStyles defaultStyle winBuf winFrame ox oy fw fh ch st bw bh idx prevCh prevSt |
     defaultStyle := Go::Terminal newStyle.
 
-    "Clear screen"
-    screen clear.
+    "Save previous frame"
+    bw := buffer width.
+    bh := buffer height.
+    prevChars := buffer charsArray copy.
+    prevStyles := buffer stylesArray copy.
 
-    "Draw each window: render into its buffer, then write directly to screen."
+    "Clear and redraw"
+    buffer clear.
+
     windows do: [:win |
       win draw.
       winBuf := win buffer.
@@ -79,8 +80,22 @@ Display subclass: Object
       0 to: fh - 1 do: [:row |
         0 to: fw - 1 do: [:col |
           ch := winBuf charAt: col y: row.
-          cellStyle := winBuf styleAt: col y: row.
-          screen setContent: ox + col _: oy + row _: ch _: cellStyle
+          st := winBuf styleAt: col y: row.
+          buffer putChar: ch x: ox + col y: oy + row style: st
+        ]
+      ]
+    ].
+
+    "Diff and flush only changed cells"
+    0 to: bh - 1 do: [:y |
+      0 to: bw - 1 do: [:x |
+        idx := y * bw + x.
+        ch := buffer charsArray at: idx.
+        st := buffer stylesArray at: idx.
+        prevCh := prevChars at: idx.
+        prevSt := prevStyles at: idx.
+        (ch = prevCh and: [st = prevSt]) ifFalse: [
+          screen setContent: x _: y _: ch _: st
         ]
       ]
     ].
@@ -91,24 +106,56 @@ Display subclass: Object
   "---- event loop ----"
 
   method: run [
-    "Main event loop — render, poll, dispatch."
-    | event needsRender |
+    "Main event loop."
+    | event |
     running := true.
-    needsRender := true.
+    "Full initial render"
+    self fullRender.
     [running] whileTrue: [
-      needsRender ifTrue: [
-        self render.
-        needsRender := false
-      ].
       event := screen pollEvent.
-      "Dispatch event to frontmost window"
       windows size > 0 ifTrue: [
         (windows at: windows size - 1) handleEvent: event
       ].
-      "Always re-render after an event"
-      needsRender := true
+      self render
     ].
     screen fini
+  ]
+
+  method: fullRender [
+    "Force full screen redraw (used for initial frame)."
+    | defaultStyle winBuf winFrame ox oy fw fh ch st bw bh |
+    defaultStyle := Go::Terminal newStyle.
+
+    buffer clear.
+    windows do: [:win |
+      win draw.
+      winBuf := win buffer.
+      winFrame := win frame.
+      ox := winFrame x.
+      oy := winFrame y.
+      fw := winFrame width.
+      fh := winFrame height.
+
+      0 to: fh - 1 do: [:row |
+        0 to: fw - 1 do: [:col |
+          ch := winBuf charAt: col y: row.
+          st := winBuf styleAt: col y: row.
+          buffer putChar: ch x: ox + col y: oy + row style: st
+        ]
+      ]
+    ].
+
+    "Write ALL cells to screen"
+    bw := buffer width.
+    bh := buffer height.
+    0 to: bh - 1 do: [:y |
+      0 to: bw - 1 do: [:x |
+        ch := buffer charAt: x y: y.
+        st := buffer styleAt: x y: y.
+        screen setContent: x _: y _: ch _: st
+      ]
+    ].
+    screen show
   ]
 
   method: stop [

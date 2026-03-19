@@ -26,6 +26,8 @@ CellBuffer subclass: Object
 
   method: width [ ^width ]
   method: height [ ^height ]
+  method: charsArray [ ^chars ]
+  method: stylesArray [ ^styles ]
 
   method: indexX: x y: y [
     "Returns 0-based index, or -1 if out of bounds."
