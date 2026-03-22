@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 SystemBrowser subclass: View
-  instanceVars: categoryList classList methodList codeView display parentWindow selectedCategory selectedClass selectedMethod focusedPane
+  instanceVars: categoryList classList methodList codeView display parentWindow selectedCategory selectedClass selectedMethod focusedPane normalStyle reverseStyle cachedCatBuf cachedClassBuf cachedMethodBuf cachedCodeBuf lastPaneWidth lastPaneHeight lastCodeHeight
 
   classMethod: new [
     | instance |
@@ -36,38 +36,69 @@ SystemBrowser subclass: View
     focusedPane := 0.
     display := nil.
     parentWindow := nil.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true.
+    lastPaneWidth := 0.
+    lastPaneHeight := 0.
+    lastCodeHeight := 0.
+    cachedCatBuf := nil.
+    cachedClassBuf := nil.
+    cachedMethodBuf := nil.
+    cachedCodeBuf := nil.
     self updateClassList
   ]
 
   method: classesForCategory: aCategoryName [
-    aCategoryName = 'Kernel' ifTrue: [^#('Rectangle' 'CellBuffer')].
-    aCategoryName = 'Display' ifTrue: [^#('Display')].
-    aCategoryName = 'MVC' ifTrue: [^#('Model' 'View' 'Controller')].
-    aCategoryName = 'Widgets' ifTrue: [^#('Window' 'Label' 'ListView')].
-    aCategoryName = 'Tools' ifTrue: [^#('Workspace' 'Transcript' 'SystemBrowser' 'Inspector')].
-    ^#()
+    "Use VM introspection to get real classes, filtered by category."
+    | allClasses result cls |
+    allClasses := Class allClassesSorted.
+    result := Array new: 0.
+    allClasses do: [:className |
+      cls := Compiler evaluate: className.
+      cls notNil ifTrue: [
+        (self categoryForClass: cls name: className) = aCategoryName ifTrue: [
+          result := result copyWith: className
+        ]
+      ]
+    ].
+    ^result
+  ]
+
+  method: categoryForClass: cls name: className [
+    "Map class to category based on namespace or heuristic."
+    | ns |
+    (cls respondsTo: #namespace) ifTrue: [
+      ns := cls namespace.
+      ns = 'Go' ifTrue: [^'Go'].
+      ns = 'Alto' ifTrue: [
+        (#('Rectangle' 'CellBuffer') includes: className) ifTrue: [^'Kernel'].
+        (#('Display') includes: className) ifTrue: [^'Display'].
+        (#('Model' 'View') includes: className) ifTrue: [^'MVC'].
+        (#('Window' 'Label' 'ListView') includes: className) ifTrue: [^'Widgets'].
+        (#('Workspace' 'Transcript' 'SystemBrowser' 'Inspector') includes: className) ifTrue: [^'Tools'].
+        ^'Other'
+      ]
+    ].
+    ^'Other'
   ]
 
   method: methodsForClass: aClassName [
+    "Use VM introspection to get real method names."
+    | cls |
     aClassName isNil ifTrue: [^#()].
-    aClassName = 'Rectangle' ifTrue: [^#('x:y:width:height:' 'x' 'y' 'width' 'height' 'containsPointX:y:')].
-    aClassName = 'CellBuffer' ifTrue: [^#('width:height:' 'putChar:x:y:style:' 'putString:x:y:style:' 'clear' 'cellAt:y:' 'width' 'height')].
-    aClassName = 'Display' ifTrue: [^#('new' 'addWindow:' 'removeWindow:' 'render' 'run' 'stop')].
-    aClassName = 'Model' ifTrue: [^#('new' 'addDependent:' 'removeDependent:' 'changed' 'changed:')].
-    aClassName = 'View' ifTrue: [^#('new' 'initialize' 'displayOn:' 'invalidate' 'model:')].
-    aClassName = 'Controller' ifTrue: [^#('new' 'initialize' 'handleEvent:' 'model:' 'view:')].
-    aClassName = 'Window' ifTrue: [^#('title:content:controller:frame:' 'draw' 'displayOn:' 'handleEvent:' 'close' 'frame' 'title')].
-    aClassName = 'Label' ifTrue: [^#('text:' 'displayOn:')].
-    aClassName = 'ListView' ifTrue: [^#('items:onSelect:' 'items:' 'displayOn:' 'handleEvent:' 'selectedItem' 'selectedIndex')].
-    aClassName = 'Workspace' ifTrue: [^#('new' 'open:' 'initialize' 'handleEvent:' 'displayOn:' 'textLines' 'cursorX' 'cursorY')].
-    aClassName = 'Transcript' ifTrue: [^#('current' 'open:' 'show:' 'appendLine:' 'handleEvent:' 'displayOn:')].
-    aClassName = 'SystemBrowser' ifTrue: [^#('new' 'open:' 'initialize' 'handleEvent:' 'displayOn:')].
-    aClassName = 'Inspector' ifTrue: [^#('inspect:on:' 'handleEvent:' 'displayOn:')].
-    ^#()
+    cls := Compiler evaluate: aClassName.
+    cls isNil ifTrue: [^#()].
+    ^cls allMethodNames
   ]
 
   method: sourceForClass: aClassName method: aMethodName [
-    ^aClassName, ' >> ', aMethodName, ' [', '  "source not available"', ']'
+    "Use VM introspection to get real source code."
+    | cls src |
+    cls := Compiler evaluate: aClassName.
+    cls isNil ifTrue: [^aClassName, ' >> ', aMethodName, ' [  "class not found" ]'].
+    src := cls methodSourceFor: aMethodName.
+    src isNil ifTrue: [^aClassName, ' >> ', aMethodName, ' [  "source not available" ]'].
+    ^src
   ]
 
   method: updateClassList [
@@ -153,9 +184,9 @@ SystemBrowser subclass: View
   method: handleEvent: evt [
     | keyCode runeVal |
 
-    (evt className asString = 'Go::V2::EventKey') ifFalse: [^self].
-    keyCode := evt key.
-    runeVal := evt rune.
+    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
+    keyCode := evt at: 'key'.
+    runeVal := evt at: 'rune'.
 
     "Escape — close"
     keyCode = 27 ifTrue: [
@@ -269,42 +300,51 @@ SystemBrowser subclass: View
   ]
 
   method: displayOn: aCellBuffer [
-    | paneWidth paneHeight catBuf classBuf methodBuf codeBuf style categories classes methods |
-    style := Go::Terminal newStyle.
+    | paneWidth paneHeight codeHeight categories classes methods |
     paneWidth := aCellBuffer width // 3.
     paneHeight := 10.
+    codeHeight := aCellBuffer height - paneHeight.
 
-    "Render category list"
-    catBuf := CellBuffer width: paneWidth height: paneHeight.
+    "Reallocate cached buffers only if dimensions changed"
+    (paneWidth = lastPaneWidth and: [paneHeight = lastPaneHeight]) ifFalse: [
+      cachedCatBuf := CellBuffer width: paneWidth height: paneHeight.
+      cachedClassBuf := CellBuffer width: paneWidth height: paneHeight.
+      cachedMethodBuf := CellBuffer width: paneWidth height: paneHeight.
+      lastPaneWidth := paneWidth.
+      lastPaneHeight := paneHeight
+    ].
+    (cachedCodeBuf isNil or: [codeHeight ~= lastCodeHeight]) ifTrue: [
+      cachedCodeBuf := CellBuffer width: aCellBuffer width height: codeHeight.
+      lastCodeHeight := codeHeight
+    ].
+
+    "Clear and render into cached buffers"
+    cachedCatBuf clear.
     categories := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
-    self renderList: categories selectedItem: selectedCategory into: catBuf focused: (focusedPane = 0).
+    self renderList: categories selectedItem: selectedCategory into: cachedCatBuf focused: (focusedPane = 0).
 
-    "Render class list"
-    classBuf := CellBuffer width: paneWidth height: paneHeight.
+    cachedClassBuf clear.
     classes := self classesForCategory: selectedCategory.
-    self renderList: classes selectedItem: selectedClass into: classBuf focused: (focusedPane = 1).
+    self renderList: classes selectedItem: selectedClass into: cachedClassBuf focused: (focusedPane = 1).
 
-    "Render method list"
-    methodBuf := CellBuffer width: paneWidth height: paneHeight.
+    cachedMethodBuf clear.
     methods := self methodsForClass: selectedClass.
     selectedClass isNil ifTrue: [methods := #()].
-    self renderList: methods selectedItem: selectedMethod into: methodBuf focused: (focusedPane = 2).
+    self renderList: methods selectedItem: selectedMethod into: cachedMethodBuf focused: (focusedPane = 2).
 
-    "Blit the 3 panes into the main buffer"
-    self blitBuffer: catBuf into: aCellBuffer atX: 0 y: 0.
-    self blitBuffer: classBuf into: aCellBuffer atX: paneWidth y: 0.
-    self blitBuffer: methodBuf into: aCellBuffer atX: (paneWidth * 2) y: 0.
+    "Blit the 3 panes into the main buffer using direct char/style access"
+    cachedCatBuf blitInto: aCellBuffer atX: 0 y: 0.
+    cachedClassBuf blitInto: aCellBuffer atX: paneWidth y: 0.
+    cachedMethodBuf blitInto: aCellBuffer atX: (paneWidth * 2) y: 0.
 
     "Bottom pane: code view"
-    codeBuf := CellBuffer width: aCellBuffer width height: (aCellBuffer height - paneHeight).
-    self renderCode: codeView into: codeBuf.
-    self blitBuffer: codeBuf into: aCellBuffer atX: 0 y: paneHeight
+    cachedCodeBuf clear.
+    self renderCode: codeView into: cachedCodeBuf.
+    cachedCodeBuf blitInto: aCellBuffer atX: 0 y: paneHeight
   ]
 
   method: renderList: anArray selectedItem: aSelection into: aCellBuffer focused: isFocused [
-    | i itemStr normalStyle reverseStyle style |
-    normalStyle := Go::Terminal newStyle.
-    reverseStyle := (Go::Terminal newStyle) reverse: true.
+    | i itemStr style |
     i := 0.
     [i < anArray size and: [i < aCellBuffer height]] whileTrue: [
       itemStr := anArray at: i.
@@ -315,22 +355,8 @@ SystemBrowser subclass: View
   ]
 
   method: renderCode: aString into: aCellBuffer [
-    | style |
-    style := Go::Terminal newStyle.
     aString isNil ifTrue: [^self].
-    aCellBuffer putString: aString x: 0 y: 0 style: style
+    aCellBuffer putString: aString x: 0 y: 0 style: normalStyle
   ]
 
-  method: blitBuffer: srcBuf into: destBuf atX: offsetX y: offsetY [
-    | row col cell |
-    row := 0.
-    [row < srcBuf height] whileTrue: [
-      col := 0.
-      [col < srcBuf width] whileTrue: [
-        cell := srcBuf cellAt: col y: row.
-        destBuf putCell: cell x: (col + offsetX) y: (row + offsetY).
-        col := col + 1
-      ].
-      row := row + 1
-    ]
-  ]
+  "blitBuffer removed — using CellBuffer>>blitInto:atX:y: instead"

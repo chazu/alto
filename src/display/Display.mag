@@ -2,10 +2,10 @@ namespace: 'Alto'
 import: 'Go'
 
 "Display — the global compositor and event loop.
- Renders windows directly to the tcell screen."
+ Caches window renders and only updates dirty windows + changed screen cells."
 
 Display subclass: Object
-  instanceVars: screen buffer windows running
+  instanceVars: screen windows running screenW screenH screenChars screenStyles
 
   classMethod: new [
     | d |
@@ -15,59 +15,60 @@ Display subclass: Object
   ]
 
   method: initDisplay [
-    | screenSize w h |
+    | screenSize sz |
     screen := Go::Terminal newScreen.
     screen init.
     screen enableMouse.
 
     screenSize := screen size.
-    w := screenSize at: 0.
-    h := screenSize at: 1.
+    screenW := screenSize at: 0.
+    screenH := screenSize at: 1.
 
-    buffer := CellBuffer width: w height: h.
     windows := Array new: 0.
-    running := false
+    running := false.
+
+    "Screen-level char/style cache for dirty tracking"
+    sz := screenW * screenH.
+    screenChars := Array new: sz withAll: -1.
+    screenStyles := Array new: sz withAll: nil
   ]
 
-  "---- window management ----"
-
-  method: addWindow: w [
-    windows := windows copyWith: w
-  ]
-
+  method: addWindow: w [ w display: self. windows := windows copyWith: w ]
   method: removeWindow: w [
+    | f sx sy idx |
+    "Invalidate screen cache where the window was so the area gets repainted"
+    f := w frame.
+    f notNil ifTrue: [
+      | clearStyle |
+      clearStyle := Go::Terminal newStyle.
+      (f y) to: (f y + f height - 1) do: [:row |
+        (row >= 0 and: [row < screenH]) ifTrue: [
+          (f x) to: (f x + f width - 1) do: [:col |
+            (col >= 0 and: [col < screenW]) ifTrue: [
+              idx := row * screenW + col.
+              screenChars at: idx put: -1.
+              screenStyles at: idx put: nil.
+              screen setContent: col _: row _: 32 _: clearStyle
+            ]
+          ]
+        ]
+      ].
+      screen show
+    ].
     windows := windows reject: [:each | each = w]
   ]
-
-  method: bringToFront: w [
-    self removeWindow: w.
-    self addWindow: w
-  ]
-
-  "---- accessors ----"
+  method: bringToFront: w [ self removeWindow: w. self addWindow: w ]
 
   method: screen [ ^screen ]
-  method: buffer [ ^buffer ]
+  method: buffer [ ^nil ]
   method: windows [ ^windows ]
   method: running [ ^running ]
 
-  "---- rendering ----"
-
   method: render [
-    "Render windows to screen. Uses double-buffering: render to CellBuffer,
-     then diff against previous frame and only send changed cells to tcell."
-    | prevChars prevStyles defaultStyle winBuf winFrame ox oy fw fh ch st bw bh idx prevCh prevSt |
-    defaultStyle := Go::Terminal newStyle.
+    "Render dirty windows and flush only changed cells to screen."
+    | winBuf winFrame ox oy fw fh ch st idx prevCh prevSt sx sy |
 
-    "Save previous frame"
-    bw := buffer width.
-    bh := buffer height.
-    prevChars := buffer charsArray copy.
-    prevStyles := buffer stylesArray copy.
-
-    "Clear and redraw"
-    buffer clear.
-
+    "Draw each window into its buffer, then diff against screen cache"
     windows do: [:win |
       win draw.
       winBuf := win buffer.
@@ -76,26 +77,24 @@ Display subclass: Object
       oy := winFrame y.
       fw := winFrame width.
       fh := winFrame height.
-
       0 to: fh - 1 do: [:row |
-        0 to: fw - 1 do: [:col |
-          ch := winBuf charAt: col y: row.
-          st := winBuf styleAt: col y: row.
-          buffer putChar: ch x: ox + col y: oy + row style: st
-        ]
-      ]
-    ].
-
-    "Diff and flush only changed cells"
-    0 to: bh - 1 do: [:y |
-      0 to: bw - 1 do: [:x |
-        idx := y * bw + x.
-        ch := buffer charsArray at: idx.
-        st := buffer stylesArray at: idx.
-        prevCh := prevChars at: idx.
-        prevSt := prevStyles at: idx.
-        (ch = prevCh and: [st = prevSt]) ifFalse: [
-          screen setContent: x _: y _: ch _: st
+        sy := oy + row.
+        (sy >= 0 and: [sy < screenH]) ifTrue: [
+          0 to: fw - 1 do: [:col |
+            sx := ox + col.
+            (sx >= 0 and: [sx < screenW]) ifTrue: [
+              ch := winBuf charAt: col y: row.
+              st := winBuf styleAt: col y: row.
+              idx := sy * screenW + sx.
+              prevCh := screenChars at: idx.
+              prevSt := screenStyles at: idx.
+              (ch = prevCh and: [prevSt notNil and: [st equals: prevSt]]) ifFalse: [
+                screen setContent: sx _: sy _: ch _: st.
+                screenChars at: idx put: ch.
+                screenStyles at: idx put: st
+              ]
+            ]
+          ]
         ]
       ]
     ].
@@ -103,59 +102,76 @@ Display subclass: Object
     screen show
   ]
 
-  "---- event loop ----"
-
   method: run [
     "Main event loop."
-    | event |
+    | result keyCode runeVal mod fourth evtDict sz |
     running := true.
-    "Full initial render"
-    self fullRender.
+    self render.
     [running] whileTrue: [
-      event := screen pollEvent.
-      windows size > 0 ifTrue: [
-        (windows at: windows size - 1) handleEvent: event
-      ].
-      self render
+      result := screen pollKeyEvent.
+      keyCode := result at: 0.
+      runeVal := result at: 1.
+      mod := result at: 2.
+      fourth := result at: 3.
+
+      evtDict := Dictionary new.
+      keyCode = -3 ifTrue: [
+        "Resize event: runeVal=width, mod=height"
+        screenW := runeVal.
+        screenH := mod.
+        sz := screenW * screenH.
+        screenChars := Array new: sz withAll: -1.
+        screenStyles := Array new: sz withAll: nil.
+        screen sync.
+        self render
+      ] ifFalse: [
+        keyCode = -2 ifTrue: [
+          evtDict at: 'type' put: 'mouse'.
+          evtDict at: 'buttons' put: runeVal.
+          evtDict at: 'x' put: mod.
+          evtDict at: 'y' put: fourth
+        ] ifFalse: [
+          evtDict at: 'type' put: 'key'.
+          evtDict at: 'key' put: keyCode.
+          evtDict at: 'rune' put: runeVal.
+          evtDict at: 'mod' put: mod
+        ].
+
+        windows size > 0 ifTrue: [
+          (evtDict at: 'type' ifAbsent: ['']) = 'mouse' ifTrue: [
+            self dispatchMouse: evtDict
+          ] ifFalse: [
+            "Key events go to topmost window"
+            (windows at: windows size - 1) handleEvent: evtDict
+          ]
+        ] ifFalse: [
+          "No windows — Escape quits"
+          (evtDict at: 'type' ifAbsent: ['']) = 'key' ifTrue: [
+            (evtDict at: 'key') = 27 ifTrue: [self stop]
+          ]
+        ].
+        self render
+      ]
     ].
     screen fini
   ]
 
-  method: fullRender [
-    "Force full screen redraw (used for initial frame)."
-    | defaultStyle winBuf winFrame ox oy fw fh ch st bw bh |
-    defaultStyle := Go::Terminal newStyle.
-
-    buffer clear.
-    windows do: [:win |
-      win draw.
-      winBuf := win buffer.
-      winFrame := win frame.
-      ox := winFrame x.
-      oy := winFrame y.
-      fw := winFrame width.
-      fh := winFrame height.
-
-      0 to: fh - 1 do: [:row |
-        0 to: fw - 1 do: [:col |
-          ch := winBuf charAt: col y: row.
-          st := winBuf styleAt: col y: row.
-          buffer putChar: ch x: ox + col y: oy + row style: st
-        ]
-      ]
-    ].
-
-    "Write ALL cells to screen"
-    bw := buffer width.
-    bh := buffer height.
-    0 to: bh - 1 do: [:y |
-      0 to: bw - 1 do: [:x |
-        ch := buffer charAt: x y: y.
-        st := buffer styleAt: x y: y.
-        screen setContent: x _: y _: ch _: st
-      ]
-    ].
-    screen show
+  method: dispatchMouse: evt [
+    "Route mouse event to the window under the cursor (topmost first)."
+    | mx my i win f |
+    mx := evt at: 'x'.
+    my := evt at: 'y'.
+    "Walk windows back-to-front (topmost = last)"
+    i := windows size - 1.
+    [i >= 0] whileTrue: [
+      win := windows at: i.
+      f := win frame.
+      (mx >= f x and: [mx < (f x + f width) and: [my >= f y and: [my < (f y + f height)]]]) ifTrue: [
+        win handleEvent: evt.
+        ^self
+      ].
+      i := i - 1
+    ]
   ]
 
   method: stop [

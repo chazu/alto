@@ -52,6 +52,20 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	}))
 
+	nsClass.AddClassMethod(v.Selectors, "startProfile:", vm.NewPrimitiveMethod("startProfile:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		_ = vmPtr
+		arg0 := int(args[0].SmallInt())
+		pkg.StartProfile(arg0)
+		return vm.Nil
+	}))
+
+	nsClass.AddClassMethod(v.Selectors, "stopProfile:", vm.NewPrimitiveMethod("stopProfile:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		_ = vmPtr
+		arg0 := int(args[0].SmallInt())
+		pkg.StopProfile(arg0)
+		return vm.Nil
+	}))
+
 	screenClass.AddPrimitiveMethod(v.Selectors, "clear", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)
 		goVal, ok := v.GetGoObject(receiver)
@@ -191,6 +205,22 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
+	screenClass.AddPrimitiveMethod(v.Selectors, "pollKeyEvent", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		goVal, ok := v.GetGoObject(receiver)
+		if !ok {
+			return vm.Nil
+		}
+		self := goVal.(*pkg.Screen)
+		r0, r1, r2, r3 := self.PollKeyEvent()
+		arr := make([]vm.Value, 4)
+		arr[0] = v.GoToValue(r0)
+		arr[1] = v.GoToValue(r1)
+		arr[2] = v.GoToValue(r2)
+		arr[3] = v.GoToValue(r3)
+		return v.NewArrayWithElements(arr)
+	})
+
 	// Skipped: Screen.PostEvent (unconvertible parameter type: github.com/gdamore/tcell/v2.Event)
 	screenClass.AddPrimitiveMethod(v.Selectors, "setContent:_:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)
@@ -269,6 +299,20 @@ func RegisterPrimitives(v *vm.VM) {
 		return vm.Nil
 	})
 
+	screenClass.AddPrimitiveMethod(v.Selectors, "waitEvent", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		goVal, ok := v.GetGoObject(receiver)
+		if !ok {
+			return vm.Nil
+		}
+		self := goVal.(*pkg.Screen)
+		r0, r1 := self.WaitEvent()
+		arr := make([]vm.Value, 2)
+		arr[0] = v.GoToValue(r0)
+		arr[1] = v.GoToValue(r1)
+		return v.NewArrayWithElements(arr)
+	})
+
 	// Skipped: Style.Background (unconvertible parameter type: github.com/gdamore/tcell/v2.Color)
 	styleClass.AddPrimitiveMethod(v.Selectors, "bold:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)
@@ -291,6 +335,18 @@ func RegisterPrimitives(v *vm.VM) {
 		self := goVal.(*pkg.Style)
 		arg0 := v.ValueToGo(args[0]).(bool)
 		result := self.Dim(arg0)
+		return v.GoToValue(result)
+	})
+
+	styleClass.AddPrimitiveMethod(v.Selectors, "equals:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		goVal, ok := v.GetGoObject(receiver)
+		if !ok {
+			return vm.Nil
+		}
+		self := goVal.(*pkg.Style)
+		arg0 := v.ValueToGo(args[0]).(*pkg.Style)
+		result := self.Equals(arg0)
 		return v.GoToValue(result)
 	})
 

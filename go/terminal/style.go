@@ -43,3 +43,8 @@ func (s *Style) Foreground(c tcell.Color) *Style {
 func (s *Style) Background(c tcell.Color) *Style {
 	return &Style{S: s.S.Background(c)}
 }
+
+// Equals returns true if two styles have the same underlying tcell.Style.
+func (s *Style) Equals(other *Style) bool {
+	return s.S == other.S
+}

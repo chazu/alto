@@ -1,0 +1,11 @@
+DnuTest subclass: Object
+  classMethod: run [
+    | result |
+    'Test 1: Basic exception handling...' println.
+    [
+      result := 42 foo.
+    ] on: Exception do: [:e |
+      ('Caught: ', e messageText) println.
+    ].
+    'Test 1 passed - did not crash.' println.
+  ]

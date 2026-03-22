@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 Inspector subclass: View
-  instanceVars: target fieldNames fieldValues selectedIndex scrollOffset valueView display parentWindow focusOnList
+  instanceVars: target fieldNames fieldValues selectedIndex scrollOffset valueView display parentWindow focusOnList normalStyle reverseStyle
 
   classMethod: new [
     | instance |
@@ -12,13 +12,14 @@ Inspector subclass: View
   ]
 
   classMethod: open: anObject on: aDisplay [
-    | frame inspector window keys vals i key allKeys |
+    | frame inspector window keys vals i key allKeys varNames |
     frame := Rectangle x: 1 y: 1 width: 60 height: 20.
     inspector := Inspector new.
     inspector privateTarget: anObject.
     keys := Array new: 0.
     vals := Array new: 0.
     (anObject isKindOf: Dictionary) ifTrue: [
+      "Dictionary: show keys and values"
       allKeys := anObject keys.
       i := 0.
       [i < allKeys size] whileTrue: [
@@ -26,6 +27,21 @@ Inspector subclass: View
         keys := keys copyWith: key.
         vals := vals copyWith: (anObject at: key) printString.
         i := i + 1
+      ]
+    ] ifFalse: [
+      "Arbitrary object: use instVarAt: and allInstVarNames"
+      keys := keys copyWith: 'self'.
+      vals := vals copyWith: anObject printString.
+      keys := keys copyWith: 'class'.
+      vals := vals copyWith: anObject class name.
+      varNames := anObject class allInstVarNames.
+      varNames notNil ifTrue: [
+        i := 0.
+        [i < varNames size] whileTrue: [
+          keys := keys copyWith: (varNames at: i).
+          vals := vals copyWith: (anObject instVarAt: i) printString.
+          i := i + 1
+        ]
       ]
     ].
     inspector privateFieldNames: keys.
@@ -51,7 +67,9 @@ Inspector subclass: View
     valueView := nil.
     display := nil.
     parentWindow := nil.
-    focusOnList := true
+    focusOnList := true.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true
   ]
 
   method: privateTarget: anObject [ target := anObject ]
@@ -81,8 +99,8 @@ Inspector subclass: View
 
   method: handleEvent: evt [
     | keyCode idx key val visibleHeight |
-    (evt className asString = 'Go::V2::EventKey') ifFalse: [^self].
-    keyCode := evt key.
+    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
+    keyCode := evt at: 'key'.
 
     "Escape — close"
     keyCode = 27 ifTrue: [
@@ -97,13 +115,24 @@ Inspector subclass: View
       ^self
     ].
 
-    "Enter — drill down into Dictionary value"
+    "Enter — drill down into selected value"
     keyCode = 13 ifTrue: [
       focusOnList ifTrue: [
-        selectedIndex < fieldValues size ifTrue: [
+        selectedIndex < fieldNames size ifTrue: [
           key := fieldNames at: selectedIndex.
-          val := target at: key.
-          (val isKindOf: Dictionary) ifTrue: [
+          (target isKindOf: Dictionary) ifTrue: [
+            val := target at: key.
+          ] ifFalse: [
+            "For arbitrary objects, get instVar by index (offset by 2 for 'self'/'class' entries)"
+            (key = 'self') ifTrue: [val := target]
+            ifFalse: [(key = 'class') ifTrue: [val := target class]
+            ifFalse: [
+              | varIdx |
+              varIdx := selectedIndex - 2.
+              varIdx >= 0 ifTrue: [val := target instVarAt: varIdx] ifFalse: [val := nil]
+            ]]
+          ].
+          val notNil ifTrue: [
             Inspector open: val on: display
           ]
         ]
@@ -151,10 +180,8 @@ Inspector subclass: View
   ]
 
   method: displayOn: aCellBuffer [
-    | listWidth visibleCount i itemIndex fieldStr valStr idx style normalStyle reverseStyle bufWidth bufHeight j charCode |
+    | listWidth visibleCount i itemIndex fieldStr valStr idx style bufWidth bufHeight j charCode |
     listWidth := 20.
-    normalStyle := Go::Terminal newStyle.
-    reverseStyle := (Go::Terminal newStyle) reverse: true.
     bufWidth := aCellBuffer width.
     bufHeight := aCellBuffer height.
 

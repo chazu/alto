@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 Window subclass: Object
-  instanceVars: title contentView contentController frame buffer dragState display
+  instanceVars: title contentView contentController frame buffer dragState display borderStyle contentBuf
 
   classMethod: title: aString content: aView controller: aController frame: aRect [
       | win |
@@ -24,7 +24,9 @@ Window subclass: Object
       contentController := nil.
       frame := nil.
       buffer := nil.
-      dragState := nil
+      dragState := nil.
+      borderStyle := Go::Terminal newStyle.
+      contentBuf := nil
   ]
 
   method: initTitle: aString content: aView controller: aController frame: aRect [
@@ -33,6 +35,8 @@ Window subclass: Object
       contentController := aController.
       frame := aRect.
       buffer := CellBuffer width: aRect width height: aRect height.
+      borderStyle := Go::Terminal newStyle.
+      contentBuf := CellBuffer width: aRect width - 2 height: aRect height - 2.
       dragState := nil
   ]
 
@@ -57,12 +61,11 @@ Window subclass: Object
   ]
 
   method: displayOn: aCellBuffer [
-    | borderRect w h titleLen closeX i ch style contentBuf cell |
+    | borderRect w h titleLen closeX i ch |
     w := frame width.
     h := frame height.
-    style := Go::Terminal newStyle.
     borderRect := Rectangle x: 0 y: 0 width: w height: h.
-    aCellBuffer drawBox: borderRect style: style.
+    aCellBuffer drawBox: borderRect style: borderStyle.
 
     "Title bar"
     titleLen := title size.
@@ -70,28 +73,23 @@ Window subclass: Object
     i := 0.
     [i < titleLen] whileTrue: [
       ch := (title at: i) value.
-      aCellBuffer putChar: ch x: i + 1 y: 0 style: style.
+      aCellBuffer putChar: ch x: i + 1 y: 0 style: borderStyle.
       i := i + 1
     ].
 
     "Close box [X]"
     closeX := w - 4.
-    aCellBuffer putChar: 91 x: closeX y: 0 style: style.
-    aCellBuffer putChar: 88 x: closeX + 1 y: 0 style: style.
-    aCellBuffer putChar: 93 x: closeX + 2 y: 0 style: style.
+    aCellBuffer putChar: 91 x: closeX y: 0 style: borderStyle.
+    aCellBuffer putChar: 88 x: closeX + 1 y: 0 style: borderStyle.
+    aCellBuffer putChar: 93 x: closeX + 2 y: 0 style: borderStyle.
 
-    "Content — render into a sub-buffer offset by the border"
+    "Content — render into cached sub-buffer offset by the border"
     contentView isNil ifTrue: [^self].
-    contentBuf := CellBuffer width: w - 2 height: h - 2.
+    contentBuf clear.
     contentView displayOn: contentBuf.
 
     "Blit content buffer into window buffer at offset (1,1)"
-    0 to: h - 3 do: [:row |
-      0 to: w - 3 do: [:col |
-        cell := contentBuf cellAt: col y: row.
-        aCellBuffer putCell: cell x: col + 1 y: row + 1
-      ]
-    ]
+    contentBuf blitInto: aCellBuffer atX: 1 y: 1
   ]
 
   method: draw [
@@ -109,7 +107,40 @@ Window subclass: Object
   ]
 
   method: handleEvent: evt [
-    "Delegate all events to contentController."
+    | evtType mx my localX localY w buttons |
+    evtType := evt at: 'type' ifAbsent: [''].
+
+    "Handle mouse clicks on window chrome (close box, title bar)"
+    (evtType = 'mouse') ifTrue: [
+      buttons := evt at: 'buttons'.
+      buttons = 1 ifTrue: [
+        mx := evt at: 'x'.
+        my := evt at: 'y'.
+        localX := mx - frame x.
+        localY := my - frame y.
+        w := frame width.
+
+        "Close box [X] is at (w-4, 0) to (w-2, 0)"
+        (localY = 0 and: [localX >= (w - 4) and: [localX <= (w - 2)]]) ifTrue: [
+          ^self close
+        ].
+
+        "Clicks inside content area → delegate with local coords (new dict, don't mutate)"
+        (localX > 0 and: [localX < (w - 1) and: [localY > 0 and: [localY < (frame height - 1)]]]) ifTrue: [
+          | localEvt |
+          contentController isNil ifTrue: [^self].
+          localEvt := Dictionary new.
+          localEvt at: 'type' put: 'mouse'.
+          localEvt at: 'buttons' put: buttons.
+          localEvt at: 'x' put: localX - 1.
+          localEvt at: 'y' put: localY - 1.
+          ^contentController handleEvent: localEvt
+        ]
+      ].
+      ^self
+    ].
+
+    "Key events → delegate to contentController"
     contentController isNil ifTrue: [^self].
     contentController handleEvent: evt
   ]

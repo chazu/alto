@@ -7,6 +7,8 @@ Terminal subclass: Object
   classMethod: newScreen [ <primitive> ]
   classMethod: newStyle [ <primitive> ]
   classMethod: newWrappedStyle [ <primitive> ]
+  classMethod: startProfile: dummy [ <primitive> ]
+  classMethod: stopProfile: dummy [ <primitive> ]
 
 Screen subclass: Object
   method: clear [ <primitive> ]
@@ -21,6 +23,7 @@ Screen subclass: Object
   method: hideCursor [ <primitive> ]
   method: init [ <primitive> ]
   method: pollEvent [ <primitive> ]
+  method: pollKeyEvent [ <primitive> ]
   method: postEvent: ev [ <primitive> ]
   method: setContent: x _: y _: mainc _: style [ <primitive> ]
   method: setCursorStyle: style [ <primitive> ]
@@ -29,11 +32,13 @@ Screen subclass: Object
   method: showCursor: x _: y [ <primitive> ]
   method: size [ <primitive> ]
   method: sync [ <primitive> ]
+  method: waitEvent [ <primitive> ]
 
 Style subclass: Object
   method: background: c [ <primitive> ]
   method: bold: on [ <primitive> ]
   method: dim: on [ <primitive> ]
+  method: equals: other [ <primitive> ]
   method: foreground: c [ <primitive> ]
   method: italic: on [ <primitive> ]
   method: reverse: on [ <primitive> ]
