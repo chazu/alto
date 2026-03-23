@@ -110,8 +110,20 @@ SystemBrowser subclass: View
   ]
 
   method: sourceForClass: aClassName method: aMethodName [
-    "Show method info. Source retention is not yet available in the VM."
-    ^aClassName, ' >> #', aMethodName
+    "Look up class object and get real source code."
+    | cls src |
+    [
+      cls := self classObjectForName: aClassName.
+      cls = false ifTrue: [^aClassName, ' >> #', aMethodName].
+      src := cls methodSourceFor: aMethodName.
+      (src isNil or: [src = false]) ifTrue: [
+        src := cls classMethodSourceFor: aMethodName.
+      ].
+      (src isNil or: [src = false]) ifTrue: [^aClassName, ' >> #', aMethodName].
+      ^'', src
+    ] on: Exception do: [:e |
+      ^aClassName, ' >> #', aMethodName
+    ]
   ]
 
   method: updateClassList [
