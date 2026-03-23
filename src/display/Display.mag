@@ -75,9 +75,7 @@ Display subclass: Object
 
     "Draw each window into its buffer, then diff against screen cache"
     windows do: [:win |
-      Go::Terminal debugLog: 'render: drawing ', win title.
       win draw.
-      Go::Terminal debugLog: 'render: draw done for ', win title.
       winBuf := win buffer.
       winFrame := win frame.
       ox := winFrame x.

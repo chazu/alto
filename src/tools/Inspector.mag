@@ -168,25 +168,18 @@ Inspector subclass: View
 
     "Down arrow"
     keyCode = 258 ifTrue: [
-      Go::Terminal debugLog: 'Inspector down: focusOnList=', focusOnList printString.
-      Go::Terminal debugLog: 'Inspector down: fieldNames size=', fieldNames size printString.
-      Go::Terminal debugLog: 'Inspector down: selectedIndex=', selectedIndex printString.
       focusOnList ifTrue: [
         fieldNames size > 0 ifTrue: [
           selectedIndex < (fieldNames size - 1) ifTrue: [
             selectedIndex := selectedIndex + 1.
-            Go::Terminal debugLog: 'Inspector down: new selectedIndex=', selectedIndex printString.
             visibleHeight := 14.
             selectedIndex >= (scrollOffset + visibleHeight) ifTrue: [
               scrollOffset := selectedIndex - visibleHeight + 1
             ].
-            Go::Terminal debugLog: 'Inspector down: about to update valueView'.
             selectedIndex < fieldValues size ifTrue: [
               valueView text: (fieldValues at: selectedIndex)
             ].
-            Go::Terminal debugLog: 'Inspector down: about to invalidate'.
-            self invalidate.
-            Go::Terminal debugLog: 'Inspector down: done'
+            self invalidate
           ]
         ]
       ].
@@ -196,7 +189,6 @@ Inspector subclass: View
 
   method: displayOn: aCellBuffer [
     | listWidth visibleCount i itemIndex fieldStr valStr idx style bufWidth bufHeight j charCode |
-    Go::Terminal debugLog: 'Inspector displayOn: start, selectedIndex=', selectedIndex printString.
     listWidth := 20.
     bufWidth := aCellBuffer width.
     bufHeight := aCellBuffer height.
@@ -234,16 +226,13 @@ Inspector subclass: View
     ].
 
     "Right pane: selected value text"
-    Go::Terminal debugLog: 'Inspector displayOn: left pane done'.
     selectedIndex < fieldValues size ifTrue: [
       valStr := fieldValues at: selectedIndex.
-      Go::Terminal debugLog: 'Inspector displayOn: valStr class=', valStr class name, ' val=', valStr.
       j := 0.
       [j < valStr size and: [j + listWidth + 1 < bufWidth]] whileTrue: [
         charCode := (valStr at: j) value.
         aCellBuffer putChar: charCode x: j + listWidth + 1 y: 0 style: normalStyle.
         j := j + 1
       ]
-    ].
-    Go::Terminal debugLog: 'Inspector displayOn: done'
+    ]
   ]
