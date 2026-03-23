@@ -142,20 +142,25 @@ Display subclass: Object
           evtDict at: 'mod' put: mod
         ].
 
-        windows size > 0 ifTrue: [
-          (evtDict at: 'type' ifAbsent: ['']) = 'mouse' ifTrue: [
-            self dispatchMouse: evtDict
+        [
+          windows size > 0 ifTrue: [
+            (evtDict at: 'type' ifAbsent: ['']) = 'mouse' ifTrue: [
+              self dispatchMouse: evtDict
+            ] ifFalse: [
+              "Key events go to topmost window"
+              (windows at: windows size - 1) handleEvent: evtDict
+            ]
           ] ifFalse: [
-            "Key events go to topmost window"
-            (windows at: windows size - 1) handleEvent: evtDict
-          ]
-        ] ifFalse: [
-          "No windows — Escape quits"
-          (evtDict at: 'type' ifAbsent: ['']) = 'key' ifTrue: [
-            (evtDict at: 'key') = 27 ifTrue: [self stop]
-          ]
-        ].
-        self render
+            "No windows — Escape quits"
+            (evtDict at: 'type' ifAbsent: ['']) = 'key' ifTrue: [
+              (evtDict at: 'key') = 27 ifTrue: [self stop]
+            ]
+          ].
+          self render
+        ] on: Exception do: [:e |
+          Transcript show: 'Error: ', e messageText.
+          self render
+        ]
       ]
     ].
     screen fini
@@ -183,6 +188,20 @@ Display subclass: Object
     "Button release with no drag — ignore"
     buttons = 0 ifTrue: [^self].
 
+    "If topmost window is a Menu and click is outside it, dismiss the menu"
+    windows size > 0 ifTrue: [
+      | topWin topFrame |
+      topWin := windows at: windows size - 1.
+      (topWin contentController isKindOf: Menu) ifTrue: [
+        topFrame := topWin frame.
+        (mx >= topFrame x and: [mx < (topFrame x + topFrame width)
+          and: [my >= topFrame y and: [my < (topFrame y + topFrame height)]]]) ifFalse: [
+          self removeWindow: topWin.
+          "Fall through to dispatch click to window underneath"
+        ]
+      ]
+    ].
+
     "Walk windows back-to-front (topmost = last)"
     i := windows size - 1.
     [i >= 0] whileTrue: [
@@ -206,6 +225,19 @@ Display subclass: Object
         ^self
       ].
       i := i - 1
+    ].
+
+    "Click on desktop (no window hit) — open desktop menu"
+    self openDesktopMenuAt: mx y: my
+  ]
+
+  method: openDesktopMenuAt: x y: y [
+    | menuItems |
+    menuItems := #('Workspace' 'System Browser' 'Transcript').
+    Menu open: menuItems at: (Array with: x with: y) on: self callback: [:item |
+      item = 'Workspace' ifTrue: [Workspace open: self].
+      item = 'System Browser' ifTrue: [SystemBrowser open: self].
+      item = 'Transcript' ifTrue: [Transcript open: self]
     ]
   ]
 

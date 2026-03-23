@@ -1,0 +1,20 @@
+PanicCatchTest subclass: Object
+  classMethod: run [
+    "Test 1: MessageNotUnderstood (already works)"
+    'Test 1: MessageNotUnderstood...' println.
+    [42 foo] on: Exception do: [:e |
+      ('  Caught: ', e messageText) println
+    ].
+
+    "Test 2: Stack overflow via infinite recursion"
+    'Test 2: Stack overflow...' println.
+    [self infiniteLoop] on: Exception do: [:e |
+      ('  Caught: ', e messageText) println
+    ].
+
+    'All tests passed.' println
+  ]
+
+  classMethod: infiniteLoop [
+    ^self infiniteLoop
+  ]

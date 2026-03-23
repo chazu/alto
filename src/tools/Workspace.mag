@@ -55,7 +55,12 @@ Workspace subclass: View
   method: handleEvent: evt [
     | keyCode runeVal lineStr leftPart rightPart newLines idx evtClass isKey |
 
-    "Events are now Dictionaries with 'type', 'key', 'rune' fields"
+    "Handle mouse events"
+    (evt at: 'type' ifAbsent: ['']) = 'mouse' ifTrue: [
+      ^self handleMouse: evt
+    ].
+
+    "Key events"
     (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
     keyCode := evt at: 'key'.
     runeVal := evt at: 'rune'.
@@ -74,56 +79,19 @@ Workspace subclass: View
       ^self
     ].
 
-    "Ctrl-D — do-it: evaluate region or current line"
+    "Ctrl-D — do-it"
     (keyCode = 68 and: [((evt at: 'mod' ifAbsent: [0]) bitAnd: 2) > 0]) ifTrue: [
-      | result |
-      [
-        result := self evaluateSelection.
-        result notNil ifTrue: [
-          Transcript show: result printString
-        ]
-      ] on: Exception do: [:e |
-        Transcript show: 'Error: ', e messageText
-      ].
-      self invalidate.
-      ^self
+      self doIt. ^self
     ].
 
-    "Ctrl-R — print-it: evaluate and insert result after cursor"
+    "Ctrl-R — print-it"
     (keyCode = 82 and: [((evt at: 'mod' ifAbsent: [0]) bitAnd: 2) > 0]) ifTrue: [
-      | result resultStr |
-      [
-        result := self evaluateSelection.
-        result notNil ifTrue: [
-          resultStr := result printString.
-          lineStr := textLines at: cursorY.
-          leftPart := lineStr copyFrom: 0 to: cursorX.
-          rightPart := lineStr copyFrom: cursorX.
-          textLines at: cursorY put: (leftPart, ' ', resultStr, rightPart).
-          cursorX := cursorX + 1 + resultStr size
-        ]
-      ] on: Exception do: [:e |
-        Transcript show: 'Error: ', e messageText
-      ].
-      self invalidate.
-      ^self
+      self printIt. ^self
     ].
 
-    "Ctrl-I — inspect-it: evaluate and open Inspector on result"
+    "Ctrl-I — inspect-it"
     (keyCode = 73 and: [((evt at: 'mod' ifAbsent: [0]) bitAnd: 2) > 0]) ifTrue: [
-      | result |
-      [
-        result := self evaluateSelection.
-        result notNil ifTrue: [
-          display notNil ifTrue: [
-            Inspector open: result on: display
-          ]
-        ]
-      ] on: Exception do: [:e |
-        Transcript show: 'Error: ', e messageText
-      ].
-      self invalidate.
-      ^self
+      self inspectIt. ^self
     ].
 
     "Readline bindings (tcell v2: key=uppercase ASCII + ModCtrl=2)"
@@ -297,6 +265,73 @@ Workspace subclass: View
       self invalidate.
       ^self
     ]
+  ]
+
+  method: handleMouse: evt [
+    | mx my btn |
+    btn := evt at: 'buttons'.
+    mx := evt at: 'x'.
+    my := evt at: 'y'.
+
+    "Left click — position cursor"
+    btn = 1 ifTrue: [
+      | lineIndex |
+      lineIndex := scrollOffset + my.
+      lineIndex < textLines size ifTrue: [
+        cursorY := lineIndex.
+        cursorX := mx min: (textLines at: cursorY) size
+      ].
+      markActive := false.
+      self invalidate.
+      ^self
+    ].
+
+  ]
+
+  method: doIt [
+    [
+      | result |
+      result := self evaluateSelection.
+      result notNil ifTrue: [
+        Transcript show: result printString
+      ]
+    ] on: Exception do: [:e |
+      Transcript show: 'Error: ', e messageText
+    ].
+    self invalidate
+  ]
+
+  method: printIt [
+    | result resultStr lineStr leftPart rightPart |
+    [
+      result := self evaluateSelection.
+      result notNil ifTrue: [
+        resultStr := result printString.
+        lineStr := textLines at: cursorY.
+        leftPart := lineStr copyFrom: 0 to: cursorX.
+        rightPart := lineStr copyFrom: cursorX.
+        textLines at: cursorY put: (leftPart, ' ', resultStr, rightPart).
+        cursorX := cursorX + 1 + resultStr size
+      ]
+    ] on: Exception do: [:e |
+      Transcript show: 'Error: ', e messageText
+    ].
+    self invalidate
+  ]
+
+  method: inspectIt [
+    [
+      | result |
+      result := self evaluateSelection.
+      result notNil ifTrue: [
+        display notNil ifTrue: [
+          Inspector open: result on: display
+        ]
+      ]
+    ] on: Exception do: [:e |
+      Transcript show: 'Error: ', e messageText
+    ].
+    self invalidate
   ]
 
   method: evalString [

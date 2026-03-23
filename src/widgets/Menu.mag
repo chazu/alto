@@ -1,0 +1,136 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Menu — a popup menu that appears at a given screen position.
+ Created via Menu open:at:on:callback: and dismissed by clicking
+ an item, clicking outside, or pressing Escape."
+
+Menu subclass: View
+  instanceVars: items callback display parentWindow normalStyle reverseStyle selectedIndex
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  classMethod: open: itemArray at: aPoint on: aDisplay callback: aBlock [
+    | menu frame menuWidth menuHeight window |
+    menu := Menu new.
+    menu privateItems: itemArray.
+    menu privateCallback: aBlock.
+    menu display: aDisplay.
+    menuWidth := 2 + (self maxItemWidth: itemArray).
+    menuHeight := 2 + itemArray size.
+    frame := Rectangle x: (aPoint at: 0) y: (aPoint at: 1) width: menuWidth height: menuHeight.
+    window := Window title: '' content: menu controller: menu frame: frame.
+    menu parentWindow: window.
+    aDisplay addWindow: window.
+    ^menu
+  ]
+
+  classMethod: maxItemWidth: itemArray [
+    | max len |
+    max := 8.
+    itemArray do: [:item |
+      len := item size.
+      len > max ifTrue: [max := len]
+    ].
+    ^max
+  ]
+
+  method: initialize [
+    super initialize.
+    items := #().
+    callback := nil.
+    display := nil.
+    parentWindow := nil.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true.
+    selectedIndex := -1
+  ]
+
+  method: privateItems: anArray [ items := anArray ]
+  method: privateCallback: aBlock [ callback := aBlock ]
+  method: display: aDisplay [ display := aDisplay ]
+  method: display [ ^display ]
+  method: parentWindow: aWindow [ parentWindow := aWindow ]
+  method: parentWindow [ ^parentWindow ]
+
+  method: handleEvent: evt [
+    | evtType keyCode mx my btn |
+    evtType := evt at: 'type' ifAbsent: [''].
+
+    evtType = 'mouse' ifTrue: [
+      btn := evt at: 'buttons'.
+      mx := evt at: 'x'.
+      my := evt at: 'y'.
+      btn = 1 ifTrue: [
+        "Click on an item"
+        (my >= 0 and: [my < items size]) ifTrue: [
+          self selectItem: my
+        ] ifFalse: [
+          self close
+        ]
+      ].
+      ^self
+    ].
+
+    evtType = 'key' ifTrue: [
+      keyCode := evt at: 'key'.
+      "Escape — dismiss"
+      keyCode = 27 ifTrue: [^self close].
+      "Up arrow"
+      keyCode = 257 ifTrue: [
+        selectedIndex > 0 ifTrue: [selectedIndex := selectedIndex - 1].
+        selectedIndex < 0 ifTrue: [selectedIndex := 0].
+        self invalidate. ^self
+      ].
+      "Down arrow"
+      keyCode = 258 ifTrue: [
+        selectedIndex < (items size - 1) ifTrue: [selectedIndex := selectedIndex + 1].
+        selectedIndex < 0 ifTrue: [selectedIndex := 0].
+        self invalidate. ^self
+      ].
+      "Enter — select"
+      keyCode = 13 ifTrue: [
+        selectedIndex >= 0 ifTrue: [self selectItem: selectedIndex].
+        ^self
+      ]
+    ]
+  ]
+
+  method: selectItem: idx [
+    | item |
+    idx < items size ifTrue: [
+      item := items at: idx.
+      self close.
+      callback notNil ifTrue: [callback value: item]
+    ]
+  ]
+
+  method: close [
+    display notNil ifTrue: [display removeWindow: parentWindow]
+  ]
+
+  method: displayOn: aCellBuffer [
+    | i itemStr style j charCode |
+    i := 0.
+    [i < items size and: [i < aCellBuffer height]] whileTrue: [
+      itemStr := items at: i.
+      style := (i = selectedIndex) ifTrue: [reverseStyle] ifFalse: [normalStyle].
+      "Fill full width with style"
+      j := 0.
+      [j < aCellBuffer width] whileTrue: [
+        j < itemStr size ifTrue: [
+          charCode := (itemStr at: j) value.
+          aCellBuffer putChar: charCode x: j y: i style: style
+        ] ifFalse: [
+          aCellBuffer putChar: 32 x: j y: i style: style
+        ].
+        j := j + 1
+      ].
+      i := i + 1
+    ]
+  ]
