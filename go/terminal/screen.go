@@ -148,7 +148,7 @@ func (s *Screen) SetStyle(style *Style) {
 
 // EnableMouse enables mouse button event reporting (clicks only, no motion).
 func (s *Screen) EnableMouse() {
-	s.screen.EnableMouse(tcell.MouseButtonEvents)
+	s.screen.EnableMouse(tcell.MouseDragEvents)
 }
 
 // DisableMouse disables mouse event reporting.

@@ -5,7 +5,7 @@ import: 'Go'
  Caches window renders and only updates dirty windows + changed screen cells."
 
 Display subclass: Object
-  instanceVars: screen windows running screenW screenH screenChars screenStyles
+  instanceVars: screen windows running screenW screenH screenChars screenStyles draggingWindow dragOffsetX dragOffsetY
 
   classMethod: new [
     | d |
@@ -30,7 +30,12 @@ Display subclass: Object
     "Screen-level char/style cache for dirty tracking"
     sz := screenW * screenH.
     screenChars := Array new: sz withAll: -1.
-    screenStyles := Array new: sz withAll: nil
+    screenStyles := Array new: sz withAll: nil.
+
+    "Drag state"
+    draggingWindow := nil.
+    dragOffsetX := 0.
+    dragOffsetY := 0
   ]
 
   method: addWindow: w [ w display: self. windows := windows copyWith: w ]
@@ -70,7 +75,9 @@ Display subclass: Object
 
     "Draw each window into its buffer, then diff against screen cache"
     windows do: [:win |
+      Go::Terminal debugLog: 'render: drawing ', win title.
       win draw.
+      Go::Terminal debugLog: 'render: draw done for ', win title.
       winBuf := win buffer.
       winFrame := win frame.
       ox := winFrame x.
@@ -157,21 +164,78 @@ Display subclass: Object
   ]
 
   method: dispatchMouse: evt [
-    "Route mouse event to the window under the cursor (topmost first)."
-    | mx my i win f |
+    "Route mouse event — handle dragging at Display level."
+    | mx my buttons i win f |
     mx := evt at: 'x'.
     my := evt at: 'y'.
+    buttons := evt at: 'buttons'.
+
+    "If dragging, route to drag logic"
+    draggingWindow notNil ifTrue: [
+      buttons = 0 ifTrue: [
+        "Button released — end drag"
+        draggingWindow := nil.
+        ^self
+      ].
+      "Move window to follow mouse"
+      self moveWindow: draggingWindow toX: mx - dragOffsetX y: my - dragOffsetY.
+      ^self
+    ].
+
+    "Button release with no drag — ignore"
+    buttons = 0 ifTrue: [^self].
+
     "Walk windows back-to-front (topmost = last)"
     i := windows size - 1.
     [i >= 0] whileTrue: [
       win := windows at: i.
       f := win frame.
       (mx >= f x and: [mx < (f x + f width) and: [my >= f y and: [my < (f y + f height)]]]) ifTrue: [
+        | localX localY |
+        localX := mx - f x.
+        localY := my - f y.
+        "Click on title bar (row 0, excluding close box) — start drag"
+        (buttons = 1 and: [localY = 0 and: [localX < (f width - 4)]]) ifTrue: [
+          draggingWindow := win.
+          dragOffsetX := localX.
+          dragOffsetY := localY.
+          self bringToFront: win.
+          ^self
+        ].
+        "Bring clicked window to front"
+        i < (windows size - 1) ifTrue: [self bringToFront: win].
         win handleEvent: evt.
         ^self
       ].
       i := i - 1
     ]
+  ]
+
+  method: moveWindow: win toX: newX y: newY [
+    "Move a window, invalidating old and new positions in screen cache."
+    | f oldX oldY idx clearStyle |
+    f := win frame.
+    oldX := f x. oldY := f y.
+    (newX = oldX and: [newY = oldY]) ifTrue: [^self].
+
+    "Invalidate old position in screen cache"
+    clearStyle := Go::Terminal newStyle.
+    oldY to: oldY + f height - 1 do: [:row |
+      (row >= 0 and: [row < screenH]) ifTrue: [
+        oldX to: oldX + f width - 1 do: [:col |
+          (col >= 0 and: [col < screenW]) ifTrue: [
+            idx := row * screenW + col.
+            screenChars at: idx put: -1.
+            screenStyles at: idx put: nil.
+            screen setContent: col _: row _: 32 _: clearStyle
+          ]
+        ]
+      ]
+    ].
+
+    "Update frame position"
+    f x: newX.
+    f y: newY
   ]
 
   method: stop [

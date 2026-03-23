@@ -74,27 +74,53 @@ Workspace subclass: View
       ^self
     ].
 
-    "Ctrl-D — do-it: evaluate region or current line
-     tcell v2 sends key=68 ('D') with ModCtrl=2"
+    "Ctrl-D — do-it: evaluate region or current line"
     (keyCode = 68 and: [((evt at: 'mod' ifAbsent: [0]) bitAnd: 2) > 0]) ifTrue: [
-      | result evalStr |
-      markActive ifTrue: [
-        evalStr := self regionText.
-        markActive := false
-      ] ifFalse: [
-        cursorY < textLines size ifTrue: [
-          evalStr := textLines at: cursorY
+      | result |
+      [
+        result := self evaluateSelection.
+        result notNil ifTrue: [
+          Transcript show: result printString
         ]
+      ] on: Exception do: [:e |
+        Transcript show: 'Error: ', e messageText
       ].
-      (evalStr notNil and: [evalStr size > 0]) ifTrue: [
-        [
-          result := Compiler evaluate: evalStr.
-          result notNil ifTrue: [
-            Transcript show: result printString
-          ]
-        ] on: Exception do: [:e |
-          Transcript show: 'Error: ', e messageText
+      self invalidate.
+      ^self
+    ].
+
+    "Ctrl-R — print-it: evaluate and insert result after cursor"
+    (keyCode = 82 and: [((evt at: 'mod' ifAbsent: [0]) bitAnd: 2) > 0]) ifTrue: [
+      | result resultStr |
+      [
+        result := self evaluateSelection.
+        result notNil ifTrue: [
+          resultStr := result printString.
+          lineStr := textLines at: cursorY.
+          leftPart := lineStr copyFrom: 0 to: cursorX.
+          rightPart := lineStr copyFrom: cursorX.
+          textLines at: cursorY put: (leftPart, ' ', resultStr, rightPart).
+          cursorX := cursorX + 1 + resultStr size
         ]
+      ] on: Exception do: [:e |
+        Transcript show: 'Error: ', e messageText
+      ].
+      self invalidate.
+      ^self
+    ].
+
+    "Ctrl-I — inspect-it: evaluate and open Inspector on result"
+    (keyCode = 73 and: [((evt at: 'mod' ifAbsent: [0]) bitAnd: 2) > 0]) ifTrue: [
+      | result |
+      [
+        result := self evaluateSelection.
+        result notNil ifTrue: [
+          display notNil ifTrue: [
+            Inspector open: result on: display
+          ]
+        ]
+      ] on: Exception do: [:e |
+        Transcript show: 'Error: ', e messageText
       ].
       self invalidate.
       ^self
@@ -271,6 +297,29 @@ Workspace subclass: View
       self invalidate.
       ^self
     ]
+  ]
+
+  method: evalString [
+    "Return text to evaluate: region text joined with newlines, or current line."
+    | lines |
+    markActive ifTrue: [
+      lines := self regionText.
+      markActive := false.
+      lines size = 1 ifTrue: [^lines at: 0].
+      ^lines inject: '' into: [:acc :line |
+        acc size = 0 ifTrue: [line] ifFalse: [acc, (String value: 10), line]
+      ]
+    ].
+    cursorY < textLines size ifTrue: [^textLines at: cursorY].
+    ^nil
+  ]
+
+  method: evaluateSelection [
+    "Evaluate the selected region or current line. Returns the result."
+    | src |
+    src := self evalString.
+    (src isNil or: [src size = 0]) ifTrue: [^nil].
+    ^Compiler evaluate: src
   ]
 
   method: updateScroll [
