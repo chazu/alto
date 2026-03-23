@@ -25,7 +25,7 @@ SystemBrowser subclass: View
   method: initialize [
     | categories |
     super initialize.
-    categories := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+    categories := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools' 'Other').
     categoryList := ListView items: categories onSelect: nil.
     classList := ListView items: #() onSelect: nil.
     methodList := ListView items: #() onSelect: nil.
@@ -50,55 +50,54 @@ SystemBrowser subclass: View
 
   method: classesForCategory: aCategoryName [
     "Use VM introspection to get real classes, filtered by category."
-    | allClasses result cls |
+    | allClasses result nameStr |
     allClasses := Class allClassesSorted.
     result := Array new: 0.
-    allClasses do: [:className |
-      cls := Compiler evaluate: className.
-      cls notNil ifTrue: [
-        (self categoryForClass: cls name: className) = aCategoryName ifTrue: [
-          result := result copyWith: className
-        ]
+    allClasses do: [:cls |
+      nameStr := '', cls name.
+      (self categoryForClassName: nameStr) = aCategoryName ifTrue: [
+        result := result copyWith: nameStr
       ]
     ].
     ^result
   ]
 
-  method: categoryForClass: cls name: className [
-    "Map class to category based on namespace or heuristic."
-    | ns |
-    (cls respondsTo: #namespace) ifTrue: [
-      ns := cls namespace.
-      ns = 'Go' ifTrue: [^'Go'].
-      ns = 'Alto' ifTrue: [
-        (#('Rectangle' 'CellBuffer') includes: className) ifTrue: [^'Kernel'].
-        (#('Display') includes: className) ifTrue: [^'Display'].
-        (#('Model' 'View') includes: className) ifTrue: [^'MVC'].
-        (#('Window' 'Label' 'ListView') includes: className) ifTrue: [^'Widgets'].
-        (#('Workspace' 'Transcript' 'SystemBrowser' 'Inspector') includes: className) ifTrue: [^'Tools'].
-        ^'Other'
-      ]
-    ].
+  method: categoryForClassName: className [
+    "Map class name to a UI category."
+    (#('Rectangle' 'CellBuffer') includes: className) ifTrue: [^'Kernel'].
+    (#('Display') includes: className) ifTrue: [^'Display'].
+    (#('Model' 'View') includes: className) ifTrue: [^'MVC'].
+    (#('Window' 'Label' 'ListView' 'Menu') includes: className) ifTrue: [^'Widgets'].
+    (#('Workspace' 'Transcript' 'SystemBrowser' 'Inspector') includes: className) ifTrue: [^'Tools'].
     ^'Other'
   ]
 
   method: methodsForClass: aClassName [
     "Use VM introspection to get real method names."
-    | cls |
+    | cls methods result |
     aClassName isNil ifTrue: [^#()].
-    cls := Compiler evaluate: aClassName.
-    cls isNil ifTrue: [^#()].
-    ^cls allMethodNames
+    [
+      cls := Compiler evaluate: aClassName.
+      cls isNil ifTrue: [^#()].
+      methods := cls allMethodNames.
+      result := Array new: 0.
+      methods do: [:sel | result := result copyWith: ('', sel)].
+      ^result
+    ] on: Exception do: [:e | ^#()]
   ]
 
   method: sourceForClass: aClassName method: aMethodName [
     "Use VM introspection to get real source code."
     | cls src |
-    cls := Compiler evaluate: aClassName.
-    cls isNil ifTrue: [^aClassName, ' >> ', aMethodName, ' [  "class not found" ]'].
-    src := cls methodSourceFor: aMethodName.
-    src isNil ifTrue: [^aClassName, ' >> ', aMethodName, ' [  "source not available" ]'].
-    ^src
+    [
+      cls := Compiler evaluate: aClassName.
+      cls isNil ifTrue: [^aClassName, ' >> ', aMethodName, ' [  "class not found" ]'].
+      src := cls methodSourceFor: aMethodName.
+      src isNil ifTrue: [^aClassName, ' >> ', aMethodName, ' [  "source not available" ]'].
+      ^'', src
+    ] on: Exception do: [:e |
+      ^aClassName, ' >> ', aMethodName, ' [  "error: ', e messageText, '" ]'
+    ]
   ]
 
   method: updateClassList [
@@ -150,7 +149,7 @@ SystemBrowser subclass: View
     x < paneWidth ifTrue: [
       focusedPane := 0.
       idx := y.
-      catItems := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+      catItems := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools' 'Other').
       idx < catItems size ifTrue: [
         selectedCategory := catItems at: idx.
         self updateClassList
@@ -222,7 +221,7 @@ SystemBrowser subclass: View
 
   method: handleCategoryArrow: keyCode [
     | items idx |
-    items := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+    items := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools' 'Other').
     idx := self indexOfItem: selectedCategory inArray: items.
     keyCode = 257 ifTrue: [idx := (idx - 1) max: 0].
     keyCode = 258 ifTrue: [idx := (idx + 1) min: items size - 1].
@@ -320,7 +319,7 @@ SystemBrowser subclass: View
 
     "Clear and render into cached buffers"
     cachedCatBuf clear.
-    categories := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools').
+    categories := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools' 'Other').
     self renderList: categories selectedItem: selectedCategory into: cachedCatBuf focused: (focusedPane = 0).
 
     cachedClassBuf clear.
