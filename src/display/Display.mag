@@ -69,6 +69,17 @@ Display subclass: Object
   method: windows [ ^windows ]
   method: running [ ^running ]
 
+  method: fullSync [
+    "Force full screen repaint — clears cache and redraws everything.
+     Use after display corruption (e.g. stdout writes bypassing tcell)."
+    | sz |
+    sz := screenW * screenH.
+    screenChars := Array new: sz withAll: -1.
+    screenStyles := Array new: sz withAll: nil.
+    self render.
+    screen sync
+  ]
+
   method: render [
     "Render dirty windows and flush only changed cells to screen."
     | winBuf winFrame ox oy fw fh ch st idx prevCh prevSt sx sy |
@@ -159,7 +170,7 @@ Display subclass: Object
           self render
         ] on: Exception do: [:e |
           Transcript show: 'Error: ', e messageText.
-          self render
+          self fullSync
         ]
       ]
     ].

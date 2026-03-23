@@ -192,6 +192,12 @@ Workspace subclass: View
       ]
     ].
 
+    "Tab — autocomplete"
+    keyCode = 9 ifTrue: [
+      self triggerAutocomplete.
+      ^self
+    ].
+
     "Enter — split line"
     keyCode = 13 ifTrue: [
       lineStr := textLines at: cursorY.
@@ -298,7 +304,8 @@ Workspace subclass: View
     ] on: Exception do: [:e |
       Transcript show: 'Error: ', e messageText
     ].
-    self invalidate
+    self invalidate.
+    display notNil ifTrue: [display fullSync]
   ]
 
   method: printIt [
@@ -331,6 +338,120 @@ Workspace subclass: View
     ] on: Exception do: [:e |
       Transcript show: 'Error: ', e messageText
     ].
+    self invalidate
+  ]
+
+  method: triggerAutocomplete [
+    "Extract word before cursor and show completion menu."
+    | lineStr prefix matches screenX screenY |
+    cursorY >= textLines size ifTrue: [^self].
+    lineStr := textLines at: cursorY.
+    prefix := self wordBeforeCursor: lineStr.
+    prefix size = 0 ifTrue: [^self].
+
+    "Get completions"
+    [matches := self completionsFor: prefix] on: Exception do: [:e | matches := #()].
+    matches size = 0 ifTrue: [^self].
+
+    "Single match — insert directly"
+    matches size = 1 ifTrue: [
+      self insertCompletion: (matches at: 0) prefix: prefix.
+      ^self
+    ].
+
+    "Multiple matches — show menu"
+    screenX := cursorX + 1.
+    screenY := cursorY - scrollOffset + 1.
+    parentWindow notNil ifTrue: [
+      screenX := parentWindow frame x + cursorX + 1.
+      screenY := parentWindow frame y + (cursorY - scrollOffset) + 1
+    ].
+    Menu open: matches at: (Array with: screenX with: screenY) on: display callback: [:item |
+      self insertCompletion: item prefix: prefix.
+      self invalidate
+    ]
+  ]
+
+  method: wordBeforeCursor: lineStr [
+    "Extract the identifier word immediately before the cursor."
+    | i code |
+    cursorX = 0 ifTrue: [^''].
+    i := cursorX - 1.
+    [i >= 0] whileTrue: [
+      code := (lineStr at: i) value.
+      "Allow letters (A-Z, a-z), digits (0-9), colon, underscore"
+      ((code >= 65 and: [code <= 90]) or: [
+        (code >= 97 and: [code <= 122]) or: [
+          (code >= 48 and: [code <= 57]) or: [
+            code = 58 or: [code = 95]]]]) ifFalse: [
+        ^lineStr copyFrom: i + 1 to: cursorX
+      ].
+      i := i - 1
+    ].
+    ^lineStr copyFrom: 0 to: cursorX
+  ]
+
+  method: completionsFor: prefix [
+    "Return matching completions. Uppercase prefix → class names, else selectors."
+    | firstCharCode all results |
+    firstCharCode := (prefix at: 0) value.
+    (firstCharCode >= 65 and: [firstCharCode <= 90]) ifTrue: [
+      "Complete class names"
+      all := Class allClassesSorted.
+      results := Array new: 0.
+      all do: [:cls |
+        | nameStr |
+        nameStr := '', cls name.
+        (self string: nameStr startsWith: prefix) ifTrue: [
+          results := results copyWith: nameStr
+        ]
+      ].
+      ^results
+    ].
+    "Complete selectors from all classes (limit to avoid huge lists)"
+    results := Array new: 0.
+    Class allClassesSorted do: [:cls |
+      | methods |
+      results size < 20 ifTrue: [
+        [
+          methods := cls allMethodNames.
+          methods do: [:sel |
+            | selStr |
+            selStr := '', sel.
+            (self string: selStr startsWith: prefix) ifTrue: [
+              (results includes: selStr) ifFalse: [
+                results size < 20 ifTrue: [
+                  results := results copyWith: selStr
+                ]
+              ]
+            ]
+          ]
+        ] on: Exception do: [:e | "skip" ]
+      ]
+    ].
+    ^results
+  ]
+
+  method: string: str startsWith: prefix [
+    "Return true if str starts with prefix."
+    | i |
+    prefix size > str size ifTrue: [^false].
+    i := 0.
+    [i < prefix size] whileTrue: [
+      (str at: i) = (prefix at: i) ifFalse: [^false].
+      i := i + 1
+    ].
+    ^true
+  ]
+
+  method: insertCompletion: completion prefix: prefix [
+    "Replace the prefix before cursor with the full completion."
+    | lineStr beforePrefix afterCursor |
+    lineStr := textLines at: cursorY.
+    beforePrefix := lineStr copyFrom: 0 to: cursorX - prefix size.
+    afterCursor := lineStr copyFrom: cursorX.
+    textLines at: cursorY put: (beforePrefix, completion, afterCursor).
+    cursorX := cursorX - prefix size + completion size.
     self invalidate
   ]
 
