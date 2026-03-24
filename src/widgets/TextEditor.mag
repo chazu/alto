@@ -1,0 +1,364 @@
+namespace: 'Alto'
+import: 'Go'
+
+"TextEditor — reusable text editing widget with cursor, selection, kill ring, scrolling.
+ Used by Workspace (full editing) and SystemBrowser code pane."
+
+TextEditor subclass: Object
+  instanceVars: lines cursorX cursorY scrollOffset normalStyle reverseStyle killBuffer markX markY markActive dirty
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  method: initialize [
+    lines := #('').
+    cursorX := 0.
+    cursorY := 0.
+    scrollOffset := 0.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true.
+    killBuffer := #().
+    markX := 0.
+    markY := 0.
+    markActive := false.
+    dirty := false
+  ]
+
+  "--- Accessors ---"
+  method: lines [ ^lines ]
+  method: lines: anArray [ lines := anArray. dirty := false ]
+  method: cursorX [ ^cursorX ]
+  method: cursorY [ ^cursorY ]
+  method: scrollOffset [ ^scrollOffset ]
+  method: markActive [ ^markActive ]
+  method: isDirty [ ^dirty ]
+  method: normalStyle [ ^normalStyle ]
+  method: reverseStyle [ ^reverseStyle ]
+
+  method: text [
+    "Return all lines joined with newlines."
+    | result nl |
+    nl := String lf.
+    result := ''.
+    lines do: [:line |
+      result size > 0 ifTrue: [result := result, nl].
+      result := result, line
+    ].
+    ^result
+  ]
+
+  method: text: aString [
+    "Set text from a string, splitting on newlines."
+    | result current i code |
+    result := Array new: 0.
+    current := ''.
+    i := 0.
+    [i < aString size] whileTrue: [
+      code := (aString at: i) value.
+      code = 10 ifTrue: [
+        result := result copyWith: current.
+        current := ''
+      ] ifFalse: [
+        current := current, (Character value: code) asString
+      ].
+      i := i + 1
+    ].
+    result := result copyWith: current.
+    lines := result.
+    cursorX := 0.
+    cursorY := 0.
+    scrollOffset := 0.
+    dirty := false
+  ]
+
+  "--- Key Handling ---"
+  method: handleKey: keyCode rune: runeVal mod: mod [
+    "Process a key event. Returns true if handled."
+    | lineStr leftPart rightPart |
+
+    "Ctrl bindings"
+    ((mod) bitAnd: 2) > 0 ifTrue: [
+      "Ctrl-Space — set/toggle mark"
+      (keyCode = 256 and: [runeVal = 32]) ifTrue: [
+        markActive ifTrue: [markActive := false] ifFalse: [
+          markX := cursorX. markY := cursorY. markActive := true
+        ]. ^true
+      ].
+      "Ctrl-G — cancel mark"
+      keyCode = 71 ifTrue: [markActive := false. ^true].
+      "Ctrl-W — kill region"
+      keyCode = 87 ifTrue: [
+        markActive ifTrue: [
+          killBuffer := self regionText.
+          self deleteRegion.
+          markActive := false.
+          dirty := true
+        ]. ^true
+      ].
+      "Ctrl-A — beginning of line"
+      keyCode = 65 ifTrue: [cursorX := 0. ^true].
+      "Ctrl-E — end of line"
+      keyCode = 69 ifTrue: [
+        cursorX := (lines at: cursorY) size. ^true
+      ].
+      "Ctrl-K — kill region if active, else kill to end of line"
+      keyCode = 75 ifTrue: [
+        markActive ifTrue: [
+          killBuffer := self regionText.
+          self deleteRegion.
+          markActive := false
+        ] ifFalse: [
+          lineStr := lines at: cursorY.
+          killBuffer := Array with: (lineStr copyFrom: cursorX).
+          lines at: cursorY put: (lineStr copyFrom: 0 to: cursorX)
+        ].
+        dirty := true. ^true
+      ].
+      "Ctrl-Y — yank"
+      keyCode = 89 ifTrue: [
+        markActive := false.
+        killBuffer size = 0 ifTrue: [^true].
+        killBuffer size = 1 ifTrue: [
+          | text |
+          text := killBuffer at: 0.
+          lineStr := lines at: cursorY.
+          leftPart := lineStr copyFrom: 0 to: cursorX.
+          rightPart := lineStr copyFrom: cursorX.
+          lines at: cursorY put: (leftPart, text, rightPart).
+          cursorX := cursorX + text size
+        ] ifFalse: [
+          | firstLine lastLine beforeLines afterLines middleLines |
+          lineStr := lines at: cursorY.
+          leftPart := lineStr copyFrom: 0 to: cursorX.
+          rightPart := lineStr copyFrom: cursorX.
+          firstLine := leftPart, (killBuffer at: 0).
+          lastLine := (killBuffer at: killBuffer size - 1), rightPart.
+          beforeLines := lines copyFrom: 0 to: cursorY.
+          afterLines := lines copyFrom: cursorY + 1.
+          middleLines := killBuffer copyFrom: 1 to: killBuffer size - 1.
+          lines := beforeLines, (Array with: firstLine), middleLines, (Array with: lastLine), afterLines.
+          cursorY := cursorY + killBuffer size - 1.
+          cursorX := (killBuffer at: killBuffer size - 1) size
+        ].
+        dirty := true. ^true
+      ].
+      "Ctrl-N — next line"
+      keyCode = 78 ifTrue: [
+        cursorY < (lines size - 1) ifTrue: [cursorY := cursorY + 1].
+        lineStr := lines at: cursorY.
+        cursorX > lineStr size ifTrue: [cursorX := lineStr size].
+        ^true
+      ].
+      "Ctrl-P — previous line"
+      keyCode = 80 ifTrue: [
+        cursorY > 0 ifTrue: [cursorY := cursorY - 1].
+        lineStr := lines at: cursorY.
+        cursorX > lineStr size ifTrue: [cursorX := lineStr size].
+        ^true
+      ]
+    ].
+
+    "Enter — split line"
+    keyCode = 13 ifTrue: [
+      lineStr := lines at: cursorY.
+      leftPart := lineStr copyFrom: 0 to: cursorX.
+      rightPart := lineStr copyFrom: cursorX.
+      lines at: cursorY put: leftPart.
+      lines := (lines copyFrom: 0 to: cursorY + 1), (Array with: rightPart), (lines copyFrom: cursorY + 1).
+      cursorY := cursorY + 1.
+      cursorX := 0.
+      dirty := true. ^true
+    ].
+
+    "Backspace"
+    (keyCode = 8 or: [keyCode = 127]) ifTrue: [
+      cursorX > 0 ifTrue: [
+        lineStr := lines at: cursorY.
+        leftPart := lineStr copyFrom: 0 to: cursorX - 1.
+        rightPart := lineStr copyFrom: cursorX.
+        lines at: cursorY put: (leftPart, rightPart).
+        cursorX := cursorX - 1
+      ] ifFalse: [
+        cursorY > 0 ifTrue: [
+          leftPart := lines at: cursorY - 1.
+          rightPart := lines at: cursorY.
+          cursorX := leftPart size.
+          lines at: cursorY - 1 put: (leftPart, rightPart).
+          lines := (lines copyFrom: 0 to: cursorY), (lines copyFrom: cursorY + 1).
+          cursorY := cursorY - 1
+        ]
+      ].
+      dirty := true. ^true
+    ].
+
+    "Arrow keys"
+    keyCode = 257 ifTrue: [  "Up"
+      cursorY > 0 ifTrue: [cursorY := cursorY - 1].
+      lineStr := lines at: cursorY.
+      cursorX > lineStr size ifTrue: [cursorX := lineStr size].
+      ^true
+    ].
+    keyCode = 258 ifTrue: [  "Down"
+      cursorY < (lines size - 1) ifTrue: [cursorY := cursorY + 1].
+      lineStr := lines at: cursorY.
+      cursorX > lineStr size ifTrue: [cursorX := lineStr size].
+      ^true
+    ].
+    keyCode = 260 ifTrue: [  "Left"
+      cursorX > 0 ifTrue: [cursorX := cursorX - 1].
+      ^true
+    ].
+    keyCode = 259 ifTrue: [  "Right"
+      lineStr := lines at: cursorY.
+      cursorX < lineStr size ifTrue: [cursorX := cursorX + 1].
+      ^true
+    ].
+
+    "Printable character (KeyRune = 256)"
+    keyCode = 256 ifTrue: [
+      lineStr := lines at: cursorY.
+      leftPart := lineStr copyFrom: 0 to: cursorX.
+      rightPart := lineStr copyFrom: cursorX.
+      lines at: cursorY put: (leftPart, ((Character value: runeVal) asString), rightPart).
+      cursorX := cursorX + 1.
+      dirty := true. ^true
+    ].
+
+    ^false
+  ]
+
+  "--- Scroll ---"
+  method: updateScroll: visibleHeight [
+    cursorY < scrollOffset ifTrue: [scrollOffset := cursorY].
+    cursorY >= (scrollOffset + visibleHeight) ifTrue: [
+      scrollOffset := cursorY - visibleHeight + 1
+    ]
+  ]
+
+  "--- Region/Selection ---"
+  method: regionStartY [
+    (markY < cursorY or: [markY = cursorY and: [markX <= cursorX]])
+      ifTrue: [^markY] ifFalse: [^cursorY]
+  ]
+  method: regionStartX [
+    (markY < cursorY or: [markY = cursorY and: [markX <= cursorX]])
+      ifTrue: [^markX] ifFalse: [^cursorX]
+  ]
+  method: regionEndY [
+    (markY < cursorY or: [markY = cursorY and: [markX <= cursorX]])
+      ifTrue: [^cursorY] ifFalse: [^markY]
+  ]
+  method: regionEndX [
+    (markY < cursorY or: [markY = cursorY and: [markX <= cursorX]])
+      ifTrue: [^cursorX] ifFalse: [^markX]
+  ]
+
+  method: isInRegion: col row: row [
+    | startY startX endY endX |
+    markActive ifFalse: [^false].
+    startY := self regionStartY. startX := self regionStartX.
+    endY := self regionEndY. endX := self regionEndX.
+    row < startY ifTrue: [^false].
+    row > endY ifTrue: [^false].
+    (row = startY and: [row = endY]) ifTrue: [^col >= startX and: [col < endX]].
+    row = startY ifTrue: [^col >= startX].
+    row = endY ifTrue: [^col < endX].
+    ^true
+  ]
+
+  method: regionText [
+    | startY startX endY endX result |
+    startY := self regionStartY. startX := self regionStartX.
+    endY := self regionEndY. endX := self regionEndX.
+    startY = endY ifTrue: [
+      ^Array with: ((lines at: startY) copyFrom: startX to: endX)
+    ].
+    result := Array with: ((lines at: startY) copyFrom: startX).
+    (startY + 1) to: endY - 1 do: [:row |
+      result := result copyWith: (lines at: row)
+    ].
+    result := result copyWith: ((lines at: endY) copyFrom: 0 to: endX).
+    ^result
+  ]
+
+  method: deleteRegion [
+    | startY startX endY endX beforePart afterPart |
+    startY := self regionStartY. startX := self regionStartX.
+    endY := self regionEndY. endX := self regionEndX.
+    startY = endY ifTrue: [
+      | line |
+      line := lines at: startY.
+      lines at: startY put: (line copyFrom: 0 to: startX), (line copyFrom: endX).
+    ] ifFalse: [
+      beforePart := (lines at: startY) copyFrom: 0 to: startX.
+      afterPart := (lines at: endY) copyFrom: endX.
+      lines at: startY put: (beforePart, afterPart).
+      lines := (lines copyFrom: 0 to: startY + 1), (lines copyFrom: endY + 1).
+    ].
+    cursorX := startX.
+    cursorY := startY
+  ]
+
+  "--- Rendering ---"
+  method: displayOn: aCellBuffer [
+    self displayOn: aCellBuffer showCursor: true
+  ]
+
+  method: displayOn: aCellBuffer showCursor: showCursor [
+    | visibleHeight i lineIndex lineStr j charCode style inRegion |
+    visibleHeight := aCellBuffer height.
+    self updateScroll: visibleHeight.
+
+    i := 0.
+    [i < visibleHeight] whileTrue: [
+      lineIndex := scrollOffset + i.
+      lineIndex < lines size ifTrue: [
+        lineStr := lines at: lineIndex.
+        j := 0.
+        [j < lineStr size and: [j < aCellBuffer width]] whileTrue: [
+          charCode := (lineStr at: j) value.
+          inRegion := self isInRegion: j row: lineIndex.
+          style := (showCursor and: [lineIndex = cursorY and: [j = cursorX]])
+            ifTrue: [reverseStyle]
+            ifFalse: [inRegion ifTrue: [reverseStyle] ifFalse: [normalStyle]].
+          aCellBuffer putChar: charCode x: j y: i style: style.
+          j := j + 1
+        ].
+        "Cursor past end of line"
+        (showCursor and: [lineIndex = cursorY and: [cursorX >= lineStr size]]) ifTrue: [
+          aCellBuffer putChar: 32 x: cursorX y: i style: reverseStyle
+        ]
+      ] ifFalse: [
+        (showCursor and: [lineIndex = cursorY]) ifTrue: [
+          aCellBuffer putChar: 32 x: 0 y: i style: reverseStyle
+        ]
+      ].
+
+      "Scrollbar indicator on right edge"
+      lines size > visibleHeight ifTrue: [
+        | scrollPos |
+        scrollPos := (scrollOffset + i) * (visibleHeight - 1) // (lines size - 1) max: 0.
+        scrollPos = i ifTrue: [
+          aCellBuffer putChar: 9608 x: aCellBuffer width - 1 y: i style: normalStyle
+        ]
+      ].
+
+      i := i + 1
+    ]
+  ]
+
+  "--- Mouse ---"
+  method: handleClick: x y: y [
+    "Position cursor from a click."
+    | lineIndex |
+    lineIndex := scrollOffset + y.
+    lineIndex < lines size ifTrue: [
+      cursorY := lineIndex.
+      cursorX := x min: (lines at: cursorY) size
+    ].
+    markActive := false
+  ]

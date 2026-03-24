@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 SystemBrowser subclass: View
-  instanceVars: categoryList classList methodList codeView display parentWindow selectedCategory selectedClass selectedMethod focusedPane normalStyle reverseStyle cachedCatBuf cachedClassBuf cachedMethodBuf cachedCodeBuf lastPaneWidth lastPaneHeight lastCodeHeight classNames classObjects codeLines codeCursorX codeCursorY codeScrollOffset codeDirty
+  instanceVars: categoryList classList methodList codeView display parentWindow selectedCategory selectedClass selectedMethod focusedPane normalStyle reverseStyle cachedCatBuf cachedClassBuf cachedMethodBuf cachedCodeBuf lastPaneWidth lastPaneHeight lastCodeHeight classNames classObjects codeEditor
 
   classMethod: new [
     | instance |
@@ -47,11 +47,7 @@ SystemBrowser subclass: View
     cachedCodeBuf := nil.
     classNames := Array new: 0.
     classObjects := Array new: 0.
-    codeLines := #('').
-    codeCursorX := 0.
-    codeCursorY := 0.
-    codeScrollOffset := 0.
-    codeDirty := false.
+    codeEditor := TextEditor new.
     self buildClassList.
     self updateClassList
   ]
@@ -163,48 +159,11 @@ SystemBrowser subclass: View
     selectedClass isNil ifTrue: [^self].
     selectedMethod isNil ifTrue: [^self].
     codeView := self sourceForClass: selectedClass method: selectedMethod.
-    self splitCodeIntoLines.
-    codeDirty := false
-  ]
-
-  method: splitCodeIntoLines [
-    "Split codeView string into array of lines for editing."
-    | result current i code |
-    result := Array new: 0.
-    current := ''.
-    i := 0.
-    [i < codeView size] whileTrue: [
-      code := (codeView at: i) value.
-      code = 10 ifTrue: [
-        result := result copyWith: current.
-        current := ''
-      ] ifFalse: [
-        current := current, (Character value: code) asString
-      ].
-      i := i + 1
-    ].
-    result := result copyWith: current.
-    codeLines := result.
-    codeCursorX := 0.
-    codeCursorY := 0.
-    codeScrollOffset := 0
-  ]
-
-  method: joinCodeLines [
-    "Join codeLines back into a single string with newlines."
-    | result nl |
-    nl := String lf.
-    result := ''.
-    codeLines do: [:line |
-      result size > 0 ifTrue: [result := result, nl].
-      result := result, line
-    ].
-    ^result
+    codeEditor text: codeView
   ]
 
   method: handleCodeKey: keyCode rune: runeVal mod: mod [
     "Handle key events in the code editing pane."
-    | lineStr leftPart rightPart |
 
     "Tab — leave code pane (back to categories)"
     keyCode = 9 ifTrue: [
@@ -224,96 +183,9 @@ SystemBrowser subclass: View
       ^self
     ].
 
-    "Ctrl-A — beginning of line"
-    (keyCode = 65 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
-      codeCursorX := 0. self invalidate. ^self
-    ].
-    "Ctrl-E — end of line"
-    (keyCode = 69 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
-      codeCursorX := (codeLines at: codeCursorY) size. self invalidate. ^self
-    ].
-
-    "Up arrow"
-    keyCode = 257 ifTrue: [
-      codeCursorY > 0 ifTrue: [codeCursorY := codeCursorY - 1].
-      lineStr := codeLines at: codeCursorY.
-      codeCursorX > lineStr size ifTrue: [codeCursorX := lineStr size].
-      self updateCodeScroll. self invalidate. ^self
-    ].
-    "Down arrow"
-    keyCode = 258 ifTrue: [
-      codeCursorY < (codeLines size - 1) ifTrue: [codeCursorY := codeCursorY + 1].
-      lineStr := codeLines at: codeCursorY.
-      codeCursorX > lineStr size ifTrue: [codeCursorX := lineStr size].
-      self updateCodeScroll. self invalidate. ^self
-    ].
-    "Left arrow"
-    keyCode = 260 ifTrue: [
-      codeCursorX > 0 ifTrue: [codeCursorX := codeCursorX - 1].
-      self invalidate. ^self
-    ].
-    "Right arrow"
-    keyCode = 259 ifTrue: [
-      lineStr := codeLines at: codeCursorY.
-      codeCursorX < lineStr size ifTrue: [codeCursorX := codeCursorX + 1].
-      self invalidate. ^self
-    ].
-
-    "Enter — split line"
-    keyCode = 13 ifTrue: [
-      lineStr := codeLines at: codeCursorY.
-      leftPart := lineStr copyFrom: 0 to: codeCursorX.
-      rightPart := lineStr copyFrom: codeCursorX.
-      codeLines at: codeCursorY put: leftPart.
-      codeLines := (codeLines copyFrom: 0 to: codeCursorY + 1), (Array with: rightPart), (codeLines copyFrom: codeCursorY + 1).
-      codeCursorY := codeCursorY + 1.
-      codeCursorX := 0.
-      codeDirty := true.
-      self updateCodeScroll. self invalidate. ^self
-    ].
-
-    "Backspace"
-    (keyCode = 8 or: [keyCode = 127]) ifTrue: [
-      codeCursorX > 0 ifTrue: [
-        lineStr := codeLines at: codeCursorY.
-        leftPart := lineStr copyFrom: 0 to: codeCursorX - 1.
-        rightPart := lineStr copyFrom: codeCursorX.
-        codeLines at: codeCursorY put: (leftPart, rightPart).
-        codeCursorX := codeCursorX - 1.
-        codeDirty := true
-      ] ifFalse: [
-        codeCursorY > 0 ifTrue: [
-          leftPart := codeLines at: codeCursorY - 1.
-          rightPart := codeLines at: codeCursorY.
-          codeCursorX := leftPart size.
-          codeLines at: codeCursorY - 1 put: (leftPart, rightPart).
-          codeLines := (codeLines copyFrom: 0 to: codeCursorY), (codeLines copyFrom: codeCursorY + 1).
-          codeCursorY := codeCursorY - 1.
-          codeDirty := true
-        ]
-      ].
-      self updateCodeScroll. self invalidate. ^self
-    ].
-
-    "Printable character"
-    keyCode = 256 ifTrue: [
-      lineStr := codeLines at: codeCursorY.
-      leftPart := lineStr copyFrom: 0 to: codeCursorX.
-      rightPart := lineStr copyFrom: codeCursorX.
-      codeLines at: codeCursorY put: (leftPart, ((Character value: runeVal) asString), rightPart).
-      codeCursorX := codeCursorX + 1.
-      codeDirty := true.
-      self invalidate. ^self
-    ]
-  ]
-
-  method: updateCodeScroll [
-    | visH |
-    visH := 10.
-    lastCodeHeight > 0 ifTrue: [visH := lastCodeHeight].
-    codeCursorY < codeScrollOffset ifTrue: [codeScrollOffset := codeCursorY].
-    codeCursorY >= (codeScrollOffset + visH) ifTrue: [
-      codeScrollOffset := codeCursorY - visH + 1
+    "Delegate all other keys to the TextEditor"
+    (codeEditor handleKey: keyCode rune: runeVal mod: mod) ifTrue: [
+      self invalidate
     ]
   ]
 
@@ -324,7 +196,7 @@ SystemBrowser subclass: View
     selectedMethod isNil ifTrue: [Transcript show: 'No method selected'. ^self].
     cls := self classObjectForName: selectedClass.
     cls = false ifTrue: [Transcript show: 'Class not found: ', selectedClass. ^self].
-    source := self joinCodeLines.
+    source := codeEditor text.
     [
       "1. Compile and install live"
       sel := cls compileAndInstall: source.
@@ -626,7 +498,7 @@ SystemBrowser subclass: View
 
     "Bottom pane: editable code view"
     cachedCodeBuf clear.
-    self renderCodeEditor: cachedCodeBuf.
+    codeEditor displayOn: cachedCodeBuf showCursor: (focusedPane = 3).
     cachedCodeBuf blitInto: aCellBuffer atX: 0 y: paneHeight
   ]
 
@@ -654,57 +526,3 @@ SystemBrowser subclass: View
     ]
   ]
 
-  method: renderCodeEditor: aCellBuffer [
-    "Render the code lines with cursor when focused."
-    | visH i lineIndex lineStr j charCode style isFocused |
-    visH := aCellBuffer height.
-    isFocused := focusedPane = 3.
-
-    i := 0.
-    [i < visH] whileTrue: [
-      lineIndex := codeScrollOffset + i.
-      lineIndex < codeLines size ifTrue: [
-        lineStr := codeLines at: lineIndex.
-        j := 0.
-        [j < lineStr size and: [j < aCellBuffer width]] whileTrue: [
-          charCode := (lineStr at: j) value.
-          style := (isFocused and: [lineIndex = codeCursorY and: [j = codeCursorX]])
-            ifTrue: [reverseStyle]
-            ifFalse: [normalStyle].
-          aCellBuffer putChar: charCode x: j y: i style: style.
-          j := j + 1
-        ].
-        "Cursor past end of line"
-        (isFocused and: [lineIndex = codeCursorY and: [codeCursorX >= lineStr size]]) ifTrue: [
-          aCellBuffer putChar: 32 x: codeCursorX y: i style: reverseStyle
-        ]
-      ].
-      i := i + 1
-    ]
-  ]
-
-  method: renderCode: aString into: aCellBuffer [
-    "Render source code with line wrapping at newline characters."
-    | row col i ch code |
-    aString isNil ifTrue: [^self].
-    aString size = 0 ifTrue: [^self].
-    row := 0.
-    col := 0.
-    i := 0.
-    [i < aString size and: [row < aCellBuffer height]] whileTrue: [
-      code := (aString at: i) value.
-      code = 10 ifTrue: [
-        "Newline"
-        row := row + 1.
-        col := 0
-      ] ifFalse: [
-        col < aCellBuffer width ifTrue: [
-          aCellBuffer putChar: code x: col y: row style: normalStyle
-        ].
-        col := col + 1
-      ].
-      i := i + 1
-    ]
-  ]
-
-  "blitBuffer removed — using CellBuffer>>blitInto:atX:y: instead"
