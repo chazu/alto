@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 ListView subclass: View
-  instanceVars: items selectedIndex scrollOffset onSelectBlock
+  instanceVars: items selectedIndex scrollOffset onSelectBlock normalStyle reverseStyle
 
   classMethod: items: anArray onSelect: aBlock [
     | instance |
@@ -17,7 +17,9 @@ ListView subclass: View
     items := Array new: 0.
     selectedIndex := 0.
     scrollOffset := 0.
-    onSelectBlock := nil
+    onSelectBlock := nil.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true
   ]
 
   method: privateItems: anArray [ items := anArray ]
@@ -39,10 +41,8 @@ ListView subclass: View
   ]
 
   method: displayOn: aCellBuffer [
-    | visibleCount i itemIndex itemStr normalStyle reverseStyle style |
+    | visibleCount i itemIndex itemStr style |
     visibleCount := aCellBuffer height.
-    normalStyle := Go::Terminal newStyle.
-    reverseStyle := (Go::Terminal newStyle) reverse: true.
     i := 0.
     [i < visibleCount] whileTrue: [
       itemIndex := scrollOffset + i.
@@ -69,8 +69,8 @@ ListView subclass: View
   method: handleEvent: evt [
     | keyCode |
 
-    (evt className asString = 'Go::V2::EventKey') ifFalse: [^self].
-    keyCode := evt key.
+    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
+    keyCode := evt at: 'key'.
 
     "Up arrow"
     keyCode = 257 ifTrue: [
