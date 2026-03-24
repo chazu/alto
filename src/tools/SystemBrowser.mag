@@ -331,9 +331,17 @@ SystemBrowser subclass: View
       codeDirty := false.
       codeView := source.
 
-      "File write-back disabled: fileOut:to: is destructive (loses imports, comments, ordering).
-       TODO: implement surgical method replacement in .mag files."
-      Transcript show: '(live only — file write-back not yet safe)'.
+      "2. Write method back to .mag file (surgical replacement)"
+      filePath := self filePathForClass: selectedClass.
+      filePath notNil ifTrue: [
+        | saveResult |
+        saveResult := Compiler updateMethodInFile: filePath selector: ('', sel) source: source.
+        (saveResult isKindOf: String) ifTrue: [
+          Transcript show: 'Saved: ', filePath
+        ] ifFalse: [
+          Transcript show: 'File save: ', saveResult printString
+        ]
+      ].
 
       self invalidate
     ] on: Exception do: [:e |
