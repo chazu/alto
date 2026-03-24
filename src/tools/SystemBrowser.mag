@@ -466,9 +466,11 @@ SystemBrowser subclass: View
 
     "Enter — select in focused pane and advance to next pane"
     keyCode = 13 ifTrue: [
-      focusedPane = 0 ifTrue: [self selectCategory. focusedPane := 1].
-      focusedPane = 1 ifTrue: [self selectClass. focusedPane := 2].
-      focusedPane = 2 ifTrue: [self selectMethod. focusedPane := 3].
+      | pane |
+      pane := focusedPane.
+      pane = 0 ifTrue: [self selectCategory. focusedPane := 1].
+      pane = 1 ifTrue: [self selectClass. focusedPane := 2].
+      pane = 2 ifTrue: [self selectMethod. focusedPane := 3].
       self invalidate.
       ^self
     ].

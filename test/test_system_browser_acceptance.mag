@@ -1,0 +1,200 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Acceptance tests for SystemBrowser navigation, selection, and scrolling.
+ Tests exercise the browser logic without a real terminal."
+
+BrowserTest subclass: Object
+  classVars: PassCount FailCount
+
+  classMethod: run [
+    | browser classes methods firstMethod toolClasses paneWidth |
+    PassCount := 0.
+    FailCount := 0.
+
+    'Creating SystemBrowser...' println.
+    [browser := SystemBrowser new] on: Exception do: [:e |
+      ('FATAL: cannot create SystemBrowser: ', e messageText) println.
+      ^self
+    ].
+    'SystemBrowser created.' println.
+
+    "=== Pane focus ==="
+    self assert: browser focusedPane = 0 msg: 'initial focus is category pane (0)'.
+    self assert: browser selectedCategory = 'Kernel' msg: 'initial category is Kernel'.
+
+    "Tab cycles focus"
+    self sendKey: 9 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 1 msg: 'Tab moves focus to class pane (1)'.
+
+    self sendKey: 9 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 2 msg: 'Tab moves focus to method pane (2)'.
+
+    self sendKey: 9 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 3 msg: 'Tab moves focus to code pane (3)'.
+
+    "Tab from code pane goes back to 0"
+    self sendKey: 9 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 0 msg: 'Tab from code pane wraps to category (0)'.
+
+    "=== Category navigation with arrow keys ==="
+    browser := SystemBrowser new.
+    self assert: browser selectedCategory = 'Kernel' msg: 'fresh browser starts on Kernel'.
+
+    "Down arrow in category pane"
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self assert: browser selectedCategory = 'Display' msg: 'Down from Kernel -> Display'.
+
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self assert: browser selectedCategory = 'MVC' msg: 'Down from Display -> MVC'.
+
+    "Up arrow"
+    self sendKey: 257 rune: 0 mod: 0 to: browser.
+    self assert: browser selectedCategory = 'Display' msg: 'Up from MVC -> Display'.
+
+    "Up at top stays at top"
+    self sendKey: 257 rune: 0 mod: 0 to: browser.
+    self sendKey: 257 rune: 0 mod: 0 to: browser.
+    self sendKey: 257 rune: 0 mod: 0 to: browser.
+    self assert: browser selectedCategory = 'Kernel' msg: 'Up at top stays Kernel'.
+
+    "=== Left/Right arrow switches panes ==="
+    browser := SystemBrowser new.
+    self sendKey: 259 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 1 msg: 'Right arrow moves to pane 1'.
+
+    self sendKey: 259 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 2 msg: 'Right arrow moves to pane 2'.
+
+    self sendKey: 259 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 3 msg: 'Right arrow moves to pane 3'.
+
+    self sendKey: 259 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 3 msg: 'Right arrow at pane 3 stays'.
+
+    self sendKey: 260 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 2 msg: 'Left arrow moves back to pane 2'.
+
+    self sendKey: 260 rune: 0 mod: 0 to: browser.
+    self sendKey: 260 rune: 0 mod: 0 to: browser.
+    self sendKey: 260 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 0 msg: 'Left arrow at pane 0 stays'.
+
+    "=== Enter advances pane and selects ==="
+    browser := SystemBrowser new.
+    "Navigate to MVC category"
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self assert: browser selectedCategory = 'MVC' msg: 'navigated to MVC'.
+
+    "Enter selects category and advances to class pane"
+    self sendKey: 13 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 1 msg: 'Enter advances to class pane'.
+
+    "Class list should have MVC classes"
+    classes := browser classList items.
+    self assert: classes size > 0 msg: 'MVC has classes'.
+    self assert: (classes includes: 'Model') msg: 'MVC includes Model'.
+    self assert: (classes includes: 'View') msg: 'MVC includes View'.
+
+    "=== Class navigation ==="
+    "Arrow down to select first class"
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    browser selectedClass isNil ifFalse: [
+      self assert: true msg: ('selected class: ', browser selectedClass)
+    ] ifTrue: [
+      self assert: false msg: 'Down arrow should select a class'
+    ].
+
+    "Enter to advance to method pane"
+    self sendKey: 13 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 2 msg: 'Enter from class pane advances to method pane'.
+
+    "=== Method list populated ==="
+    methods := browser methodList items.
+    self assert: methods size > 0 msg: ('method list has entries: ', methods size printString).
+
+    "=== Method navigation ==="
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    browser selectedMethod isNil ifFalse: [
+      self assert: true msg: ('selected method: ', browser selectedMethod)
+    ] ifTrue: [
+      self assert: false msg: 'Down arrow should select a method'
+    ].
+
+    "Arrow down multiple times — list should stay stable"
+    firstMethod := browser selectedMethod.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 257 rune: 0 mod: 0 to: browser.
+    self assert: browser selectedMethod = firstMethod msg: 'down then up returns to same method'.
+
+    "=== Enter on method advances to code pane ==="
+    self sendKey: 13 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 3 msg: 'Enter from method pane advances to code pane'.
+
+    "=== Mouse click on category pane ==="
+    browser := SystemBrowser new.
+    "Simulate click on row 2 (MVC), column 5 (inside category pane)"
+    self sendMouse: 5 y: 2 buttons: 1 to: browser.
+    self assert: browser selectedCategory = 'MVC' msg: 'mouse click selects MVC category'.
+    self assert: browser focusedPane = 0 msg: 'mouse click on cat sets focus to 0'.
+
+    "=== Mouse click on class pane ==="
+    "First populate classes by selecting a category"
+    browser := SystemBrowser new.
+    "Navigate to Tools"
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self assert: browser selectedCategory = 'Tools' msg: 'navigated to Tools'.
+
+    toolClasses := browser classList items.
+    self assert: toolClasses size > 0 msg: 'Tools has classes'.
+
+    "Click on class pane (x = paneWidth + 2, y = 0)"
+    paneWidth := 26.
+    self sendMouse: paneWidth + 2 y: 0 buttons: 1 to: browser.
+    self assert: browser focusedPane = 1 msg: 'mouse click on class pane sets focus to 1'.
+    browser selectedClass isNil ifFalse: [
+      self assert: true msg: ('mouse selected class: ', browser selectedClass)
+    ].
+
+    "=== Summary ==="
+    ('').println.
+    ('Results: ', PassCount printString, ' passed, ', FailCount printString, ' failed') println
+  ]
+
+  classMethod: sendKey: keyCode rune: runeVal mod: mod to: browser [
+    | evt |
+    evt := Dictionary new.
+    evt at: 'type' put: 'key'.
+    evt at: 'key' put: keyCode.
+    evt at: 'rune' put: runeVal.
+    evt at: 'mod' put: mod.
+    [browser handleEvent: evt] on: Exception do: [:e |
+      ('  EVENT ERROR: ', e messageText) println
+    ]
+  ]
+
+  classMethod: sendMouse: x y: y buttons: btn to: browser [
+    | evt |
+    evt := Dictionary new.
+    evt at: 'type' put: 'mouse'.
+    evt at: 'x' put: x.
+    evt at: 'y' put: y.
+    evt at: 'buttons' put: btn.
+    [browser handleEvent: evt] on: Exception do: [:e |
+      ('  MOUSE ERROR: ', e messageText) println
+    ]
+  ]
+
+  classMethod: assert: condition msg: message [
+    condition ifTrue: [
+      PassCount := PassCount + 1.
+      ('  PASS: ', message) println
+    ] ifFalse: [
+      FailCount := FailCount + 1.
+      ('  FAIL: ', message) println
+    ]
+  ]
