@@ -15,29 +15,20 @@ AltoDebugger subclass: View
   ]
 
   classMethod: openOnError: errMsg on: aDisplay [
-    "Open a debugger window showing the current error state."
+    "Open a debugger with the current call stack."
+    ^self openOnError: errMsg stack: Compiler captureCallStack on: aDisplay
+  ]
+
+  classMethod: openOnError: errMsg stack: aStack on: aDisplay [
+    "Open a debugger window showing the given error and stack."
     | dbg frame window stack vars screenSize w h |
     dbg := AltoDebugger new.
     dbg display: aDisplay.
     dbg privateErrorMessage: errMsg.
-
-    "Get call stack from VM debugger"
-    [
-      Debugger activate.
-      stack := Debugger getCallStack.
-      stack isNil ifTrue: [stack := #()].
-      dbg privateFrames: stack.
-
-      "Get variables for top frame"
-      stack size > 0 ifTrue: [
-        vars := Debugger getVariables: ((stack at: 0) at: 'id').
-        vars isNil ifTrue: [vars := #()].
-        dbg privateVariables: vars
-      ]
-    ] on: Exception do: [:e |
-      dbg privateFrames: #().
-      dbg privateVariables: #()
-    ].
+    stack := aStack.
+    stack isNil ifTrue: [stack := #()].
+    dbg privateFrames: stack.
+    dbg privateVariables: #().
 
     "Create window"
     screenSize := aDisplay screen size.
@@ -83,14 +74,6 @@ AltoDebugger subclass: View
     idx < 0 ifTrue: [idx := 0].
     idx >= frames size ifTrue: [idx := frames size - 1].
     selectedFrame := idx.
-    frames size > 0 ifTrue: [
-      frameDict := frames at: selectedFrame.
-      [
-        vars := Debugger getVariables: (frameDict at: 'id').
-        vars isNil ifTrue: [vars := #()].
-        variables := vars
-      ] on: Exception do: [:e | variables := #()]
-    ].
     self updateSource
   ]
 
@@ -163,9 +146,9 @@ AltoDebugger subclass: View
       ^self
     ].
 
-    "Tab — cycle focus (frames, variables, source)"
+    "Tab — cycle focus (frames, source)"
     keyCode = 9 ifTrue: [
-      focusedPane := (focusedPane + 1) \\ 3.
+      focusedPane := (focusedPane + 1) \\ 2.
       self invalidate. ^self
     ].
 
@@ -178,9 +161,6 @@ AltoDebugger subclass: View
         ]
       ].
       focusedPane = 1 ifTrue: [
-        varScrollOffset > 0 ifTrue: [varScrollOffset := varScrollOffset - 1]
-      ].
-      focusedPane = 2 ifTrue: [
         sourceScrollOffset > 0 ifTrue: [sourceScrollOffset := sourceScrollOffset - 1]
       ].
       self invalidate. ^self
@@ -194,9 +174,6 @@ AltoDebugger subclass: View
         ]
       ].
       focusedPane = 1 ifTrue: [
-        varScrollOffset := varScrollOffset + 1
-      ].
-      focusedPane = 2 ifTrue: [
         sourceScrollOffset := sourceScrollOffset + 1
       ].
       self invalidate. ^self
@@ -204,15 +181,14 @@ AltoDebugger subclass: View
   ]
 
   method: displayOn: aCellBuffer [
-    "Three-pane layout: stack frames (top), variables (middle), source (bottom)."
-    | bufW bufH frameH varH srcH y |
+    "Two-pane layout: stack frames (top half), source (bottom half)."
+    | bufW bufH frameH srcH |
     bufW := aCellBuffer width.
     bufH := aCellBuffer height.
 
-    "Divide height: 1/3 frames, 1/3 variables, 1/3 source"
-    frameH := bufH // 3.
-    varH := bufH // 3.
-    srcH := bufH - frameH - varH.
+    "Divide height: top half frames, bottom half source"
+    frameH := bufH // 2.
+    srcH := bufH - frameH - 1.
 
     "Draw stack frames"
     self renderFrames: aCellBuffer fromY: 0 height: frameH width: bufW.
@@ -222,16 +198,8 @@ AltoDebugger subclass: View
       aCellBuffer putChar: 9472 x: x y: frameH style: normalStyle
     ].
 
-    "Draw variables"
-    self renderVariables: aCellBuffer fromY: frameH + 1 height: varH - 1 width: bufW.
-
-    "Separator"
-    0 to: bufW - 1 do: [:x |
-      aCellBuffer putChar: 9472 x: x y: frameH + varH style: normalStyle
-    ].
-
     "Draw source"
-    self renderSource: aCellBuffer fromY: frameH + varH + 1 height: srcH - 1 width: bufW
+    self renderSource: aCellBuffer fromY: frameH + 1 height: srcH width: bufW
   ]
 
   method: renderFrames: buf fromY: startY height: h width: w [

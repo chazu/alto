@@ -174,8 +174,10 @@ Display subclass: Object
           ].
           self render
         ] on: Exception do: [:e |
+          | errStack |
           Transcript show: 'Error: ', e messageText.
-          [AltoDebugger openOnError: e messageText on: self] on: Exception do: [:e2 |
+          errStack := Compiler captureCallStack.
+          [AltoDebugger openOnError: e messageText stack: errStack on: self] on: Exception do: [:e2 |
             Transcript show: 'Debugger error: ', e2 messageText
           ].
           self fullSync

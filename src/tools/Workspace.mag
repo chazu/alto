@@ -302,7 +302,12 @@ Workspace subclass: View
         Transcript show: result printString
       ]
     ] on: Exception do: [:e |
-      Transcript show: 'Error: ', e messageText
+      | errStack |
+      Transcript show: 'Error: ', e messageText.
+      errStack := Compiler captureCallStack.
+      [AltoDebugger openOnError: e messageText stack: errStack on: display] on: Exception do: [:e2 |
+        Transcript show: 'Debugger error: ', e2 messageText
+      ]
     ].
     self invalidate.
     display notNil ifTrue: [display fullSync]
@@ -321,7 +326,10 @@ Workspace subclass: View
         cursorX := cursorX + 1 + resultStr size
       ]
     ] on: Exception do: [:e |
-      Transcript show: 'Error: ', e messageText
+      | errStack |
+      Transcript show: 'Error: ', e messageText.
+      errStack := Compiler captureCallStack.
+      [AltoDebugger openOnError: e messageText stack: errStack on: display] on: Exception do: [:e2 | ]
     ].
     self invalidate
   ]
@@ -336,7 +344,10 @@ Workspace subclass: View
         ]
       ]
     ] on: Exception do: [:e |
-      Transcript show: 'Error: ', e messageText
+      | errStack |
+      Transcript show: 'Error: ', e messageText.
+      errStack := Compiler captureCallStack.
+      [AltoDebugger openOnError: e messageText stack: errStack on: display] on: Exception do: [:e2 | ]
     ].
     self invalidate
   ]
