@@ -108,7 +108,7 @@ SystemBrowser subclass: View
       methods := cls allMethodNames.
       result := Array new: 0.
       methods do: [:sel | result := result copyWith: ('', sel)].
-      ^result
+      ^result sorted
     ] on: Exception do: [:e |
       Transcript show: 'Browser methods error: ', e messageText.
       ^#()

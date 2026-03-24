@@ -83,6 +83,9 @@ Window subclass: Object
     aCellBuffer putChar: 88 x: closeX + 1 y: 0 style: borderStyle.
     aCellBuffer putChar: 93 x: closeX + 2 y: 0 style: borderStyle.
 
+    "Resize handle (bottom-right corner) — ◢"
+    aCellBuffer putChar: 9698 x: w - 1 y: h - 1 style: borderStyle.
+
     "Content — render into cached sub-buffer offset by the border"
     contentView isNil ifTrue: [^self].
     contentBuf clear.
@@ -143,6 +146,18 @@ Window subclass: Object
     "Key events → delegate to contentController"
     contentController isNil ifTrue: [^self].
     contentController handleEvent: evt
+  ]
+
+  method: resizeTo: newWidth height: newHeight [
+    "Resize the window, reallocating buffers."
+    | minW minH w h |
+    minW := 10. minH := 5.
+    w := newWidth max: minW.
+    h := newHeight max: minH.
+    frame width: w.
+    frame height: h.
+    buffer := CellBuffer width: w height: h.
+    contentBuf := CellBuffer width: w - 2 height: h - 2
   ]
 
   method: close [

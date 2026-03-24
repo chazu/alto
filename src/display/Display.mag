@@ -5,7 +5,7 @@ import: 'Go'
  Caches window renders and only updates dirty windows + changed screen cells."
 
 Display subclass: Object
-  instanceVars: screen windows running screenW screenH screenChars screenStyles draggingWindow dragOffsetX dragOffsetY
+  instanceVars: screen windows running screenW screenH screenChars screenStyles draggingWindow dragOffsetX dragOffsetY resizingWindow
 
   classMethod: new [
     | d |
@@ -35,7 +35,8 @@ Display subclass: Object
     "Drag state"
     draggingWindow := nil.
     dragOffsetX := 0.
-    dragOffsetY := 0
+    dragOffsetY := 0.
+    resizingWindow := nil
   ]
 
   method: addWindow: w [ w display: self. windows := windows copyWith: w ]
@@ -67,7 +68,11 @@ Display subclass: Object
   method: screen [ ^screen ]
   method: buffer [ ^nil ]
   method: windows [ ^windows ]
-  method: running [ ^running ]
+
+  method: running [
+    "do it run?"
+    ^running 
+  ]
 
   method: fullSync [
     "Force full screen repaint — clears cache and redraws everything.
@@ -179,10 +184,24 @@ Display subclass: Object
 
   method: dispatchMouse: evt [
     "Route mouse event — handle dragging at Display level."
-    | mx my buttons i win f |
+    | mx my buttons i win f rf newW newH |
     mx := evt at: 'x'.
     my := evt at: 'y'.
     buttons := evt at: 'buttons'.
+
+    "If resizing, route to resize logic"
+    resizingWindow notNil ifTrue: [
+      buttons = 0 ifTrue: [
+        resizingWindow := nil.
+        ^self
+      ].
+      rf := resizingWindow frame.
+      newW := mx - rf x + 1.
+      newH := my - rf y + 1.
+      self invalidateWindow: resizingWindow.
+      resizingWindow resizeTo: newW height: newH.
+      ^self
+    ].
 
     "If dragging, route to drag logic"
     draggingWindow notNil ifTrue: [
@@ -222,6 +241,12 @@ Display subclass: Object
         | localX localY |
         localX := mx - f x.
         localY := my - f y.
+        "Click on resize handle (bottom-right corner) — start resize"
+        (buttons = 1 and: [localY = (f height - 1) and: [localX = (f width - 1)]]) ifTrue: [
+          resizingWindow := win.
+          self bringToFront: win.
+          ^self
+        ].
         "Click on title bar (row 0, excluding close box) — start drag"
         (buttons = 1 and: [localY = 0 and: [localX < (f width - 4)]]) ifTrue: [
           draggingWindow := win.
@@ -252,18 +277,14 @@ Display subclass: Object
     ]
   ]
 
-  method: moveWindow: win toX: newX y: newY [
-    "Move a window, invalidating old and new positions in screen cache."
-    | f oldX oldY idx clearStyle |
+  method: invalidateWindow: win [
+    "Clear screen cache where a window currently sits."
+    | f clearStyle idx |
     f := win frame.
-    oldX := f x. oldY := f y.
-    (newX = oldX and: [newY = oldY]) ifTrue: [^self].
-
-    "Invalidate old position in screen cache"
     clearStyle := Go::Terminal newStyle.
-    oldY to: oldY + f height - 1 do: [:row |
+    f y to: f y + f height - 1 do: [:row |
       (row >= 0 and: [row < screenH]) ifTrue: [
-        oldX to: oldX + f width - 1 do: [:col |
+        f x to: f x + f width - 1 do: [:col |
           (col >= 0 and: [col < screenW]) ifTrue: [
             idx := row * screenW + col.
             screenChars at: idx put: -1.
@@ -272,9 +293,15 @@ Display subclass: Object
           ]
         ]
       ]
-    ].
+    ]
+  ]
 
-    "Update frame position"
+  method: moveWindow: win toX: newX y: newY [
+    "Move a window, invalidating old position in screen cache."
+    | f |
+    f := win frame.
+    (newX = f x and: [newY = f y]) ifTrue: [^self].
+    self invalidateWindow: win.
     f x: newX.
     f y: newY
   ]
