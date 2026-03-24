@@ -120,6 +120,22 @@ CellBuffer subclass: Object
     styles := Array new: sz withAll: defaultStyle
   ]
 
+  method: blitInto: destBuf atX: offsetX y: offsetY [
+    "Copy this buffer into destBuf at the given offset. No Dictionary boxing."
+    | row col ch st |
+    row := 0.
+    [row < height] whileTrue: [
+      col := 0.
+      [col < width] whileTrue: [
+        ch := chars at: row * width + col.
+        st := styles at: row * width + col.
+        destBuf putChar: ch x: col + offsetX y: row + offsetY style: st.
+        col := col + 1
+      ].
+      row := row + 1
+    ]
+  ]
+
   method: clearRect: rect [
     | rx ry rw rh cx cy |
     rx := rect x.
