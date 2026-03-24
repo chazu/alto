@@ -175,6 +175,9 @@ Display subclass: Object
           self render
         ] on: Exception do: [:e |
           Transcript show: 'Error: ', e messageText.
+          [AltoDebugger openOnError: e messageText on: self] on: Exception do: [:e2 |
+            Transcript show: 'Debugger error: ', e2 messageText
+          ].
           self fullSync
         ]
       ]
@@ -269,11 +272,12 @@ Display subclass: Object
 
   method: openDesktopMenuAt: x y: y [
     | menuItems |
-    menuItems := #('Workspace' 'System Browser' 'Transcript').
+    menuItems := #('Workspace' 'System Browser' 'Transcript' 'Debugger').
     Menu open: menuItems at: (Array with: x with: y) on: self callback: [:item |
       item = 'Workspace' ifTrue: [Workspace open: self].
       item = 'System Browser' ifTrue: [SystemBrowser open: self].
-      item = 'Transcript' ifTrue: [Transcript open: self]
+      item = 'Transcript' ifTrue: [Transcript open: self].
+      item = 'Debugger' ifTrue: [AltoDebugger openOnError: 'Manual debug' on: self]
     ]
   ]
 

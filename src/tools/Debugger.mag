@@ -1,0 +1,319 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Debugger — shows stack frames, variables, and source when an error occurs.
+ Uses the VM's built-in Debugger primitives for stack/variable inspection."
+
+AltoDebugger subclass: View
+  instanceVars: errorMessage frames variables selectedFrame focusedPane normalStyle reverseStyle display parentWindow frameScrollOffset varScrollOffset sourceLines sourceScrollOffset
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  classMethod: openOnError: errMsg on: aDisplay [
+    "Open a debugger window showing the current error state."
+    | dbg frame window stack vars screenSize w h |
+    dbg := AltoDebugger new.
+    dbg display: aDisplay.
+    dbg privateErrorMessage: errMsg.
+
+    "Get call stack from VM debugger"
+    [
+      Debugger activate.
+      stack := Debugger getCallStack.
+      stack isNil ifTrue: [stack := #()].
+      dbg privateFrames: stack.
+
+      "Get variables for top frame"
+      stack size > 0 ifTrue: [
+        vars := Debugger getVariables: ((stack at: 0) at: 'id').
+        vars isNil ifTrue: [vars := #()].
+        dbg privateVariables: vars
+      ]
+    ] on: Exception do: [:e |
+      dbg privateFrames: #().
+      dbg privateVariables: #()
+    ].
+
+    "Create window"
+    screenSize := aDisplay screen size.
+    w := (screenSize at: 0) - 4.
+    h := (screenSize at: 1) - 4.
+    w := w min: 100.
+    h := h min: 35.
+    frame := Rectangle x: 2 y: 1 width: w height: h.
+    window := Window title: ('Debugger: ', errMsg) content: dbg controller: dbg frame: frame.
+    dbg parentWindow: window.
+    aDisplay addWindow: window.
+    ^dbg
+  ]
+
+  method: initialize [
+    super initialize.
+    errorMessage := ''.
+    frames := #().
+    variables := #().
+    selectedFrame := 0.
+    focusedPane := 0.
+    normalStyle := Go::Terminal newStyle.
+    reverseStyle := (Go::Terminal newStyle) reverse: true.
+    display := nil.
+    parentWindow := nil.
+    frameScrollOffset := 0.
+    varScrollOffset := 0.
+    sourceLines := #('').
+    sourceScrollOffset := 0
+  ]
+
+  method: privateErrorMessage: msg [ errorMessage := msg ]
+  method: privateFrames: arr [ frames := arr ]
+  method: privateVariables: arr [ variables := arr ]
+  method: display: d [ display := d ]
+  method: display [ ^display ]
+  method: parentWindow: w [ parentWindow := w ]
+  method: parentWindow [ ^parentWindow ]
+
+  method: selectFrame: idx [
+    "Select a stack frame and update variables."
+    | frameDict vars |
+    idx < 0 ifTrue: [idx := 0].
+    idx >= frames size ifTrue: [idx := frames size - 1].
+    selectedFrame := idx.
+    frames size > 0 ifTrue: [
+      frameDict := frames at: selectedFrame.
+      [
+        vars := Debugger getVariables: (frameDict at: 'id').
+        vars isNil ifTrue: [vars := #()].
+        variables := vars
+      ] on: Exception do: [:e | variables := #()]
+    ].
+    self updateSource
+  ]
+
+  method: updateSource [
+    "Update source lines for the selected frame."
+    | frameDict className methodName cls sym src |
+    frames size = 0 ifTrue: [sourceLines := #(''). ^self].
+    frameDict := frames at: selectedFrame.
+    className := frameDict at: 'class' ifAbsent: [''].
+    methodName := frameDict at: 'method' ifAbsent: [''].
+    sourceLines := #('').
+    [
+      cls := self findClassNamed: className.
+      cls = false ifTrue: [^self].
+      "Find matching symbol"
+      sym := nil.
+      cls allMethodNames do: [:sel |
+        ('', sel) = methodName ifTrue: [sym := sel]
+      ].
+      sym isNil ifTrue: [^self].
+      src := cls methodSourceFor: sym.
+      (src isNil or: [src = false]) ifTrue: [
+        src := cls classMethodSourceFor: sym
+      ].
+      (src isNil or: [src = false]) ifTrue: [^self].
+      self splitSource: ('', src)
+    ] on: Exception do: [:e | ]
+  ]
+
+  method: findClassNamed: name [
+    "Find a class object by name from allClassesSorted."
+    | nameStr |
+    Class allClassesSorted do: [:cls |
+      nameStr := '', cls name.
+      nameStr = name ifTrue: [^cls]
+    ].
+    ^false
+  ]
+
+  method: splitSource: src [
+    "Split source string into lines array."
+    | result current i code |
+    result := Array new: 0.
+    current := ''.
+    i := 0.
+    [i < src size] whileTrue: [
+      code := (src at: i) value.
+      code = 10 ifTrue: [
+        result := result copyWith: current.
+        current := ''
+      ] ifFalse: [
+        current := current, (Character value: code) asString
+      ].
+      i := i + 1
+    ].
+    result := result copyWith: current.
+    sourceLines := result
+  ]
+
+  method: handleEvent: evt [
+    | evtType keyCode |
+    evtType := evt at: 'type' ifAbsent: [''].
+    evtType = 'key' ifFalse: [^self].
+    keyCode := evt at: 'key'.
+
+    "Escape — close debugger"
+    keyCode = 27 ifTrue: [
+      [Debugger deactivate] on: Exception do: [:e | ].
+      display notNil ifTrue: [display removeWindow: parentWindow].
+      ^self
+    ].
+
+    "Tab — cycle focus (frames, variables, source)"
+    keyCode = 9 ifTrue: [
+      focusedPane := (focusedPane + 1) \\ 3.
+      self invalidate. ^self
+    ].
+
+    "Up arrow"
+    keyCode = 257 ifTrue: [
+      focusedPane = 0 ifTrue: [
+        selectedFrame > 0 ifTrue: [
+          self selectFrame: selectedFrame - 1.
+          selectedFrame < frameScrollOffset ifTrue: [frameScrollOffset := selectedFrame]
+        ]
+      ].
+      focusedPane = 1 ifTrue: [
+        varScrollOffset > 0 ifTrue: [varScrollOffset := varScrollOffset - 1]
+      ].
+      focusedPane = 2 ifTrue: [
+        sourceScrollOffset > 0 ifTrue: [sourceScrollOffset := sourceScrollOffset - 1]
+      ].
+      self invalidate. ^self
+    ].
+
+    "Down arrow"
+    keyCode = 258 ifTrue: [
+      focusedPane = 0 ifTrue: [
+        selectedFrame < (frames size - 1) ifTrue: [
+          self selectFrame: selectedFrame + 1
+        ]
+      ].
+      focusedPane = 1 ifTrue: [
+        varScrollOffset := varScrollOffset + 1
+      ].
+      focusedPane = 2 ifTrue: [
+        sourceScrollOffset := sourceScrollOffset + 1
+      ].
+      self invalidate. ^self
+    ]
+  ]
+
+  method: displayOn: aCellBuffer [
+    "Three-pane layout: stack frames (top), variables (middle), source (bottom)."
+    | bufW bufH frameH varH srcH y |
+    bufW := aCellBuffer width.
+    bufH := aCellBuffer height.
+
+    "Divide height: 1/3 frames, 1/3 variables, 1/3 source"
+    frameH := bufH // 3.
+    varH := bufH // 3.
+    srcH := bufH - frameH - varH.
+
+    "Draw stack frames"
+    self renderFrames: aCellBuffer fromY: 0 height: frameH width: bufW.
+
+    "Separator"
+    0 to: bufW - 1 do: [:x |
+      aCellBuffer putChar: 9472 x: x y: frameH style: normalStyle
+    ].
+
+    "Draw variables"
+    self renderVariables: aCellBuffer fromY: frameH + 1 height: varH - 1 width: bufW.
+
+    "Separator"
+    0 to: bufW - 1 do: [:x |
+      aCellBuffer putChar: 9472 x: x y: frameH + varH style: normalStyle
+    ].
+
+    "Draw source"
+    self renderSource: aCellBuffer fromY: frameH + varH + 1 height: srcH - 1 width: bufW
+  ]
+
+  method: renderFrames: buf fromY: startY height: h width: w [
+    | i frameIdx frameDict label style line j |
+    i := 0.
+    [i < h] whileTrue: [
+      frameIdx := frameScrollOffset + i.
+      frameIdx < frames size ifTrue: [
+        frameDict := frames at: frameIdx.
+        label := '[', (frameDict at: 'id' ifAbsent: [0]) printString, '] '.
+        label := label, (frameDict at: 'class' ifAbsent: ['']), '>>'.
+        label := label, (frameDict at: 'method' ifAbsent: ['']).
+        line := frameDict at: 'line' ifAbsent: [0].
+        line > 0 ifTrue: [label := label, '  L', line printString].
+
+        style := (frameIdx = selectedFrame and: [focusedPane = 0])
+          ifTrue: [reverseStyle] ifFalse: [normalStyle].
+
+        "Render label, filling width"
+        j := 0.
+        [j < w] whileTrue: [
+          j < label size ifTrue: [
+            buf putChar: (label at: j) value x: j y: startY + i style: style
+          ] ifFalse: [
+            buf putChar: 32 x: j y: startY + i style: style
+          ].
+          j := j + 1
+        ]
+      ].
+      i := i + 1
+    ]
+  ]
+
+  method: renderVariables: buf fromY: startY height: h width: w [
+    | i varIdx varDict label style j |
+    i := 0.
+    [i < h] whileTrue: [
+      varIdx := varScrollOffset + i.
+      varIdx < variables size ifTrue: [
+        varDict := variables at: varIdx.
+        label := (varDict at: 'name' ifAbsent: ['']), ' = ', (varDict at: 'value' ifAbsent: ['']).
+        style := (focusedPane = 1) ifTrue: [normalStyle] ifFalse: [normalStyle].
+
+        j := 0.
+        [j < w and: [j < label size]] whileTrue: [
+          buf putChar: (label at: j) value x: j y: startY + i style: style.
+          j := j + 1
+        ]
+      ].
+      i := i + 1
+    ]
+  ]
+
+  method: renderSource: buf fromY: startY height: h width: w [
+    | i lineIdx lineStr j style currentLine |
+    "Highlight the current line from the selected frame"
+    currentLine := -1.
+    frames size > 0 ifTrue: [
+      currentLine := (frames at: selectedFrame) at: 'line' ifAbsent: [-1].
+      currentLine := currentLine - 1  "0-indexed"
+    ].
+
+    i := 0.
+    [i < h] whileTrue: [
+      lineIdx := sourceScrollOffset + i.
+      lineIdx < sourceLines size ifTrue: [
+        lineStr := sourceLines at: lineIdx.
+        style := (lineIdx = currentLine) ifTrue: [reverseStyle] ifFalse: [normalStyle].
+
+        j := 0.
+        [j < w and: [j < lineStr size]] whileTrue: [
+          buf putChar: (lineStr at: j) value x: j y: startY + i style: style.
+          j := j + 1
+        ].
+        "Fill rest of line for highlight"
+        (lineIdx = currentLine) ifTrue: [
+          [j < w] whileTrue: [
+            buf putChar: 32 x: j y: startY + i style: reverseStyle.
+            j := j + 1
+          ]
+        ]
+      ].
+      i := i + 1
+    ]
+  ]
