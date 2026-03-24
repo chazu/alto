@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 Workspace subclass: View
-  instanceVars: textLines cursorX cursorY scrollOffset display parentWindow normalStyle reverseStyle killBuffer markX markY markActive undoLines undoCursorX undoCursorY
+  instanceVars: textLines cursorX cursorY scrollOffset display parentWindow normalStyle reverseStyle killBuffer markX markY markActive
 
   classMethod: new [
     | instance |
@@ -35,10 +35,7 @@ Workspace subclass: View
     killBuffer := #().
     markX := 0.
     markY := 0.
-    markActive := false.
-    undoLines := nil.
-    undoCursorX := 0.
-    undoCursorY := 0
+    markActive := false
   ]
 
   method: parentWindow: aWindow [ parentWindow := aWindow ]
@@ -95,11 +92,6 @@ Workspace subclass: View
     "Ctrl-I — inspect-it"
     (keyCode = 73 and: [((evt at: 'mod' ifAbsent: [0]) bitAnd: 2) > 0]) ifTrue: [
       self inspectIt. ^self
-    ].
-
-    "Ctrl-Z — undo"
-    (keyCode = 90 and: [((evt at: 'mod' ifAbsent: [0]) bitAnd: 2) > 0]) ifTrue: [
-      self undo. ^self
     ].
 
     "Readline bindings (tcell v2: key=uppercase ASCII + ModCtrl=2)"
@@ -208,7 +200,6 @@ Workspace subclass: View
 
     "Enter — split line"
     keyCode = 13 ifTrue: [
-      self saveUndo.
       lineStr := textLines at: cursorY.
       leftPart := lineStr copyFrom: 0 to: cursorX.
       rightPart := lineStr copyFrom: cursorX.
@@ -224,7 +215,6 @@ Workspace subclass: View
 
     "Backspace"
     (keyCode = 8 or: [keyCode = 127]) ifTrue: [
-      self saveUndo.
       cursorX > 0 ifTrue: [
         lineStr := textLines at: cursorY.
         leftPart := lineStr copyFrom: 0 to: cursorX - 1.
@@ -283,25 +273,6 @@ Workspace subclass: View
     ]
   ]
 
-  method: saveUndo [
-    "Save current state for undo."
-    undoLines := textLines copy.
-    undoCursorX := cursorX.
-    undoCursorY := cursorY
-  ]
-
-  method: undo [
-    "Restore previous state."
-    undoLines isNil ifTrue: [^self].
-    textLines := undoLines.
-    cursorX := undoCursorX.
-    cursorY := undoCursorY.
-    undoLines := nil.
-    markActive := false.
-    self updateScroll.
-    self invalidate
-  ]
-
   method: handleMouse: evt [
     | mx my btn |
     btn := evt at: 'buttons'.
@@ -321,22 +292,6 @@ Workspace subclass: View
       ^self
     ].
 
-    "Right click — context menu"
-    btn > 1 ifTrue: [
-      | screenX screenY |
-      screenX := mx.
-      screenY := my.
-      parentWindow notNil ifTrue: [
-        screenX := parentWindow frame x + mx + 1.
-        screenY := parentWindow frame y + my + 1
-      ].
-      Menu open: #('Do It' 'Print It' 'Inspect It') at: (Array with: screenX with: screenY) on: display callback: [:item |
-        item = 'Do It' ifTrue: [self doIt].
-        item = 'Print It' ifTrue: [self printIt].
-        item = 'Inspect It' ifTrue: [self inspectIt]
-      ].
-      ^self
-    ]
   ]
 
   method: doIt [
