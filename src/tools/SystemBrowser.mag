@@ -378,18 +378,35 @@ SystemBrowser subclass: View
   method: selectedMethod [ ^selectedMethod ]
   method: focusedPane [ ^focusedPane ]
 
+  method: scrollOffsetForList: anArray selected: aSelection visibleHeight: visH [
+    "Compute the scroll offset that renderList: would use."
+    | selIdx |
+    selIdx := self indexOfItem: aSelection inArray: anArray.
+    selIdx >= visH ifTrue: [^selIdx - visH + 1].
+    ^0
+  ]
+
   method: handleMouseLocalX: x y: y buttons: btn [
-    | paneWidth idx catItems classes methods |
+    | paneWidth idx catItems classes methods paneHeight scrollOff |
     btn = 1 ifFalse: [^self].
     paneWidth := 26.
+    paneHeight := 10.
     parentWindow notNil ifTrue: [
       paneWidth := (parentWindow frame width - 2) // 3
     ].
 
+    "Only handle clicks in the top pane area"
+    y >= paneHeight ifTrue: [
+      focusedPane := 3.
+      self invalidate.
+      ^self
+    ].
+
     x < paneWidth ifTrue: [
       focusedPane := 0.
-      idx := y.
       catItems := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools' 'Other').
+      scrollOff := self scrollOffsetForList: catItems selected: selectedCategory visibleHeight: paneHeight.
+      idx := scrollOff + y.
       idx < catItems size ifTrue: [
         selectedCategory := catItems at: idx.
         self updateClassList
@@ -397,8 +414,9 @@ SystemBrowser subclass: View
     ] ifFalse: [
       x < (paneWidth * 2) ifTrue: [
         focusedPane := 1.
-        idx := y.
-        classes := self classesForCategory: selectedCategory.
+        classes := classList items.
+        scrollOff := self scrollOffsetForList: classes selected: selectedClass visibleHeight: paneHeight.
+        idx := scrollOff + y.
         idx < classes size ifTrue: [
           selectedClass := classes at: idx.
           self updateMethodList
@@ -406,8 +424,9 @@ SystemBrowser subclass: View
       ] ifFalse: [
         x < (paneWidth * 3) ifTrue: [
           focusedPane := 2.
-          idx := y.
-          methods := self methodsForClass: selectedClass.
+          methods := methodList items.
+          scrollOff := self scrollOffsetForList: methods selected: selectedMethod visibleHeight: paneHeight.
+          idx := scrollOff + y.
           idx < methods size ifTrue: [
             selectedMethod := methods at: idx.
             self updateCodeView

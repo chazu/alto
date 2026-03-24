@@ -72,13 +72,18 @@ BrowserTest subclass: Object
     self sendKey: 259 rune: 0 mod: 0 to: browser.
     self assert: browser focusedPane = 3 msg: 'Right arrow at pane 3 stays'.
 
+    "Tab out of code pane, then test Left arrow"
+    self sendKey: 9 rune: 0 mod: 0 to: browser.
+    self sendKey: 259 rune: 0 mod: 0 to: browser.
+    self sendKey: 259 rune: 0 mod: 0 to: browser.
+    self assert: browser focusedPane = 2 msg: 'Right Right from 0 -> 2'.
+
     self sendKey: 260 rune: 0 mod: 0 to: browser.
-    self assert: browser focusedPane = 2 msg: 'Left arrow moves back to pane 2'.
+    self assert: browser focusedPane = 1 msg: 'Left from pane 2 -> 1'.
 
     self sendKey: 260 rune: 0 mod: 0 to: browser.
     self sendKey: 260 rune: 0 mod: 0 to: browser.
-    self sendKey: 260 rune: 0 mod: 0 to: browser.
-    self assert: browser focusedPane = 0 msg: 'Left arrow at pane 0 stays'.
+    self assert: browser focusedPane = 0 msg: 'Left at pane 0 stays'.
 
     "=== Enter advances pane and selects ==="
     browser := SystemBrowser new.
@@ -158,6 +163,33 @@ BrowserTest subclass: Object
     self assert: browser focusedPane = 1 msg: 'mouse click on class pane sets focus to 1'.
     browser selectedClass isNil ifFalse: [
       self assert: true msg: ('mouse selected class: ', browser selectedClass)
+    ].
+
+    "=== Mouse click on method pane selects correct method ==="
+    browser := SystemBrowser new.
+    "Navigate to Tools > Workspace"
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self assert: browser selectedCategory = 'Tools' msg: 'mouse-method: at Tools'.
+    "Select first class"
+    self sendKey: 13 rune: 0 mod: 0 to: browser.
+    self sendKey: 258 rune: 0 mod: 0 to: browser.
+    self sendKey: 13 rune: 0 mod: 0 to: browser.
+    methods := browser methodList items.
+    self assert: methods size > 0 msg: 'mouse-method: methods exist'.
+
+    "Click on row 0 in method pane — should select first method"
+    paneWidth := 26.
+    self sendMouse: paneWidth * 2 + 2 y: 0 buttons: 1 to: browser.
+    self assert: browser focusedPane = 2 msg: 'mouse click on method pane sets focus to 2'.
+    self assert: browser selectedMethod = (methods at: 0) msg: 'mouse click row 0 selects first method'.
+
+    "Click on row 2 — should select third method"
+    methods size > 2 ifTrue: [
+      self sendMouse: paneWidth * 2 + 2 y: 2 buttons: 1 to: browser.
+      self assert: browser selectedMethod = (methods at: 2) msg: 'mouse click row 2 selects third method'
     ].
 
     "=== Summary ==="
