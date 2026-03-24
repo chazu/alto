@@ -457,13 +457,14 @@ Workspace subclass: View
 
   method: evalString [
     "Return text to evaluate: region text joined with newlines, or current line."
-    | lines |
+    | lines nl |
+    nl := String lf.
     markActive ifTrue: [
       lines := self regionText.
       markActive := false.
       lines size = 1 ifTrue: [^lines at: 0].
       ^lines inject: '' into: [:acc :line |
-        acc size = 0 ifTrue: [line] ifFalse: [acc, (String value: 10), line]
+        acc size = 0 ifTrue: [line] ifFalse: [acc, nl, line]
       ]
     ].
     cursorY < textLines size ifTrue: [^textLines at: cursorY].

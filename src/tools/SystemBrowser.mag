@@ -192,10 +192,11 @@ SystemBrowser subclass: View
 
   method: joinCodeLines [
     "Join codeLines back into a single string with newlines."
-    | result |
+    | result nl |
+    nl := String lf.
     result := ''.
     codeLines do: [:line |
-      result size > 0 ifTrue: [result := result, (String value: 10)].
+      result size > 0 ifTrue: [result := result, nl].
       result := result, line
     ].
     ^result
