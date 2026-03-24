@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 SystemBrowser subclass: View
-  instanceVars: categoryList classList methodList codeView display parentWindow selectedCategory selectedClass selectedMethod focusedPane normalStyle reverseStyle cachedCatBuf cachedClassBuf cachedMethodBuf cachedCodeBuf lastPaneWidth lastPaneHeight lastCodeHeight classNames classObjects
+  instanceVars: categoryList classList methodList codeView display parentWindow selectedCategory selectedClass selectedMethod focusedPane normalStyle reverseStyle cachedCatBuf cachedClassBuf cachedMethodBuf cachedCodeBuf lastPaneWidth lastPaneHeight lastCodeHeight classNames classObjects codeLines codeCursorX codeCursorY codeScrollOffset codeDirty
 
   classMethod: new [
     | instance |
@@ -47,6 +47,11 @@ SystemBrowser subclass: View
     cachedCodeBuf := nil.
     classNames := Array new: 0.
     classObjects := Array new: 0.
+    codeLines := #('').
+    codeCursorX := 0.
+    codeCursorY := 0.
+    codeScrollOffset := 0.
+    codeDirty := false.
     self buildClassList.
     self updateClassList
   ]
@@ -93,7 +98,8 @@ SystemBrowser subclass: View
   ]
 
   method: methodsForClass: aClassName [
-    "Look up class object and get real method names."
+    "Look up class object and get real method names.
+     Returns String array for display; sourceForClass:method: converts back to Symbol for lookup."
     | cls methods result |
     aClassName isNil ifTrue: [^#()].
     [
@@ -110,14 +116,22 @@ SystemBrowser subclass: View
   ]
 
   method: sourceForClass: aClassName method: aMethodName [
-    "Look up class object and get real source code."
-    | cls src |
+    "Look up class object and get real source code.
+     aMethodName is a String; we find the matching Symbol from allMethodNames for lookup."
+    | cls src sym methods |
     [
       cls := self classObjectForName: aClassName.
       cls = false ifTrue: [^aClassName, ' >> #', aMethodName].
-      src := cls methodSourceFor: aMethodName.
+      "Find the Symbol that matches this method name"
+      sym := nil.
+      methods := cls allMethodNames.
+      methods do: [:sel |
+        ('', sel) = aMethodName ifTrue: [sym := sel]
+      ].
+      sym isNil ifTrue: [^aClassName, ' >> #', aMethodName].
+      src := cls methodSourceFor: sym.
       (src isNil or: [src = false]) ifTrue: [
-        src := cls classMethodSourceFor: aMethodName.
+        src := cls classMethodSourceFor: sym
       ].
       (src isNil or: [src = false]) ifTrue: [^aClassName, ' >> #', aMethodName].
       ^'', src
@@ -148,7 +162,198 @@ SystemBrowser subclass: View
   method: updateCodeView [
     selectedClass isNil ifTrue: [^self].
     selectedMethod isNil ifTrue: [^self].
-    codeView := self sourceForClass: selectedClass method: selectedMethod
+    codeView := self sourceForClass: selectedClass method: selectedMethod.
+    self splitCodeIntoLines.
+    codeDirty := false
+  ]
+
+  method: splitCodeIntoLines [
+    "Split codeView string into array of lines for editing."
+    | result current i code |
+    result := Array new: 0.
+    current := ''.
+    i := 0.
+    [i < codeView size] whileTrue: [
+      code := (codeView at: i) value.
+      code = 10 ifTrue: [
+        result := result copyWith: current.
+        current := ''
+      ] ifFalse: [
+        current := current, (Character value: code) asString
+      ].
+      i := i + 1
+    ].
+    result := result copyWith: current.
+    codeLines := result.
+    codeCursorX := 0.
+    codeCursorY := 0.
+    codeScrollOffset := 0
+  ]
+
+  method: joinCodeLines [
+    "Join codeLines back into a single string with newlines."
+    | result |
+    result := ''.
+    codeLines do: [:line |
+      result size > 0 ifTrue: [result := result, (String value: 10)].
+      result := result, line
+    ].
+    ^result
+  ]
+
+  method: handleCodeKey: keyCode rune: runeVal mod: mod [
+    "Handle key events in the code editing pane."
+    | lineStr leftPart rightPart |
+
+    "Tab — leave code pane (back to categories)"
+    keyCode = 9 ifTrue: [
+      focusedPane := 0.
+      self invalidate. ^self
+    ].
+
+    "Escape — close browser"
+    keyCode = 27 ifTrue: [
+      display notNil ifTrue: [display removeWindow: parentWindow].
+      ^self
+    ].
+
+    "Ctrl-S — compile and install"
+    (keyCode = 83 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
+      self compileAndSave.
+      ^self
+    ].
+
+    "Ctrl-A — beginning of line"
+    (keyCode = 65 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
+      codeCursorX := 0. self invalidate. ^self
+    ].
+    "Ctrl-E — end of line"
+    (keyCode = 69 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
+      codeCursorX := (codeLines at: codeCursorY) size. self invalidate. ^self
+    ].
+
+    "Up arrow"
+    keyCode = 257 ifTrue: [
+      codeCursorY > 0 ifTrue: [codeCursorY := codeCursorY - 1].
+      lineStr := codeLines at: codeCursorY.
+      codeCursorX > lineStr size ifTrue: [codeCursorX := lineStr size].
+      self updateCodeScroll. self invalidate. ^self
+    ].
+    "Down arrow"
+    keyCode = 258 ifTrue: [
+      codeCursorY < (codeLines size - 1) ifTrue: [codeCursorY := codeCursorY + 1].
+      lineStr := codeLines at: codeCursorY.
+      codeCursorX > lineStr size ifTrue: [codeCursorX := lineStr size].
+      self updateCodeScroll. self invalidate. ^self
+    ].
+    "Left arrow"
+    keyCode = 260 ifTrue: [
+      codeCursorX > 0 ifTrue: [codeCursorX := codeCursorX - 1].
+      self invalidate. ^self
+    ].
+    "Right arrow"
+    keyCode = 259 ifTrue: [
+      lineStr := codeLines at: codeCursorY.
+      codeCursorX < lineStr size ifTrue: [codeCursorX := codeCursorX + 1].
+      self invalidate. ^self
+    ].
+
+    "Enter — split line"
+    keyCode = 13 ifTrue: [
+      lineStr := codeLines at: codeCursorY.
+      leftPart := lineStr copyFrom: 0 to: codeCursorX.
+      rightPart := lineStr copyFrom: codeCursorX.
+      codeLines at: codeCursorY put: leftPart.
+      codeLines := (codeLines copyFrom: 0 to: codeCursorY + 1), (Array with: rightPart), (codeLines copyFrom: codeCursorY + 1).
+      codeCursorY := codeCursorY + 1.
+      codeCursorX := 0.
+      codeDirty := true.
+      self updateCodeScroll. self invalidate. ^self
+    ].
+
+    "Backspace"
+    (keyCode = 8 or: [keyCode = 127]) ifTrue: [
+      codeCursorX > 0 ifTrue: [
+        lineStr := codeLines at: codeCursorY.
+        leftPart := lineStr copyFrom: 0 to: codeCursorX - 1.
+        rightPart := lineStr copyFrom: codeCursorX.
+        codeLines at: codeCursorY put: (leftPart, rightPart).
+        codeCursorX := codeCursorX - 1.
+        codeDirty := true
+      ] ifFalse: [
+        codeCursorY > 0 ifTrue: [
+          leftPart := codeLines at: codeCursorY - 1.
+          rightPart := codeLines at: codeCursorY.
+          codeCursorX := leftPart size.
+          codeLines at: codeCursorY - 1 put: (leftPart, rightPart).
+          codeLines := (codeLines copyFrom: 0 to: codeCursorY), (codeLines copyFrom: codeCursorY + 1).
+          codeCursorY := codeCursorY - 1.
+          codeDirty := true
+        ]
+      ].
+      self updateCodeScroll. self invalidate. ^self
+    ].
+
+    "Printable character"
+    keyCode = 256 ifTrue: [
+      lineStr := codeLines at: codeCursorY.
+      leftPart := lineStr copyFrom: 0 to: codeCursorX.
+      rightPart := lineStr copyFrom: codeCursorX.
+      codeLines at: codeCursorY put: (leftPart, ((Character value: runeVal) asString), rightPart).
+      codeCursorX := codeCursorX + 1.
+      codeDirty := true.
+      self invalidate. ^self
+    ]
+  ]
+
+  method: updateCodeScroll [
+    | visH |
+    visH := 10.
+    lastCodeHeight > 0 ifTrue: [visH := lastCodeHeight].
+    codeCursorY < codeScrollOffset ifTrue: [codeScrollOffset := codeCursorY].
+    codeCursorY >= (codeScrollOffset + visH) ifTrue: [
+      codeScrollOffset := codeCursorY - visH + 1
+    ]
+  ]
+
+  method: compileAndSave [
+    "Compile the edited code, install it live, and write the class back to disk."
+    | cls source sel filePath |
+    selectedClass isNil ifTrue: [Transcript show: 'No class selected'. ^self].
+    selectedMethod isNil ifTrue: [Transcript show: 'No method selected'. ^self].
+    cls := self classObjectForName: selectedClass.
+    cls = false ifTrue: [Transcript show: 'Class not found: ', selectedClass. ^self].
+    source := self joinCodeLines.
+    [
+      "1. Compile and install live"
+      sel := cls compileAndInstall: source.
+      Transcript show: 'Installed: ', selectedClass, ' >> ', ('', sel).
+      codeDirty := false.
+      codeView := source.
+
+      "File write-back disabled: fileOut:to: is destructive (loses imports, comments, ordering).
+       TODO: implement surgical method replacement in .mag files."
+      Transcript show: '(live only — file write-back not yet safe)'.
+
+      self invalidate
+    ] on: Exception do: [:e |
+      Transcript show: 'Compile error: ', e messageText
+    ]
+  ]
+
+  method: filePathForClass: className [
+    "Derive .mag file path from class name and category."
+    | category dirMap dir |
+    category := self categoryForClassName: className.
+    dirMap := Dictionary new.
+    dirMap at: 'Kernel' put: 'src/display'.
+    dirMap at: 'Display' put: 'src/display'.
+    dirMap at: 'MVC' put: 'src/mvc'.
+    dirMap at: 'Widgets' put: 'src/widgets'.
+    dirMap at: 'Tools' put: 'src/tools'.
+    dir := dirMap at: category ifAbsent: [nil].
+    dir isNil ifTrue: [^nil].
+    ^dir, '/', className, '.mag'
   ]
 
   method: display: aDisplay [ display := aDisplay ]
@@ -234,6 +439,11 @@ SystemBrowser subclass: View
       focusedPane := (focusedPane + 1) \\ 4.
       self invalidate.
       ^self
+    ].
+
+    "When code pane is focused, route all keys to code editor"
+    focusedPane = 3 ifTrue: [
+      ^self handleCodeKey: keyCode rune: runeVal mod: (evt at: 'mod' ifAbsent: [0])
     ].
 
     "Arrow keys — delegate to focused pane"
@@ -384,9 +594,9 @@ SystemBrowser subclass: View
     cachedClassBuf blitInto: aCellBuffer atX: paneWidth y: 0.
     cachedMethodBuf blitInto: aCellBuffer atX: (paneWidth * 2) y: 0.
 
-    "Bottom pane: code view"
+    "Bottom pane: editable code view"
     cachedCodeBuf clear.
-    self renderCode: codeView into: cachedCodeBuf.
+    self renderCodeEditor: cachedCodeBuf.
     cachedCodeBuf blitInto: aCellBuffer atX: 0 y: paneHeight
   ]
 
@@ -409,6 +619,35 @@ SystemBrowser subclass: View
         itemStr := anArray at: itemIdx.
         style := (itemStr = aSelection) ifTrue: [reverseStyle] ifFalse: [normalStyle].
         aCellBuffer putString: itemStr x: 0 y: i style: style
+      ].
+      i := i + 1
+    ]
+  ]
+
+  method: renderCodeEditor: aCellBuffer [
+    "Render the code lines with cursor when focused."
+    | visH i lineIndex lineStr j charCode style isFocused |
+    visH := aCellBuffer height.
+    isFocused := focusedPane = 3.
+
+    i := 0.
+    [i < visH] whileTrue: [
+      lineIndex := codeScrollOffset + i.
+      lineIndex < codeLines size ifTrue: [
+        lineStr := codeLines at: lineIndex.
+        j := 0.
+        [j < lineStr size and: [j < aCellBuffer width]] whileTrue: [
+          charCode := (lineStr at: j) value.
+          style := (isFocused and: [lineIndex = codeCursorY and: [j = codeCursorX]])
+            ifTrue: [reverseStyle]
+            ifFalse: [normalStyle].
+          aCellBuffer putChar: charCode x: j y: i style: style.
+          j := j + 1
+        ].
+        "Cursor past end of line"
+        (isFocused and: [lineIndex = codeCursorY and: [codeCursorX >= lineStr size]]) ifTrue: [
+          aCellBuffer putChar: 32 x: codeCursorX y: i style: reverseStyle
+        ]
       ].
       i := i + 1
     ]
