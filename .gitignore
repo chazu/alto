@@ -1,2 +1,11 @@
 .maggie/
 *.image
+__pycache__/
+
+# Build artifacts
+alto
+alto-thin
+alto_test
+mag-custom
+cpu.pprof
+profile.folded
