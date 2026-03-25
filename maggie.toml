@@ -4,7 +4,7 @@ namespace = "Alto"
 version = "0.1.0"
 
 [source]
-dirs = ["wrap/tcell", "wrap/terminal", "src"]
+dirs = ["wrap/tcell", "wrap/terminal", "src", "examples"]
 entry = "Main.start"
 
 [go-wrap]

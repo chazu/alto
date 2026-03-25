@@ -17,6 +17,19 @@ image: wrap
 run-image: image
 	mag --image alto.image -m Alto::Main.start
 
+# Run example apps (use: make example-hello, make example-counter, etc.)
+example-hello: build
+	./alto -m Alto::HelloApp.start
+
+example-counter: build
+	./alto -m Alto::CounterApp.start
+
+example-todo: build
+	./alto -m Alto::TodoApp.start
+
+example-dashboard: build
+	./alto -m Alto::DashboardApp.start
+
 # Run acceptance tests (40 tests)
 test: wrap
 	@cp test/test_system_browser_acceptance.mag src/tools/BrowserTest.mag

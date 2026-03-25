@@ -1,0 +1,14 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Hello World — minimal Alto app.
+ Run: mag build --full -o alto && ./alto -m Alto::HelloApp.start"
+
+HelloApp subclass: Object
+  classMethod: start [
+    | app label |
+    label := Label text: 'Hello from Alto! Press Escape to quit.'.
+    app := App new.
+    app openWindow: 'Hello World' content: label controller: label.
+    app run
+  ]

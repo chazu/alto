@@ -1,0 +1,149 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Dashboard — multi-pane layout demo using HBox, VBox, and styled widgets.
+ Run: mag build --full -o alto && ./alto -m Alto::DashboardApp.start"
+
+StatusView subclass: View
+  instanceVars: items style headerStyle
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  method: initialize [
+    super initialize.
+    items := #().
+    style := Go::Terminal newStyle.
+    headerStyle := (Go::Terminal newStyle) bold: true
+  ]
+
+  method: items: anArray [
+    items := anArray.
+    self invalidate
+  ]
+
+  method: displayOn: aCellBuffer [
+    | i itemStr j ch |
+    aCellBuffer putString: 'Status' x: 0 y: 0 style: headerStyle.
+    i := 0.
+    [i < items size and: [i + 1 < aCellBuffer height]] whileTrue: [
+      itemStr := items at: i.
+      j := 0.
+      [j < itemStr size and: [j < aCellBuffer width]] whileTrue: [
+        ch := (itemStr at: j) value.
+        aCellBuffer putChar: ch x: j y: i + 1 style: style.
+        j := j + 1
+      ].
+      i := i + 1
+    ]
+  ]
+
+  method: handleEvent: evt [ ^self ]
+
+LogView subclass: View
+  instanceVars: lines maxLines scrollOffset style headerStyle
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  method: initialize [
+    super initialize.
+    lines := Array new: 0.
+    maxLines := 200.
+    scrollOffset := 0.
+    style := Go::Terminal newStyle.
+    headerStyle := (Go::Terminal newStyle) bold: true
+  ]
+
+  method: addLine: aString [
+    lines := lines copyWith: aString.
+    lines size > maxLines ifTrue: [
+      lines := lines copyFrom: lines size - maxLines
+    ].
+    scrollOffset := (lines size - 1) max: 0.
+    self invalidate
+  ]
+
+  method: displayOn: aCellBuffer [
+    | visibleH i lineIdx lineStr j ch |
+    aCellBuffer putString: 'Log' x: 0 y: 0 style: headerStyle.
+    visibleH := aCellBuffer height - 1.
+    i := 0.
+    [i < visibleH] whileTrue: [
+      lineIdx := scrollOffset - visibleH + 1 + i.
+      (lineIdx >= 0 and: [lineIdx < lines size]) ifTrue: [
+        lineStr := lines at: lineIdx.
+        j := 0.
+        [j < lineStr size and: [j < aCellBuffer width]] whileTrue: [
+          ch := (lineStr at: j) value.
+          aCellBuffer putChar: ch x: j y: i + 1 style: style.
+          j := j + 1
+        ]
+      ].
+      i := i + 1
+    ]
+  ]
+
+  method: handleEvent: evt [
+    | keyCode |
+    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
+    keyCode := evt at: 'key'.
+    keyCode = 257 ifTrue: [
+      scrollOffset > 0 ifTrue: [scrollOffset := scrollOffset - 1].
+      self invalidate
+    ].
+    keyCode = 258 ifTrue: [
+      scrollOffset < (lines size - 1) ifTrue: [scrollOffset := scrollOffset + 1].
+      self invalidate
+    ]
+  ]
+
+DashboardApp subclass: Object
+  classMethod: start [
+    | app statusView logView actionList sidebar mainContent layout |
+
+    "Left sidebar: action list"
+    actionList := ListView items: #('Refresh' 'Clear Log' 'Add Entry' 'Quit') onSelect: [:item | ].
+
+    "Top-right: status panel"
+    statusView := StatusView new.
+    statusView items: #(
+      'Server: running'
+      'Uptime: 3h 42m'
+      'Memory: 128MB / 512MB'
+      'CPU: 23%'
+      'Connections: 47'
+    ).
+
+    "Bottom-right: log panel"
+    logView := LogView new.
+    logView addLine: 'Dashboard started.'.
+    logView addLine: 'Monitoring active.'.
+    logView addLine: 'All systems nominal.'.
+
+    "Layout: sidebar | (status / log)"
+    mainContent := SplitPane vertical: statusView and: logView.
+    mainContent ratio: 0.4.
+
+    layout := SplitPane horizontal: actionList and: mainContent.
+    layout ratio: 0.2.
+
+    "Wire up action list"
+    actionList := ListView items: #('Refresh' 'Clear Log' 'Add Entry' 'Quit') onSelect: [:item |
+      item = 'Add Entry' ifTrue: [logView addLine: 'Manual entry at ', Date today printString].
+      item = 'Quit' ifTrue: [app stop]
+    ].
+    layout privateFirst: actionList.
+
+    app := App new.
+    app openWindow: 'Dashboard' content: layout controller: layout.
+    app run
+  ]

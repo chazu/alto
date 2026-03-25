@@ -1,0 +1,76 @@
+namespace: 'Alto'
+import: 'Go'
+
+"App — clean entry point for building TUI applications with Alto.
+ Usage:
+   app := App new.
+   app title: 'My App'.
+   app addWindow: myWindow.
+   app run.
+
+ Or with a single fullscreen content view:
+   app := App new.
+   app openWindow: 'My App' content: myView controller: myCtrl.
+   app run.
+
+ Desktop menu can be customized:
+   app onDesktopMenu: [:display :x :y |
+     Menu open: #('Quit') at: (Array with: x with: y) on: display callback: [:item |
+       item = 'Quit' ifTrue: [app stop]
+     ]
+   ].
+"
+
+App subclass: Object
+  instanceVars: display desktopMenuBlock
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  method: initialize [
+    display := Display new.
+    desktopMenuBlock := nil
+  ]
+
+  method: display [ ^display ]
+
+  method: openWindow: aTitle content: aView controller: aCtrl [
+    "Open a window sized to fill most of the screen."
+    | screenSize w h frame window |
+    screenSize := display screen size.
+    w := (screenSize at: 0) - 2.
+    h := (screenSize at: 1) - 2.
+    frame := Rectangle x: 1 y: 1 width: w height: h.
+    window := Window title: aTitle content: aView controller: aCtrl frame: frame.
+    display addWindow: window.
+    ^window
+  ]
+
+  method: openWindow: aTitle content: aView controller: aCtrl frame: aRect [
+    "Open a window with an explicit frame."
+    | window |
+    window := Window title: aTitle content: aView controller: aCtrl frame: aRect.
+    display addWindow: window.
+    ^window
+  ]
+
+  method: addWindow: aWindow [
+    display addWindow: aWindow
+  ]
+
+  method: run [
+    "Start the event loop."
+    display run
+  ]
+
+  method: stop [
+    display stop
+  ]
+
+  method: screenSize [
+    ^display screen size
+  ]

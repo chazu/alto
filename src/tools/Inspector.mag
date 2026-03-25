@@ -1,8 +1,13 @@
 namespace: 'Alto'
 import: 'Go'
 
+"Inspector — shows an object's instance variables and their values.
+ Left pane: field names. Right pane: selected value detail.
+ Enter drills down into the selected value, opening a new Inspector.
+ Supports Dictionary, Array, and arbitrary objects."
+
 Inspector subclass: View
-  instanceVars: target fieldNames fieldValues selectedIndex scrollOffset valueView display parentWindow focusOnList normalStyle reverseStyle
+  instanceVars: target fieldNames fieldValues fieldObjects selectedIndex scrollOffset display parentWindow focusOnList normalStyle reverseStyle dimStyle
 
   classMethod: new [
     | instance |
@@ -12,52 +17,22 @@ Inspector subclass: View
   ]
 
   classMethod: open: anObject on: aDisplay [
-    | frame inspector window keys vals i key allKeys varNames offsetX offsetY |
+    | frame inspector window offsetX offsetY title className |
+    inspector := self new.
+    inspector privateTarget: anObject.
+    inspector display: aDisplay.
+    [inspector buildFields] on: Exception do: [:e | ].
+
+    className := ''.
+    [className := '', anObject class name] on: Exception do: [:e | className := '??'].
+    title := 'Inspector: ', className.
+
     offsetX := 3 + (aDisplay windows size * 2).
     offsetY := 2 + (aDisplay windows size * 1).
-    frame := Rectangle x: offsetX y: offsetY width: 50 height: 16.
-    inspector := Inspector new.
-    inspector privateTarget: anObject.
-    keys := Array new: 0.
-    vals := Array new: 0.
-    (anObject isKindOf: Dictionary) ifTrue: [
-      "Dictionary: show keys and values"
-      allKeys := anObject keys.
-      i := 0.
-      [i < allKeys size] whileTrue: [
-        key := allKeys at: i.
-        keys := keys copyWith: key.
-        vals := vals copyWith: (anObject at: key) printString.
-        i := i + 1
-      ]
-    ] ifFalse: [
-      "Arbitrary object: use instVarAt: and allInstVarNames"
-      keys := keys copyWith: 'self'.
-      vals := vals copyWith: anObject printString.
-      keys := keys copyWith: 'class'.
-      vals := vals copyWith: '', anObject class name.
-      [
-        varNames := anObject class allInstVarNames.
-        (varNames notNil and: [varNames size > 0]) ifTrue: [
-          i := 0.
-          [i < varNames size] whileTrue: [
-            keys := keys copyWith: (varNames at: i).
-            vals := vals copyWith: (anObject instVarAt: i) printString.
-            i := i + 1
-          ]
-        ]
-      ] on: Exception do: [:e | "ignore — primitive types have no inst vars" ]
-    ].
-    inspector privateFieldNames: keys.
-    inspector privateFieldValues: vals.
-    inspector privateValueView: (Label text: '').
-    window := Window title: ('Inspector: ', anObject class name) content: inspector controller: inspector frame: frame.
+    frame := Rectangle x: offsetX y: offsetY width: 60 height: 20.
+    window := Window title: title content: inspector controller: inspector frame: frame.
     inspector parentWindow: window.
-    inspector display: aDisplay.
     aDisplay addWindow: window.
-    keys size > 0 ifTrue: [
-      inspector valueView text: (vals at: 0)
-    ].
     ^inspector
   ]
 
@@ -66,20 +41,18 @@ Inspector subclass: View
     target := nil.
     fieldNames := Array new: 0.
     fieldValues := Array new: 0.
+    fieldObjects := Array new: 0.
     selectedIndex := 0.
     scrollOffset := 0.
-    valueView := nil.
     display := nil.
     parentWindow := nil.
     focusOnList := true.
     normalStyle := Go::Terminal newStyle.
-    reverseStyle := (Go::Terminal newStyle) reverse: true
+    reverseStyle := (Go::Terminal newStyle) reverse: true.
+    dimStyle := (Go::Terminal newStyle) dim: true
   ]
 
   method: privateTarget: anObject [ target := anObject ]
-  method: privateFieldNames: anArray [ fieldNames := anArray ]
-  method: privateFieldValues: anArray [ fieldValues := anArray ]
-  method: privateValueView: aView [ valueView := aView ]
   method: parentWindow: aWindow [ parentWindow := aWindow ]
   method: display: aDisplay [ display := aDisplay ]
   method: display [ ^display ]
@@ -88,151 +61,287 @@ Inspector subclass: View
   method: fieldValues [ ^fieldValues ]
   method: selectedIndex [ ^selectedIndex ]
   method: scrollOffset [ ^scrollOffset ]
-  method: valueView [ ^valueView ]
   method: parentWindow [ ^parentWindow ]
   method: focusOnList [ ^focusOnList ]
 
-  method: onFieldSelected: item [
-    | idx |
-    idx := selectedIndex.
-    idx < fieldValues size ifTrue: [
-      valueView text: (fieldValues at: idx)
+  method: buildFields [
+    "Populate field names, display values, and raw object references for drill-down."
+    | keys vals objs allKeys i key varNames val className isDict isArray |
+    keys := Array new: 0.
+    vals := Array new: 0.
+    objs := Array new: 0.
+
+    "Header: self and class"
+    keys := keys copyWith: 'self'.
+    [vals := vals copyWith: target printString] on: Exception do: [:e |
+      vals := vals copyWith: '??'
     ].
-    self invalidate
+    objs := objs copyWith: target.
+
+    keys := keys copyWith: 'class'.
+    [vals := vals copyWith: ('', target class name)] on: Exception do: [:e |
+      vals := vals copyWith: '??'
+    ].
+    objs := objs copyWith: target class.
+
+    "Determine type safely — avoid isKindOf: which returns nil for some objects"
+    isDict := false.
+    isArray := false.
+    [isDict := ('', target class name) = 'Dictionary'] on: Exception do: [:e | ].
+    [isArray := ('', target class name) = 'Array'] on: Exception do: [:e | ].
+
+    isDict ifTrue: [
+      [
+        allKeys := target keys.
+        i := 0.
+        [i < allKeys size] whileTrue: [
+          key := allKeys at: i.
+          val := target at: key.
+          keys := keys copyWith: key printString.
+          vals := vals copyWith: val printString.
+          objs := objs copyWith: val.
+          i := i + 1
+        ]
+      ] on: Exception do: [:e | ]
+    ] ifFalse: [
+      isArray ifTrue: [
+        [
+          i := 0.
+          [i < target size] whileTrue: [
+            val := target at: i.
+            keys := keys copyWith: '[', i printString, ']'.
+            vals := vals copyWith: val printString.
+            objs := objs copyWith: val.
+            i := i + 1
+          ]
+        ] on: Exception do: [:e | ]
+      ] ifFalse: [
+        "Arbitrary object: instance variables"
+        [
+          varNames := target class allInstVarNames.
+          (varNames notNil and: [varNames size > 0]) ifTrue: [
+            i := 0.
+            [i < varNames size] whileTrue: [
+              [
+                val := target instVarAt: i.
+                keys := keys copyWith: (varNames at: i).
+                vals := vals copyWith: val printString.
+                objs := objs copyWith: val
+              ] on: Exception do: [:e |
+                keys := keys copyWith: (varNames at: i).
+                vals := vals copyWith: '<error>'.
+                objs := objs copyWith: nil
+              ].
+              i := i + 1
+            ]
+          ]
+        ] on: Exception do: [:e | ]
+      ]
+    ].
+
+    fieldNames := keys.
+    fieldValues := vals.
+    fieldObjects := objs
+  ]
+
+  method: drillDown [
+    "Open a new Inspector on the selected field's actual object."
+    | obj className |
+    selectedIndex >= fieldObjects size ifTrue: [^self].
+    obj := fieldObjects at: selectedIndex.
+    obj isNil ifTrue: [^self].
+    "Skip drill-down into Class objects — they cause render issues"
+    className := ''.
+    [className := '', obj class name] on: Exception do: [:e | ].
+    (className = 'Class' or: [
+      (className size > 6) and: [
+        (className copyFrom: className size - 5) = ' class'
+      ]
+    ]) ifTrue: [^self].
+    Inspector open: obj on: display
   ]
 
   method: handleEvent: evt [
-    | keyCode idx key val visibleHeight |
-    [self handleEventInner: evt] on: Exception do: [:e |
-      Transcript show: 'Inspector error: ', e messageText
-    ]
-  ]
+    | evtType keyCode visibleHeight |
+    evtType := evt at: 'type' ifAbsent: [''].
 
-  method: handleEventInner: evt [
-    | keyCode idx key val visibleHeight |
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
+    evtType = 'mouse' ifTrue: [
+      [self handleMouse: evt] on: Exception do: [:e |
+        Transcript show: 'INSP mouse err: ', e messageText
+      ].
+      ^self
+    ].
+
+    evtType = 'key' ifFalse: [^self].
     keyCode := evt at: 'key'.
 
-    "Escape — close"
     keyCode = 27 ifTrue: [
       display notNil ifTrue: [display removeWindow: parentWindow].
       ^self
     ].
 
-    "Tab — toggle focus"
     keyCode = 9 ifTrue: [
-      focusOnList := focusOnList not.
-      self invalidate.
-      ^self
+      focusOnList := focusOnList = true ifTrue: [false] ifFalse: [true].
+      self invalidate. ^self
     ].
 
-    "Enter — drill down into selected value"
     keyCode = 13 ifTrue: [
-      focusOnList ifTrue: [
-        selectedIndex < fieldNames size ifTrue: [
-          key := fieldNames at: selectedIndex.
-          (target isKindOf: Dictionary) ifTrue: [
-            val := target at: key.
-          ] ifFalse: [
-            "For arbitrary objects, get instVar by index (offset by 2 for 'self'/'class' entries)"
-            (key = 'self') ifTrue: [val := target]
-            ifFalse: [(key = 'class') ifTrue: [val := target class]
-            ifFalse: [
-              | varIdx |
-              varIdx := selectedIndex - 2.
-              varIdx >= 0 ifTrue: [val := target instVarAt: varIdx] ifFalse: [val := nil]
-            ]]
-          ].
-          val notNil ifTrue: [
-            Inspector open: val on: display
-          ]
-        ]
-      ].
+      (focusOnList = true) ifTrue: [self drillDown].
       ^self
     ].
 
-    "Up arrow"
     keyCode = 257 ifTrue: [
-      focusOnList ifTrue: [
+      (focusOnList = true) ifTrue: [
         selectedIndex > 0 ifTrue: [
           selectedIndex := selectedIndex - 1.
           selectedIndex < scrollOffset ifTrue: [scrollOffset := selectedIndex].
-          selectedIndex < fieldValues size ifTrue: [
-            valueView text: (fieldValues at: selectedIndex)
-          ].
           self invalidate
         ]
       ].
       ^self
     ].
 
-    "Down arrow"
     keyCode = 258 ifTrue: [
-      focusOnList ifTrue: [
-        fieldNames size > 0 ifTrue: [
-          selectedIndex < (fieldNames size - 1) ifTrue: [
-            selectedIndex := selectedIndex + 1.
-            visibleHeight := 14.
-            selectedIndex >= (scrollOffset + visibleHeight) ifTrue: [
-              scrollOffset := selectedIndex - visibleHeight + 1
-            ].
-            selectedIndex < fieldValues size ifTrue: [
-              valueView text: (fieldValues at: selectedIndex)
-            ].
-            self invalidate
-          ]
+      (focusOnList = true) ifTrue: [
+        selectedIndex < (fieldNames size - 1) ifTrue: [
+          selectedIndex := selectedIndex + 1.
+          visibleHeight := 18.
+          parentWindow notNil ifTrue: [visibleHeight := parentWindow frame height - 2].
+          selectedIndex >= (scrollOffset + visibleHeight) ifTrue: [
+            scrollOffset := selectedIndex - visibleHeight + 1
+          ].
+          self invalidate
         ]
       ].
       ^self
     ]
   ]
 
+
+  method: handleMouse: evt [
+    | btn mx my listWidth clickedIndex |
+    btn := evt at: 'buttons'.
+    mx := evt at: 'x'.
+    my := evt at: 'y'.
+    btn = 1 ifFalse: [^self].
+
+    listWidth := 22.
+
+    mx < listWidth ifTrue: [
+      "Click in field list"
+      focusOnList := true.
+      clickedIndex := scrollOffset + my.
+      (clickedIndex >= 0 and: [clickedIndex < fieldNames size]) ifTrue: [
+        selectedIndex := clickedIndex.
+        self invalidate
+      ]
+    ] ifFalse: [
+      "Click in value area"
+      focusOnList := false.
+      self invalidate
+    ]
+  ]
+
   method: displayOn: aCellBuffer [
-    | listWidth visibleCount i itemIndex fieldStr valStr idx style bufWidth bufHeight j charCode |
-    listWidth := 20.
+    | listWidth bufWidth bufHeight i itemIndex fieldStr valStr style j charCode rightX valueLines lineIdx lineStr rightW typeStr hint |
+    listWidth := 22.
     bufWidth := aCellBuffer width.
     bufHeight := aCellBuffer height.
 
     "Draw vertical separator"
     i := 0.
     [i < bufHeight] whileTrue: [
-      aCellBuffer putChar: 9474 x: listWidth y: i style: normalStyle.
+      aCellBuffer putChar: 9474 x: listWidth y: i style: dimStyle.
       i := i + 1
     ].
 
     "Left pane: field names with selection highlight"
-    visibleCount := bufHeight.
     i := 0.
-    [i < visibleCount] whileTrue: [
+    [i < bufHeight] whileTrue: [
       itemIndex := scrollOffset + i.
       itemIndex < fieldNames size ifTrue: [
         fieldStr := fieldNames at: itemIndex.
-        style := (itemIndex = selectedIndex and: [focusOnList])
+        style := (itemIndex = selectedIndex and: [focusOnList = true])
           ifTrue: [reverseStyle]
           ifFalse: [normalStyle].
         j := 0.
-        [j < fieldStr size and: [j < listWidth]] whileTrue: [
-          charCode := (fieldStr at: j) value.
-          aCellBuffer putChar: charCode x: j y: i style: style.
-          j := j + 1
-        ].
-        "Fill remaining width with style for selection bar"
         [j < listWidth] whileTrue: [
-          aCellBuffer putChar: 32 x: j y: i style: style.
+          j < fieldStr size ifTrue: [
+            charCode := (fieldStr at: j) value.
+            aCellBuffer putChar: charCode x: j y: i style: style
+          ] ifFalse: [
+            aCellBuffer putChar: 32 x: j y: i style: style
+          ].
           j := j + 1
         ]
       ].
       i := i + 1
     ].
 
-    "Right pane: selected value text"
+    "Right pane: selected value detail (word-wrapped)"
+    rightX := listWidth + 1.
     selectedIndex < fieldValues size ifTrue: [
+      rightW := bufWidth - rightX.
       valStr := fieldValues at: selectedIndex.
+      valueLines := self wrapText: valStr width: rightW.
+
+      "Show type on first line"
+      typeStr := ''.
+      [
+        selectedIndex < fieldObjects size ifTrue: [
+          typeStr := '(', ('', (fieldObjects at: selectedIndex) class name), ')'
+        ]
+      ] on: Exception do: [:e | typeStr := '' ].
       j := 0.
-      [j < valStr size and: [j + listWidth + 1 < bufWidth]] whileTrue: [
-        charCode := (valStr at: j) value.
-        aCellBuffer putChar: charCode x: j + listWidth + 1 y: 0 style: normalStyle.
+      [j < typeStr size and: [rightX + j < bufWidth]] whileTrue: [
+        aCellBuffer putChar: (typeStr at: j) value x: rightX + j y: 0 style: dimStyle.
         j := j + 1
+      ].
+
+      "Value text starting at row 1"
+      lineIdx := 0.
+      [lineIdx < valueLines size and: [lineIdx + 1 < bufHeight]] whileTrue: [
+        lineStr := valueLines at: lineIdx.
+        j := 0.
+        [j < lineStr size and: [rightX + j < bufWidth]] whileTrue: [
+          aCellBuffer putChar: (lineStr at: j) value x: rightX + j y: lineIdx + 1 style: normalStyle.
+          j := j + 1
+        ].
+        lineIdx := lineIdx + 1
       ]
+    ].
+
+    "Footer hint"
+    hint := 'Enter=drill down  Tab=switch pane  Esc=close'.
+    j := 0.
+    [j < hint size and: [j < bufWidth]] whileTrue: [
+      aCellBuffer putChar: (hint at: j) value x: j y: bufHeight - 1 style: dimStyle.
+      j := j + 1
     ]
+  ]
+
+  method: wrapText: aString width: maxWidth [
+    "Simple word wrap — returns Array of lines."
+    | lines current i code |
+    maxWidth < 1 ifTrue: [^#(aString)].
+    lines := Array new: 0.
+    current := ''.
+    i := 0.
+    [i < aString size] whileTrue: [
+      code := (aString at: i) value.
+      code = 10 ifTrue: [
+        lines := lines copyWith: current.
+        current := ''
+      ] ifFalse: [
+        current := current, (Character value: code) asString.
+        current size >= maxWidth ifTrue: [
+          lines := lines copyWith: current.
+          current := ''
+        ]
+      ].
+      i := i + 1
+    ].
+    current size > 0 ifTrue: [lines := lines copyWith: current].
+    lines size = 0 ifTrue: [lines := #('')].
+    ^lines
   ]

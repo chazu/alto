@@ -68,23 +68,23 @@ Workspace subclass: View
     ].
 
     "Ctrl-C — quit app"
-    (keyCode = 67 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
+    (keyCode = 3 or: [keyCode = 67 and: [((mod) bitAnd: 2) > 0]]) ifTrue: [
       display notNil ifTrue: [display stop].
       ^self
     ].
 
     "Ctrl-D — do-it"
-    (keyCode = 68 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
+    (keyCode = 4 or: [keyCode = 68 and: [((mod) bitAnd: 2) > 0]]) ifTrue: [
       self doIt. ^self
     ].
 
     "Ctrl-R — print-it"
-    (keyCode = 82 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
+    (keyCode = 18 or: [keyCode = 82 and: [((mod) bitAnd: 2) > 0]]) ifTrue: [
       self printIt. ^self
     ].
 
-    "Ctrl-I — inspect-it"
-    (keyCode = 73 and: [((mod) bitAnd: 2) > 0]) ifTrue: [
+    "Ctrl-O — inspect-it"
+    (keyCode = 15 or: [keyCode = 79 and: [((mod) bitAnd: 2) > 0]]) ifTrue: [
       self inspectIt. ^self
     ].
 
@@ -107,10 +107,11 @@ Workspace subclass: View
         Transcript show: result printString
       ]
     ] on: Exception do: [:e |
-      | errStack |
+      | errStack errVars |
       Transcript show: 'Error: ', e messageText.
       errStack := Compiler captureCallStack.
-      [AltoDebugger openOnError: e messageText stack: errStack on: display] on: Exception do: [:e2 |
+      errVars := AltoDebugger captureAllVariables: errStack.
+      [AltoDebugger openOnError: e messageText stack: errStack vars: errVars on: display] on: Exception do: [:e2 |
         Transcript show: 'Debugger error: ', e2 messageText
       ]
     ].
@@ -131,10 +132,11 @@ Workspace subclass: View
         editor lines at: editor cursorY put: (leftPart, ' ', resultStr, rightPart)
       ]
     ] on: Exception do: [:e |
-      | errStack |
+      | errStack errVars |
       Transcript show: 'Error: ', e messageText.
       errStack := Compiler captureCallStack.
-      [AltoDebugger openOnError: e messageText stack: errStack on: display] on: Exception do: [:e2 | ]
+      errVars := AltoDebugger captureAllVariables: errStack.
+      [AltoDebugger openOnError: e messageText stack: errStack vars: errVars on: display] on: Exception do: [:e2 | ]
     ].
     self invalidate
   ]
@@ -149,10 +151,11 @@ Workspace subclass: View
         ]
       ]
     ] on: Exception do: [:e |
-      | errStack |
+      | errStack errVars |
       Transcript show: 'Error: ', e messageText.
       errStack := Compiler captureCallStack.
-      [AltoDebugger openOnError: e messageText stack: errStack on: display] on: Exception do: [:e2 | ]
+      errVars := AltoDebugger captureAllVariables: errStack.
+      [AltoDebugger openOnError: e messageText stack: errStack vars: errVars on: display] on: Exception do: [:e2 | ]
     ].
     self invalidate
   ]

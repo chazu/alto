@@ -1,0 +1,62 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Counter — interactive counter with styled display.
+ Run: mag build --full -o alto && ./alto -m Alto::CounterApp.start"
+
+CounterView subclass: View
+  instanceVars: count titleStyle countStyle hintStyle
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  method: initialize [
+    super initialize.
+    count := 0.
+    titleStyle := (Go::Terminal newStyle) bold: true.
+    countStyle := ((Go::Terminal newStyle) foreground: (Go::V2 getColor: 'green')) bold: true.
+    hintStyle := (Go::Terminal newStyle) dim: true
+  ]
+
+  method: displayOn: aCellBuffer [
+    | countStr |
+    aCellBuffer putString: 'Counter' x: 0 y: 0 style: titleStyle.
+    aCellBuffer putString: '-------' x: 0 y: 1 style: hintStyle.
+    countStr := count printString.
+    aCellBuffer putString: countStr x: 0 y: 3 style: countStyle.
+    aCellBuffer putString: 'Up/Down or +/- to change' x: 0 y: 5 style: hintStyle.
+    aCellBuffer putString: 'R to reset, Escape to quit' x: 0 y: 6 style: hintStyle
+  ]
+
+  method: handleEvent: evt [
+    | keyCode runeVal |
+    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
+    keyCode := evt at: 'key'.
+    runeVal := evt at: 'rune' ifAbsent: [0].
+
+    "Up arrow or +"
+    (keyCode = 257 or: [runeVal = 43]) ifTrue: [
+      count := count + 1. self invalidate. ^self
+    ].
+    "Down arrow or -"
+    (keyCode = 258 or: [runeVal = 45]) ifTrue: [
+      count := count - 1. self invalidate. ^self
+    ].
+    "R to reset"
+    (runeVal = 114 or: [runeVal = 82]) ifTrue: [
+      count := 0. self invalidate. ^self
+    ]
+  ]
+
+CounterApp subclass: Object
+  classMethod: start [
+    | app view |
+    view := CounterView new.
+    app := App new.
+    app openWindow: 'Counter' content: view controller: view.
+    app run
+  ]

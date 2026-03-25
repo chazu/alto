@@ -1,0 +1,146 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Color — Maggie-level color abstraction wrapping tcell colors.
+ Provides named colors, RGB, hex, and palette access.
+ Usage:
+   Color red
+   Color rgb: 255 g: 128 b: 0
+   Color hex: 16rFF8000
+   Color named: 'darkblue'
+"
+
+Color subclass: Object
+  instanceVars: tcellColor
+
+  method: tcellColor [ ^tcellColor ]
+  method: tcellColor: c [ tcellColor := c ]
+
+  "Named color constants — returns a tcell color value"
+  classMethod: black      [ ^Go::V2 getColor: 'black' ]
+  classMethod: red        [ ^Go::V2 getColor: 'red' ]
+  classMethod: green      [ ^Go::V2 getColor: 'green' ]
+  classMethod: yellow     [ ^Go::V2 getColor: 'yellow' ]
+  classMethod: blue       [ ^Go::V2 getColor: 'blue' ]
+  classMethod: magenta    [ ^Go::V2 getColor: 'magenta' ]
+  classMethod: cyan       [ ^Go::V2 getColor: 'cyan' ]
+  classMethod: white      [ ^Go::V2 getColor: 'white' ]
+  classMethod: darkRed    [ ^Go::V2 getColor: 'darkred' ]
+  classMethod: darkGreen  [ ^Go::V2 getColor: 'darkgreen' ]
+  classMethod: darkBlue   [ ^Go::V2 getColor: 'darkblue' ]
+  classMethod: darkCyan   [ ^Go::V2 getColor: 'darkcyan' ]
+  classMethod: grey       [ ^Go::V2 getColor: 'grey' ]
+  classMethod: darkGrey   [ ^Go::V2 getColor: 'darkgrey' ]
+  classMethod: orange     [ ^Go::V2 getColor: 'orange' ]
+  classMethod: pink       [ ^Go::V2 getColor: 'pink' ]
+  classMethod: purple     [ ^Go::V2 getColor: 'purple' ]
+
+  "RGB color — 0..255 per channel"
+  classMethod: rgb: r g: g b: b [
+    ^Go::V2 newRGBColor: r _: g _: b
+  ]
+
+  "Hex color — integer value, e.g. 16rFF8000"
+  classMethod: hex: value [
+    ^Go::V2 newHexColor: value
+  ]
+
+  "Named color — any CSS/tcell color name string"
+  classMethod: named: aString [
+    ^Go::V2 getColor: aString
+  ]
+
+  "256-color palette"
+  classMethod: palette: index [
+    ^Go::V2 paletteColor: index
+  ]
+
+"Style — convenience builder on top of Go::Terminal style.
+ Usage:
+   Style fg: Color red bg: Color black
+   Style fg: Color blue
+   (Style fg: Color white bg: Color darkBlue) bold
+   Style default bold italic
+"
+
+Style subclass: Object
+  instanceVars: goStyle
+
+  classMethod: new [
+    | s |
+    s := super new.
+    s initDefault.
+    ^s
+  ]
+
+  method: initDefault [
+    goStyle := Go::Terminal newStyle
+  ]
+
+  method: goStyle [ ^goStyle ]
+  method: goStyle: s [ goStyle := s ]
+
+  "Foreground color"
+  classMethod: fg: aColor [
+    | s |
+    s := self new.
+    s goStyle: (s goStyle foreground: aColor).
+    ^s
+  ]
+
+  "Background color"
+  classMethod: bg: aColor [
+    | s |
+    s := self new.
+    s goStyle: (s goStyle background: aColor).
+    ^s
+  ]
+
+  "Foreground + background"
+  classMethod: fg: fgColor bg: bgColor [
+    | s |
+    s := self new.
+    s goStyle: ((s goStyle foreground: fgColor) background: bgColor).
+    ^s
+  ]
+
+  "Default style (terminal defaults)"
+  classMethod: default [
+    ^self new
+  ]
+
+  "Mutating builders — return self for chaining"
+  method: fg: aColor [
+    goStyle := goStyle foreground: aColor.
+    ^self
+  ]
+
+  method: bg: aColor [
+    goStyle := goStyle background: aColor.
+    ^self
+  ]
+
+  method: bold [
+    goStyle := goStyle bold: true.
+    ^self
+  ]
+
+  method: italic [
+    goStyle := goStyle italic: true.
+    ^self
+  ]
+
+  method: dim [
+    goStyle := goStyle dim: true.
+    ^self
+  ]
+
+  method: reverse [
+    goStyle := goStyle reverse: true.
+    ^self
+  ]
+
+  "Equality — delegates to Go style"
+  method: equals: other [
+    ^goStyle equals: other goStyle
+  ]

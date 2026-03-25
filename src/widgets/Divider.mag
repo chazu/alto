@@ -1,0 +1,93 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Divider — a visual separator line (horizontal or vertical).
+ Usage:
+   Divider horizontal        'full-width line'
+   Divider vertical          'full-height line'
+   Divider horizontal style: myStyle
+"
+
+Divider subclass: View
+  instanceVars: orientation dividerStyle
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  classMethod: horizontal [
+    | d |
+    d := self new.
+    d orientation: #horizontal.
+    ^d
+  ]
+
+  classMethod: vertical [
+    | d |
+    d := self new.
+    d orientation: #vertical.
+    ^d
+  ]
+
+  classMethod: horizontalStyle: aStyle [
+    | d |
+    d := self horizontal.
+    d dividerStyle: aStyle goStyle.
+    ^d
+  ]
+
+  classMethod: verticalStyle: aStyle [
+    | d |
+    d := self vertical.
+    d dividerStyle: aStyle goStyle.
+    ^d
+  ]
+
+  method: initialize [
+    super initialize.
+    orientation := #horizontal.
+    dividerStyle := Go::Terminal newStyle
+  ]
+
+  method: orientation [ ^orientation ]
+  method: orientation: sym [ orientation := sym ]
+
+  method: dividerStyle: aGoStyle [
+    dividerStyle := aGoStyle.
+    self invalidate
+  ]
+
+  method: style: aStyle [
+    "Accept an Alto Style object"
+    dividerStyle := aStyle goStyle.
+    self invalidate
+  ]
+
+  method: displayOn: aCellBuffer [
+    orientation = #horizontal
+      ifTrue: [self displayHorizontalOn: aCellBuffer]
+      ifFalse: [self displayVerticalOn: aCellBuffer]
+  ]
+
+  method: displayHorizontalOn: aCellBuffer [
+    | w i |
+    w := aCellBuffer width.
+    i := 0.
+    [i < w] whileTrue: [
+      aCellBuffer putChar: 9472 x: i y: 0 style: dividerStyle.   "─"
+      i := i + 1
+    ]
+  ]
+
+  method: displayVerticalOn: aCellBuffer [
+    | h i |
+    h := aCellBuffer height.
+    i := 0.
+    [i < h] whileTrue: [
+      aCellBuffer putChar: 9474 x: 0 y: i style: dividerStyle.   "│"
+      i := i + 1
+    ]
+  ]

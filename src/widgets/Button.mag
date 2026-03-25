@@ -1,0 +1,117 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Button — a clickable button widget.
+ Usage:
+   Button label: 'Save' action: [Transcript show: 'Saved!']
+   Button label: 'Cancel' action: [window close] style: myStyle
+"
+
+Button subclass: View
+  instanceVars: label action normalStyle pressedStyle focused
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  classMethod: label: aString action: aBlock [
+    | btn |
+    btn := self new.
+    btn privateLabel: aString.
+    btn privateAction: aBlock.
+    ^btn
+  ]
+
+  classMethod: label: aString action: aBlock style: aStyle [
+    | btn |
+    btn := self new.
+    btn privateLabel: aString.
+    btn privateAction: aBlock.
+    btn normalStyle: aStyle goStyle.
+    ^btn
+  ]
+
+  method: initialize [
+    super initialize.
+    label := ''.
+    action := nil.
+    normalStyle := Go::Terminal newStyle.
+    pressedStyle := (Go::Terminal newStyle) reverse: true.
+    focused := false
+  ]
+
+  method: privateLabel: aString [ label := aString ]
+  method: privateAction: aBlock [ action := aBlock ]
+  method: label [ ^label ]
+  method: action [ ^action ]
+
+  method: label: aString [
+    label := aString.
+    self invalidate
+  ]
+
+  method: action: aBlock [
+    action := aBlock
+  ]
+
+  method: normalStyle: aGoStyle [
+    normalStyle := aGoStyle.
+    pressedStyle := aGoStyle reverse: true.
+    self invalidate
+  ]
+
+  method: style: aStyle [
+    "Accept an Alto Style object"
+    normalStyle := aStyle goStyle.
+    pressedStyle := aStyle goStyle reverse: true.
+    self invalidate
+  ]
+
+  method: displayOn: aCellBuffer [
+    | btnText padLeft w i ch style |
+    w := aCellBuffer width.
+    btnText := '[ ', label, ' ]'.
+    padLeft := (w - btnText size) / 2.
+    padLeft < 0 ifTrue: [padLeft := 0].
+    style := focused ifTrue: [pressedStyle] ifFalse: [normalStyle].
+
+    "Fill background"
+    i := 0.
+    [i < w] whileTrue: [
+      aCellBuffer putChar: 32 x: i y: 0 style: style.
+      i := i + 1
+    ].
+
+    "Draw button text centered"
+    i := 0.
+    [i < btnText size] whileTrue: [
+      ch := (btnText at: i) value.
+      aCellBuffer putChar: ch x: padLeft + i y: 0 style: style.
+      i := i + 1
+    ]
+  ]
+
+  method: handleMouseLocalX: x y: y buttons: btn [
+    btn = 1 ifTrue: [
+      focused := true.
+      self invalidate.
+      action notNil ifTrue: [action value].
+      focused := false.
+      self invalidate
+    ]
+  ]
+
+  method: handleEvent: evt [
+    | evtType keyCode |
+    evtType := evt at: 'type' ifAbsent: [''].
+    evtType = 'key' ifFalse: [^self].
+    keyCode := evt at: 'key'.
+
+    "Enter or Space activates"
+    (keyCode = 13 or: [keyCode = 32]) ifTrue: [
+      action notNil ifTrue: [action value]
+    ]
+  ]

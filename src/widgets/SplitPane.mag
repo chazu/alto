@@ -1,0 +1,247 @@
+namespace: 'Alto'
+import: 'Go'
+
+"SplitPane — a two-pane split view with a draggable divider.
+ Usage:
+   split := SplitPane horizontal: listView and: detailView.
+   split := SplitPane vertical: topView and: bottomView.
+   split ratio: 0.3.          'left/top pane gets 30%'
+   split onResize: [:r | ...]. 'called when divider is dragged'
+
+ The first pane receives focus by default. Tab switches focus.
+ The divider can be dragged with the mouse.
+"
+
+SplitPane subclass: View
+  instanceVars: orientation firstView secondView firstCtrl secondCtrl ratio focusFirst dividerStyle firstBuf secondBuf minRatio maxRatio
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  classMethod: horizontal: first and: second [
+    "Left-right split."
+    | sp |
+    sp := self new.
+    sp orientation: #horizontal.
+    sp privateFirst: first.
+    sp privateSecond: second.
+    ^sp
+  ]
+
+  classMethod: vertical: first and: second [
+    "Top-bottom split."
+    | sp |
+    sp := self new.
+    sp orientation: #vertical.
+    sp privateFirst: first.
+    sp privateSecond: second.
+    ^sp
+  ]
+
+  method: initialize [
+    super initialize.
+    orientation := #horizontal.
+    firstView := nil.
+    secondView := nil.
+    firstCtrl := nil.
+    secondCtrl := nil.
+    ratio := 0.5.
+    focusFirst := true.
+    dividerStyle := (Go::Terminal newStyle) dim: true.
+    firstBuf := nil.
+    secondBuf := nil.
+    minRatio := 0.1.
+    maxRatio := 0.9
+  ]
+
+  method: orientation [ ^orientation ]
+  method: orientation: sym [ orientation := sym ]
+  method: ratio [ ^ratio ]
+  method: focusFirst [ ^focusFirst ]
+  method: firstView [ ^firstView ]
+  method: secondView [ ^secondView ]
+
+  method: privateFirst: aView [
+    firstView := aView.
+    firstCtrl := aView
+  ]
+
+  method: privateSecond: aView [
+    secondView := aView.
+    secondCtrl := aView
+  ]
+
+  method: firstController: aCtrl [ firstCtrl := aCtrl ]
+  method: secondController: aCtrl [ secondCtrl := aCtrl ]
+
+  method: ratio: aNumber [
+    ratio := aNumber max: minRatio.
+    ratio := ratio min: maxRatio.
+    self invalidate
+  ]
+
+  method: dividerStyle: aGoStyle [
+    dividerStyle := aGoStyle.
+    self invalidate
+  ]
+
+  method: displayOn: aCellBuffer [
+    | w h splitPos firstW firstH secondW secondH secondX secondY i |
+    w := aCellBuffer width.
+    h := aCellBuffer height.
+
+    orientation = #horizontal ifTrue: [
+      "Left-right split"
+      splitPos := (w * ratio) truncated.
+      splitPos := splitPos max: 1.
+      splitPos := splitPos min: w - 2.
+      firstW := splitPos.
+      firstH := h.
+      secondW := w - splitPos - 1.
+      secondH := h.
+      secondX := splitPos + 1.
+      secondY := 0.
+
+      "Draw vertical divider"
+      i := 0.
+      [i < h] whileTrue: [
+        aCellBuffer putChar: 9474 x: splitPos y: i style: dividerStyle.
+        i := i + 1
+      ]
+    ] ifFalse: [
+      "Top-bottom split"
+      splitPos := (h * ratio) truncated.
+      splitPos := splitPos max: 1.
+      splitPos := splitPos min: h - 2.
+      firstW := w.
+      firstH := splitPos.
+      secondW := w.
+      secondH := h - splitPos - 1.
+      secondX := 0.
+      secondY := splitPos + 1.
+
+      "Draw horizontal divider"
+      i := 0.
+      [i < w] whileTrue: [
+        aCellBuffer putChar: 9472 x: i y: splitPos style: dividerStyle.
+        i := i + 1
+      ]
+    ].
+
+    "Render first pane"
+    firstView notNil ifTrue: [
+      (firstBuf isNil or: [firstBuf width ~= firstW or: [firstBuf height ~= firstH]]) ifTrue: [
+        firstBuf := CellBuffer width: firstW height: firstH
+      ].
+      firstBuf clear.
+      firstView displayOn: firstBuf.
+      firstBuf blitInto: aCellBuffer atX: 0 y: 0
+    ].
+
+    "Render second pane"
+    secondView notNil ifTrue: [
+      (secondBuf isNil or: [secondBuf width ~= secondW or: [secondBuf height ~= secondH]]) ifTrue: [
+        secondBuf := CellBuffer width: secondW height: secondH
+      ].
+      secondBuf clear.
+      secondView displayOn: secondBuf.
+      secondBuf blitInto: aCellBuffer atX: secondX y: secondY
+    ]
+  ]
+
+  method: handleEvent: evt [
+    | evtType |
+    evtType := evt at: 'type' ifAbsent: [''].
+
+    evtType = 'mouse' ifTrue: [
+      ^self handleMouseEvent: evt
+    ].
+
+    evtType = 'key' ifFalse: [^self].
+
+    "Tab — switch focus"
+    (evt at: 'key') = 9 ifTrue: [
+      focusFirst := focusFirst = true ifTrue: [false] ifFalse: [true].
+      self invalidate.
+      ^self
+    ].
+
+    "Delegate to focused pane"
+    focusFirst = true
+      ifTrue: [firstCtrl notNil ifTrue: [firstCtrl handleEvent: evt]]
+      ifFalse: [secondCtrl notNil ifTrue: [secondCtrl handleEvent: evt]].
+    self invalidate
+  ]
+
+  method: handleMouseEvent: evt [
+    | mx my btn w h splitPos localEvt |
+    mx := evt at: 'x'.
+    my := evt at: 'y'.
+    btn := evt at: 'buttons'.
+    w := buffer notNil ifTrue: [buffer width] ifFalse: [80].
+    h := buffer notNil ifTrue: [buffer height] ifFalse: [24].
+
+    orientation = #horizontal ifTrue: [
+      splitPos := (w * ratio) truncated.
+      "Click on divider — drag"
+      (btn = 1 and: [mx = splitPos]) ifTrue: [^self].
+      "Click left of divider or drag"
+      (btn = 1 and: [(mx - splitPos) abs <= 1]) ifTrue: [
+        self ratio: (mx * 1.0 / w).
+        ^self
+      ].
+      mx < splitPos ifTrue: [
+        focusFirst := true.
+        firstCtrl notNil ifTrue: [
+          localEvt := Dictionary new.
+          localEvt at: 'type' put: 'mouse'.
+          localEvt at: 'buttons' put: btn.
+          localEvt at: 'x' put: mx.
+          localEvt at: 'y' put: my.
+          firstCtrl handleEvent: localEvt
+        ]
+      ] ifFalse: [
+        focusFirst := false.
+        secondCtrl notNil ifTrue: [
+          localEvt := Dictionary new.
+          localEvt at: 'type' put: 'mouse'.
+          localEvt at: 'buttons' put: btn.
+          localEvt at: 'x' put: mx - splitPos - 1.
+          localEvt at: 'y' put: my.
+          secondCtrl handleEvent: localEvt
+        ]
+      ]
+    ] ifFalse: [
+      splitPos := (h * ratio) truncated.
+      (btn = 1 and: [(my - splitPos) abs <= 1]) ifTrue: [
+        self ratio: (my * 1.0 / h).
+        ^self
+      ].
+      my < splitPos ifTrue: [
+        focusFirst := true.
+        firstCtrl notNil ifTrue: [
+          localEvt := Dictionary new.
+          localEvt at: 'type' put: 'mouse'.
+          localEvt at: 'buttons' put: btn.
+          localEvt at: 'x' put: mx.
+          localEvt at: 'y' put: my.
+          firstCtrl handleEvent: localEvt
+        ]
+      ] ifFalse: [
+        focusFirst := false.
+        secondCtrl notNil ifTrue: [
+          localEvt := Dictionary new.
+          localEvt at: 'type' put: 'mouse'.
+          localEvt at: 'buttons' put: btn.
+          localEvt at: 'x' put: mx.
+          localEvt at: 'y' put: my - splitPos - 1.
+          secondCtrl handleEvent: localEvt
+        ]
+      ]
+    ].
+    self invalidate
+  ]

@@ -1,0 +1,189 @@
+namespace: 'Alto'
+import: 'Go'
+
+"ScrollBar — a vertical or horizontal scroll indicator.
+ Shows position and extent of visible content within a scrollable region.
+ Usage:
+   ScrollBar vertical totalItems: 100 visibleItems: 20 offset: 0
+   scrollBar offset: 30.    'update scroll position'
+   scrollBar onScroll: [:pos | listView scrollTo: pos]
+"
+
+ScrollBar subclass: View
+  instanceVars: orientation totalItems visibleItems offset onScrollBlock trackStyle thumbStyle
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  classMethod: vertical [
+    | sb |
+    sb := self new.
+    sb orientation: #vertical.
+    ^sb
+  ]
+
+  classMethod: horizontal [
+    | sb |
+    sb := self new.
+    sb orientation: #horizontal.
+    ^sb
+  ]
+
+  classMethod: verticalTotal: total visible: visible offset: off [
+    | sb |
+    sb := self new.
+    sb orientation: #vertical.
+    sb totalItems: total.
+    sb visibleItems: visible.
+    sb offset: off.
+    ^sb
+  ]
+
+  method: initialize [
+    super initialize.
+    orientation := #vertical.
+    totalItems := 0.
+    visibleItems := 0.
+    offset := 0.
+    onScrollBlock := nil.
+    trackStyle := Go::Terminal newStyle.
+    thumbStyle := (Go::Terminal newStyle) reverse: true
+  ]
+
+  method: orientation [ ^orientation ]
+  method: orientation: sym [ orientation := sym ]
+  method: totalItems [ ^totalItems ]
+  method: visibleItems [ ^visibleItems ]
+  method: offset [ ^offset ]
+  method: onScrollBlock [ ^onScrollBlock ]
+
+  method: totalItems: n [
+    totalItems := n.
+    self invalidate
+  ]
+
+  method: visibleItems: n [
+    visibleItems := n.
+    self invalidate
+  ]
+
+  method: offset: n [
+    offset := n max: 0.
+    totalItems > visibleItems ifTrue: [
+      offset := offset min: totalItems - visibleItems
+    ].
+    self invalidate
+  ]
+
+  method: onScroll: aBlock [
+    onScrollBlock := aBlock
+  ]
+
+  method: trackStyle: aGoStyle [
+    trackStyle := aGoStyle.
+    self invalidate
+  ]
+
+  method: thumbStyle: aGoStyle [
+    thumbStyle := aGoStyle.
+    self invalidate
+  ]
+
+  method: style: aStyle [
+    "Accept an Alto Style — use it for the track, reversed for thumb"
+    trackStyle := aStyle goStyle.
+    thumbStyle := aStyle goStyle reverse: true.
+    self invalidate
+  ]
+
+  method: displayOn: aCellBuffer [
+    orientation = #vertical
+      ifTrue: [self displayVerticalOn: aCellBuffer]
+      ifFalse: [self displayHorizontalOn: aCellBuffer]
+  ]
+
+  method: displayVerticalOn: aCellBuffer [
+    | h thumbStart thumbSize i style |
+    h := aCellBuffer height.
+    h < 1 ifTrue: [^self].
+
+    totalItems <= visibleItems ifTrue: [
+      "Everything visible — no thumb needed, just draw track"
+      i := 0.
+      [i < h] whileTrue: [
+        aCellBuffer putChar: 9474 x: 0 y: i style: trackStyle.  "│"
+        i := i + 1
+      ].
+      ^self
+    ].
+
+    thumbSize := (visibleItems * h / totalItems) max: 1.
+    thumbStart := offset * h / totalItems.
+    thumbStart := thumbStart min: h - thumbSize.
+
+    i := 0.
+    [i < h] whileTrue: [
+      (i >= thumbStart and: [i < (thumbStart + thumbSize)])
+        ifTrue: [
+          style := thumbStyle.
+          aCellBuffer putChar: 9608 x: 0 y: i style: style   "█"
+        ]
+        ifFalse: [
+          style := trackStyle.
+          aCellBuffer putChar: 9474 x: 0 y: i style: style   "│"
+        ].
+      i := i + 1
+    ]
+  ]
+
+  method: displayHorizontalOn: aCellBuffer [
+    | w thumbStart thumbSize i style |
+    w := aCellBuffer width.
+    w < 1 ifTrue: [^self].
+
+    totalItems <= visibleItems ifTrue: [
+      i := 0.
+      [i < w] whileTrue: [
+        aCellBuffer putChar: 9472 x: i y: 0 style: trackStyle.  "─"
+        i := i + 1
+      ].
+      ^self
+    ].
+
+    thumbSize := (visibleItems * w / totalItems) max: 1.
+    thumbStart := offset * w / totalItems.
+    thumbStart := thumbStart min: w - thumbSize.
+
+    i := 0.
+    [i < w] whileTrue: [
+      (i >= thumbStart and: [i < (thumbStart + thumbSize)])
+        ifTrue: [
+          style := thumbStyle.
+          aCellBuffer putChar: 9608 x: i y: 0 style: style   "█"
+        ]
+        ifFalse: [
+          style := trackStyle.
+          aCellBuffer putChar: 9472 x: i y: 0 style: style   "─"
+        ].
+      i := i + 1
+    ]
+  ]
+
+  method: handleMouseLocalX: x y: y buttons: btn [
+    | pos trackLen newOffset |
+    btn = 1 ifFalse: [^self].
+    totalItems <= visibleItems ifTrue: [^self].
+
+    trackLen := orientation = #vertical
+      ifTrue: [buffer notNil ifTrue: [buffer height] ifFalse: [10]]
+      ifFalse: [buffer notNil ifTrue: [buffer width] ifFalse: [10]].
+
+    pos := orientation = #vertical ifTrue: [y] ifFalse: [x].
+    newOffset := pos * totalItems / trackLen.
+    self offset: newOffset.
+    onScrollBlock notNil ifTrue: [onScrollBlock value: offset]
+  ]
