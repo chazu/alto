@@ -70,7 +70,7 @@ HBox subclass: View
       i = (children size - 1)
         ifTrue: [childW := remaining]
         ifFalse: [
-          childW := (w * (weights at: i) / totalWeight) truncated.
+          childW := (w * (weights at: i) * 1.0 / totalWeight) truncated.
           childW := childW max: 1.
           childW := childW min: remaining
         ].
@@ -138,7 +138,7 @@ HBox subclass: View
       i = (children size - 1)
         ifTrue: [childW := w - cx]
         ifFalse: [
-          childW := (w * (weights at: i) / totalWeight) truncated.
+          childW := (w * (weights at: i) * 1.0 / totalWeight) truncated.
           childW := childW max: 1
         ].
       (x >= cx and: [x < (cx + childW)]) ifTrue: [

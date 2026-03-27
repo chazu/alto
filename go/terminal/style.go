@@ -44,6 +44,22 @@ func (s *Style) Background(c tcell.Color) *Style {
 	return &Style{S: s.S.Background(c)}
 }
 
+// ForegroundColor sets the foreground using an int32 color value (wrapper-friendly).
+func (s *Style) ForegroundColor(c int32) *Style {
+	return &Style{S: s.S.Foreground(tcell.Color(c))}
+}
+
+// BackgroundColor sets the background using an int32 color value (wrapper-friendly).
+func (s *Style) BackgroundColor(c int32) *Style {
+	return &Style{S: s.S.Background(tcell.Color(c))}
+}
+
+// PostEventKey posts a synthetic key event to the screen (wrapper-friendly).
+func (s *Screen) PostEventKey(k, ch, mod int32) {
+	ev := tcell.NewEventKey(tcell.Key(k), rune(ch), tcell.ModMask(mod))
+	s.screen.PostEvent(ev)
+}
+
 // Equals returns true if two styles have the same underlying tcell.Style.
 func (s *Style) Equals(other *Style) bool {
 	return s.S == other.S

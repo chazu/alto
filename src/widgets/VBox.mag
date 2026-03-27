@@ -71,7 +71,7 @@ VBox subclass: View
       i = (children size - 1)
         ifTrue: [childH := remaining]
         ifFalse: [
-          childH := (h * (weights at: i) / totalWeight) truncated.
+          childH := (h * (weights at: i) * 1.0 / totalWeight) truncated.
           childH := childH max: 1.
           childH := childH min: remaining
         ].
@@ -139,7 +139,7 @@ VBox subclass: View
       i = (children size - 1)
         ifTrue: [childH := h - cy]
         ifFalse: [
-          childH := (h * (weights at: i) / totalWeight) truncated.
+          childH := (h * (weights at: i) * 1.0 / totalWeight) truncated.
           childH := childH max: 1
         ].
       (y >= cy and: [y < (cy + childH)]) ifTrue: [

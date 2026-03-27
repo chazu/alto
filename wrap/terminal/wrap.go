@@ -222,6 +222,20 @@ func RegisterPrimitives(v *vm.VM) {
 	})
 
 	// Skipped: Screen.PostEvent (unconvertible parameter type: github.com/gdamore/tcell/v2.Event)
+	screenClass.AddPrimitiveMethod(v.Selectors, "postEventKey:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		goVal, ok := v.GetGoObject(receiver)
+		if !ok {
+			return vm.Nil
+		}
+		self := goVal.(*pkg.Screen)
+		arg0 := int32(args[0].SmallInt())
+		arg1 := int32(args[1].SmallInt())
+		arg2 := int32(args[2].SmallInt())
+		self.PostEventKey(arg0, arg1, arg2)
+		return vm.Nil
+	})
+
 	screenClass.AddPrimitiveMethod(v.Selectors, "setContent:_:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)
 		goVal, ok := v.GetGoObject(receiver)
@@ -314,6 +328,18 @@ func RegisterPrimitives(v *vm.VM) {
 	})
 
 	// Skipped: Style.Background (unconvertible parameter type: github.com/gdamore/tcell/v2.Color)
+	styleClass.AddPrimitiveMethod(v.Selectors, "backgroundColor:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		goVal, ok := v.GetGoObject(receiver)
+		if !ok {
+			return vm.Nil
+		}
+		self := goVal.(*pkg.Style)
+		arg0 := int32(args[0].SmallInt())
+		result := self.BackgroundColor(arg0)
+		return v.GoToValue(result)
+	})
+
 	styleClass.AddPrimitiveMethod(v.Selectors, "bold:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)
 		goVal, ok := v.GetGoObject(receiver)
@@ -351,6 +377,18 @@ func RegisterPrimitives(v *vm.VM) {
 	})
 
 	// Skipped: Style.Foreground (unconvertible parameter type: github.com/gdamore/tcell/v2.Color)
+	styleClass.AddPrimitiveMethod(v.Selectors, "foregroundColor:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		goVal, ok := v.GetGoObject(receiver)
+		if !ok {
+			return vm.Nil
+		}
+		self := goVal.(*pkg.Style)
+		arg0 := int32(args[0].SmallInt())
+		result := self.ForegroundColor(arg0)
+		return v.GoToValue(result)
+	})
+
 	styleClass.AddPrimitiveMethod(v.Selectors, "italic:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)
 		goVal, ok := v.GetGoObject(receiver)

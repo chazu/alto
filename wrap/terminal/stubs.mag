@@ -25,6 +25,7 @@ Screen subclass: Object
   method: pollEvent [ <primitive> ]
   method: pollKeyEvent [ <primitive> ]
   method: postEvent: ev [ <primitive> ]
+  method: postEventKey: k _: ch _: mod [ <primitive> ]
   method: setContent: x _: y _: mainc _: style [ <primitive> ]
   method: setCursorStyle: style [ <primitive> ]
   method: setStyle: style [ <primitive> ]
@@ -36,10 +37,12 @@ Screen subclass: Object
 
 Style subclass: Object
   method: background: c [ <primitive> ]
+  method: backgroundColor: c [ <primitive> ]
   method: bold: on [ <primitive> ]
   method: dim: on [ <primitive> ]
   method: equals: other [ <primitive> ]
   method: foreground: c [ <primitive> ]
+  method: foregroundColor: c [ <primitive> ]
   method: italic: on [ <primitive> ]
   method: reverse: on [ <primitive> ]
 
