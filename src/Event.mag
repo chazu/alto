@@ -1,0 +1,101 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Event — base class for input events.
+ Subclasses: KeyEvent, MouseEvent.
+ Replaces raw Dictionary-based events with proper objects.
+ Each event knows how to dispatch itself polymorphically via dispatchTo:."
+
+Event subclass: Object
+
+  method: isKey [ ^false ]
+  method: isMouse [ ^false ]
+
+  method: dispatchTo: handler [
+    "Override in subclasses to call the appropriate handler method."
+  ]
+
+"KeyEvent — keyboard input event."
+
+KeyEvent subclass: Event
+  instanceVars: key rune mod
+
+  classMethod: key: aKeyCode rune: aRuneVal mod: aMod [
+    | evt |
+    evt := super new.
+    evt privateKey: aKeyCode rune: aRuneVal mod: aMod.
+    ^evt
+  ]
+
+  method: privateKey: aKeyCode rune: aRuneVal mod: aMod [
+    key := aKeyCode.
+    rune := aRuneVal.
+    mod := aMod
+  ]
+
+  method: key [ ^key ]
+  method: rune [ ^rune ]
+  method: mod [ ^mod ]
+  method: isKey [ ^true ]
+
+  "Dictionary compatibility — allows gradual migration"
+  method: at: aKey ifAbsent: aBlock [
+    aKey = 'type' ifTrue: [^'key'].
+    aKey = 'key' ifTrue: [^key].
+    aKey = 'rune' ifTrue: [^rune].
+    aKey = 'mod' ifTrue: [^mod].
+    ^aBlock value
+  ]
+
+  method: at: aKey [
+    ^self at: aKey ifAbsent: [nil]
+  ]
+
+  method: dispatchTo: handler [
+    ^handler handleKeyEvent: self
+  ]
+
+"MouseEvent — mouse input event."
+
+MouseEvent subclass: Event
+  instanceVars: x y buttons
+
+  classMethod: x: anX y: aY buttons: btn [
+    | evt |
+    evt := super new.
+    evt privateX: anX y: aY buttons: btn.
+    ^evt
+  ]
+
+  method: privateX: anX y: aY buttons: btn [
+    x := anX.
+    y := aY.
+    buttons := btn
+  ]
+
+  method: x [ ^x ]
+  method: y [ ^y ]
+  method: buttons [ ^buttons ]
+  method: isMouse [ ^true ]
+
+  method: withX: newX y: newY [
+    "Return a new MouseEvent with translated coordinates."
+    ^MouseEvent x: newX y: newY buttons: buttons
+  ]
+
+  "Dictionary compatibility — allows gradual migration"
+  method: at: aKey ifAbsent: aBlock [
+    aKey = 'type' ifTrue: [^'mouse'].
+    aKey = 'x' ifTrue: [^x].
+    aKey = 'y' ifTrue: [^y].
+    aKey = 'buttons' ifTrue: [^buttons].
+    ^aBlock value
+  ]
+
+  method: at: aKey [
+    ^self at: aKey ifAbsent: [nil]
+  ]
+
+  method: dispatchTo: handler [
+    ^handler handleMouseEvent: self
+  ]

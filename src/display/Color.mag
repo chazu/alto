@@ -69,11 +69,11 @@ Style subclass: Object
   classMethod: new [
     | s |
     s := super new.
-    s initDefault.
+    s initialize.
     ^s
   ]
 
-  method: initDefault [
+  method: initialize [
     goStyle := Go::Terminal newStyle
   ]
 

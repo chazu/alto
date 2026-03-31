@@ -5,16 +5,16 @@ import: 'Go'
  Caches window renders and only updates dirty windows + changed screen cells."
 
 Display subclass: Object
-  instanceVars: screen windows running screenW screenH screenChars screenStyles draggingWindow dragOffsetX dragOffsetY resizingWindow
+  instanceVars: screen windows running screenW screenH screenChars screenStyles draggingWindow dragOffsetX dragOffsetY resizingWindow desktopMenuBlock
 
   classMethod: new [
     | d |
     d := super new.
-    d initDisplay.
+    d initialize.
     ^d
   ]
 
-  method: initDisplay [
+  method: initialize [
     | screenSize sz |
     screen := Go::Terminal newScreen.
     screen init.
@@ -36,7 +36,13 @@ Display subclass: Object
     draggingWindow := nil.
     dragOffsetX := 0.
     dragOffsetY := 0.
-    resizingWindow := nil
+    resizingWindow := nil.
+    desktopMenuBlock := nil
+  ]
+
+  method: onDesktopMenu: aBlock [
+    "Set custom desktop menu handler: [:display :x :y | ...]"
+    desktopMenuBlock := aBlock
   ]
 
   method: addWindow: w [ w display: self. windows := windows copyWith: w ]
@@ -125,7 +131,7 @@ Display subclass: Object
 
   method: run [
     "Main event loop."
-    | result keyCode runeVal mod fourth evtDict sz |
+    | result keyCode runeVal mod fourth evt |
     running := true.
     self render.
     [running] whileTrue: [
@@ -135,145 +141,157 @@ Display subclass: Object
       mod := result at: 2.
       fourth := result at: 3.
 
-      evtDict := Dictionary new.
       keyCode = EventConstants eventResize ifTrue: [
-        "Resize event: runeVal=width, mod=height"
-        screenW := runeVal.
-        screenH := mod.
-        sz := screenW * screenH.
-        screenChars := Array new: sz withAll: -1.
-        screenStyles := Array new: sz withAll: nil.
-        screen sync.
-        self render
+        self handleResize: runeVal height: mod
       ] ifFalse: [
-        keyCode = EventConstants eventMouse ifTrue: [
-          evtDict at: 'type' put: 'mouse'.
-          evtDict at: 'buttons' put: runeVal.
-          evtDict at: 'x' put: mod.
-          evtDict at: 'y' put: fourth
-        ] ifFalse: [
-          evtDict at: 'type' put: 'key'.
-          evtDict at: 'key' put: keyCode.
-          evtDict at: 'rune' put: runeVal.
-          evtDict at: 'mod' put: mod
-        ].
-
-        [
-          windows size > 0 ifTrue: [
-            (evtDict at: 'type' ifAbsent: ['']) = 'mouse' ifTrue: [
-              self dispatchMouse: evtDict
-            ] ifFalse: [
-              "Key events go to topmost window"
-              (windows at: windows size - 1) handleEvent: evtDict
-            ]
-          ] ifFalse: [
-            "No windows — Escape quits"
-            (evtDict at: 'type' ifAbsent: ['']) = 'key' ifTrue: [
-              (evtDict at: 'key') = EventConstants keyEscape ifTrue: [self stop]
-            ]
-          ].
-          self render
-        ] on: Exception do: [:e |
-          | errStack errVars |
-          Transcript show: 'Error: ', e messageText.
-          errStack := Compiler captureCallStack.
-          errVars := AltoDebugger captureAllVariables: errStack.
-          [AltoDebugger openOnError: e messageText stack: errStack vars: errVars on: self] on: Exception do: [:e2 |
-            Transcript show: 'Debugger error: ', e2 messageText
-          ].
-          self fullSync
-        ]
+        evt := self buildEvent: keyCode rune: runeVal mod: mod fourth: fourth.
+        self dispatchWithErrorRecovery: evt
       ]
     ].
     screen fini
   ]
 
+  method: handleResize: newW height: newH [
+    "Handle terminal resize — rebuild screen cache and re-render."
+    | sz |
+    screenW := newW.
+    screenH := newH.
+    sz := screenW * screenH.
+    screenChars := Array new: sz withAll: -1.
+    screenStyles := Array new: sz withAll: nil.
+    screen sync.
+    self render
+  ]
+
+  method: buildEvent: keyCode rune: runeVal mod: mod fourth: fourth [
+    "Construct a typed Event object from raw terminal input."
+    keyCode = EventConstants eventMouse ifTrue: [
+      ^MouseEvent x: mod y: fourth buttons: runeVal
+    ].
+    ^KeyEvent key: keyCode rune: runeVal mod: mod
+  ]
+
+  method: dispatchWithErrorRecovery: evt [
+    "Dispatch an event to the appropriate window, with debugger on error."
+    [
+      self dispatchEvent: evt.
+      self render
+    ] on: Exception do: [:e |
+      | errStack errVars |
+      Transcript show: 'Error: ', e messageText.
+      errStack := Compiler captureCallStack.
+      errVars := AltoDebugger captureAllVariables: errStack.
+      [AltoDebugger openOnError: e messageText stack: errStack vars: errVars on: self] on: Exception do: [:e2 |
+        Transcript show: 'Debugger error: ', e2 messageText
+      ].
+      self fullSync
+    ]
+  ]
+
+  method: dispatchEvent: evt [
+    "Route event to the right handler."
+    windows size > 0 ifTrue: [
+      evt isMouse ifTrue: [
+        self dispatchMouse: evt
+      ] ifFalse: [
+        (windows at: windows size - 1) handleEvent: evt
+      ]
+    ] ifFalse: [
+      "No windows — Escape quits"
+      (evt isKey and: [evt key = EventConstants keyEscape]) ifTrue: [self stop]
+    ]
+  ]
+
   method: dispatchMouse: evt [
     "Route mouse event — handle dragging at Display level."
-    | mx my buttons i win f rf newW newH |
-    mx := evt at: 'x'.
-    my := evt at: 'y'.
-    buttons := evt at: 'buttons'.
+    | mx my buttons |
+    mx := evt x.
+    my := evt y.
+    buttons := evt buttons.
 
-    "If resizing, route to resize logic"
-    resizingWindow notNil ifTrue: [
-      buttons = 0 ifTrue: [
-        resizingWindow := nil.
-        ^self
-      ].
-      rf := resizingWindow frame.
-      newW := mx - rf x + 1.
-      newH := my - rf y + 1.
-      self invalidateWindow: resizingWindow.
-      resizingWindow resizeTo: newW height: newH.
-      ^self
-    ].
-
-    "If dragging, route to drag logic"
-    draggingWindow notNil ifTrue: [
-      buttons = 0 ifTrue: [
-        "Button released — end drag"
-        draggingWindow := nil.
-        ^self
-      ].
-      "Move window to follow mouse"
-      self moveWindow: draggingWindow toX: mx - dragOffsetX y: my - dragOffsetY.
-      ^self
-    ].
+    "Active drag/resize takes priority"
+    resizingWindow notNil ifTrue: [^self handleResizeDrag: mx y: my buttons: buttons].
+    draggingWindow notNil ifTrue: [^self handleWindowDrag: mx y: my buttons: buttons].
 
     "Button release with no drag — ignore"
     buttons = 0 ifTrue: [^self].
 
-    "If topmost window is a Menu and click is outside it, dismiss the menu"
-    windows size > 0 ifTrue: [
-      | topWin topFrame |
-      topWin := windows at: windows size - 1.
-      (topWin contentController isKindOf: Menu) ifTrue: [
-        topFrame := topWin frame.
-        (mx >= topFrame x and: [mx < (topFrame x + topFrame width)
-          and: [my >= topFrame y and: [my < (topFrame y + topFrame height)]]]) ifFalse: [
-          self removeWindow: topWin.
-          "Fall through to dispatch click to window underneath"
-        ]
-      ]
-    ].
+    "Dismiss menu if clicking outside it"
+    self dismissMenuIfOutside: mx y: my.
 
-    "Walk windows back-to-front (topmost = last)"
-    i := windows size - 1.
-    [i >= 0] whileTrue: [
-      win := windows at: i.
-      f := win frame.
-      (mx >= f x and: [mx < (f x + f width) and: [my >= f y and: [my < (f y + f height)]]]) ifTrue: [
-        | localX localY |
-        localX := mx - f x.
-        localY := my - f y.
-        "Click on resize handle (bottom-right corner) — start resize"
-        (buttons = 1 and: [localY = (f height - 1) and: [localX = (f width - 1)]]) ifTrue: [
-          resizingWindow := win.
-          self bringToFront: win.
-          ^self
-        ].
-        "Click on title bar (row 0, excluding close box) — start drag"
-        (buttons = 1 and: [localY = 0 and: [localX < (f width - 4)]]) ifTrue: [
-          draggingWindow := win.
-          dragOffsetX := localX.
-          dragOffsetY := localY.
-          self bringToFront: win.
-          ^self
-        ].
-        "Bring clicked window to front"
-        i < (windows size - 1) ifTrue: [self bringToFront: win].
-        win handleEvent: evt.
-        ^self
-      ].
-      i := i - 1
-    ].
+    "Hit-test windows back-to-front"
+    (self windowHitTest: evt x: mx y: my buttons: buttons) ifTrue: [^self].
 
     "Click on desktop (no window hit) — open desktop menu"
     self openDesktopMenuAt: mx y: my
   ]
 
+  method: handleResizeDrag: mx y: my buttons: buttons [
+    "Continue or end a window resize drag."
+    | rf |
+    buttons = 0 ifTrue: [resizingWindow := nil. ^self].
+    rf := resizingWindow frame.
+    self invalidateWindow: resizingWindow.
+    resizingWindow resizeTo: mx - rf x + 1 height: my - rf y + 1
+  ]
+
+  method: handleWindowDrag: mx y: my buttons: buttons [
+    "Continue or end a window move drag."
+    buttons = 0 ifTrue: [draggingWindow := nil. ^self].
+    self moveWindow: draggingWindow toX: mx - dragOffsetX y: my - dragOffsetY
+  ]
+
+  method: dismissMenuIfOutside: mx y: my [
+    "If topmost window is a Menu and click is outside it, dismiss."
+    | topWin topFrame |
+    windows size = 0 ifTrue: [^self].
+    topWin := windows at: windows size - 1.
+    (topWin contentController isKindOf: Menu) ifFalse: [^self].
+    topFrame := topWin frame.
+    (mx >= topFrame x and: [mx < (topFrame x + topFrame width)
+      and: [my >= topFrame y and: [my < (topFrame y + topFrame height)]]]) ifTrue: [^self].
+    self removeWindow: topWin
+  ]
+
+  method: windowHitTest: evt x: mx y: my buttons: buttons [
+    "Walk windows back-to-front. Returns true if a window was hit."
+    | i win f localX localY |
+    i := windows size - 1.
+    [i >= 0] whileTrue: [
+      win := windows at: i.
+      f := win frame.
+      (mx >= f x and: [mx < (f x + f width) and: [my >= f y and: [my < (f y + f height)]]]) ifTrue: [
+        localX := mx - f x.
+        localY := my - f y.
+        "Resize handle (bottom-right corner)"
+        (buttons = 1 and: [localY = (f height - 1) and: [localX = (f width - 1)]]) ifTrue: [
+          resizingWindow := win. self bringToFront: win. ^true
+        ].
+        "Title bar drag (row 0, excluding close box)"
+        (buttons = 1 and: [localY = 0 and: [localX < (f width - 4)]]) ifTrue: [
+          draggingWindow := win. dragOffsetX := localX. dragOffsetY := localY.
+          self bringToFront: win. ^true
+        ].
+        "Bring clicked window to front and deliver event"
+        i < (windows size - 1) ifTrue: [self bringToFront: win].
+        win handleEvent: evt.
+        ^true
+      ].
+      i := i - 1
+    ].
+    ^false
+  ]
+
   method: openDesktopMenuAt: x y: y [
+    "Open the desktop context menu. Delegates to custom block if set."
+    desktopMenuBlock notNil ifTrue: [
+      ^desktopMenuBlock value: self value: x value: y
+    ].
+    self defaultDesktopMenuAt: x y: y
+  ]
+
+  method: defaultDesktopMenuAt: x y: y [
+    "Built-in desktop menu with standard ST-80 tools."
     | menuItems |
     menuItems := #('Workspace' 'System Browser' 'Transcript' 'Debugger').
     Menu open: menuItems at: (Array with: x with: y) on: self callback: [:item |

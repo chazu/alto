@@ -207,6 +207,8 @@ Inspector subclass: View
   ]
 
 
+  method: listPaneWidth [ ^22 ]
+
   method: handleMouse: evt [
     | btn mx my listWidth |
     btn := evt at: 'buttons'.
@@ -214,7 +216,7 @@ Inspector subclass: View
     my := evt at: 'y'.
     btn = 1 ifFalse: [^self].
 
-    listWidth := 22.
+    listWidth := self listPaneWidth.
 
     mx < listWidth ifTrue: [
       "Click in field list — delegate to ListView"
@@ -230,7 +232,7 @@ Inspector subclass: View
 
   method: displayOn: aCellBuffer [
     | listWidth bufWidth bufHeight selectedIdx valStr rightX valueLines lineIdx lineStr rightW typeStr hint j i itemIndex fieldStr style |
-    listWidth := 22.
+    listWidth := self listPaneWidth.
     bufWidth := aCellBuffer width.
     bufHeight := aCellBuffer height.
 
@@ -302,27 +304,30 @@ Inspector subclass: View
   ]
 
   method: wrapText: aString width: maxWidth [
-    "Simple word wrap — returns Array of lines."
-    | lines current i code |
+    "Simple word wrap using substring extraction — returns Array of lines."
+    | lines i lineStart lineLen code |
     maxWidth < 1 ifTrue: [^#(aString)].
     lines := Array new: 0.
-    current := ''.
+    lineStart := 0.
+    lineLen := 0.
     i := 0.
     [i < aString size] whileTrue: [
       code := (aString at: i) value.
       code = 10 ifTrue: [
-        lines := lines copyWith: current.
-        current := ''
+        lines := lines copyWith: (aString copyFrom: lineStart to: i).
+        lineStart := i + 1.
+        lineLen := 0
       ] ifFalse: [
-        current := current, (Character value: code) asString.
-        current size >= maxWidth ifTrue: [
-          lines := lines copyWith: current.
-          current := ''
+        lineLen := lineLen + 1.
+        lineLen >= maxWidth ifTrue: [
+          lines := lines copyWith: (aString copyFrom: lineStart to: i + 1).
+          lineStart := i + 1.
+          lineLen := 0
         ]
       ].
       i := i + 1
     ].
-    current size > 0 ifTrue: [lines := lines copyWith: current].
+    lineStart < aString size ifTrue: [lines := lines copyWith: (aString copyFrom: lineStart)].
     lines size = 0 ifTrue: [lines := #('')].
     ^lines
   ]

@@ -14,11 +14,11 @@ Window subclass: Object
   classMethod: new [
       | instance |
       instance := super new.
-      instance initDefaults.
+      instance initialize.
       ^instance
   ]
 
-  method: initDefaults [
+  method: initialize [
       title := ''.
       contentView := nil.
       contentController := nil.
@@ -110,15 +110,14 @@ Window subclass: Object
   ]
 
   method: handleEvent: evt [
-    | evtType mx my localX localY w buttons |
-    evtType := evt at: 'type' ifAbsent: [''].
+    | mx my localX localY w buttons |
 
     "Handle mouse clicks on window chrome (close box, title bar)"
-    (evtType = 'mouse') ifTrue: [
-      buttons := evt at: 'buttons'.
+    evt isMouse ifTrue: [
+      buttons := evt buttons.
       buttons = 1 ifTrue: [
-        mx := evt at: 'x'.
-        my := evt at: 'y'.
+        mx := evt x.
+        my := evt y.
         localX := mx - frame x.
         localY := my - frame y.
         w := frame width.
@@ -128,16 +127,10 @@ Window subclass: Object
           ^self close
         ].
 
-        "Clicks inside content area → delegate with local coords (new dict, don't mutate)"
+        "Clicks inside content area → delegate with translated coordinates"
         (localX > 0 and: [localX < (w - 1) and: [localY > 0 and: [localY < (frame height - 1)]]]) ifTrue: [
-          | localEvt |
           contentController isNil ifTrue: [^self].
-          localEvt := Dictionary new.
-          localEvt at: 'type' put: 'mouse'.
-          localEvt at: 'buttons' put: buttons.
-          localEvt at: 'x' put: localX - 1.
-          localEvt at: 'y' put: localY - 1.
-          ^contentController handleEvent: localEvt
+          ^contentController handleEvent: (evt withX: localX - 1 y: localY - 1)
         ]
       ].
       ^self

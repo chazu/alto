@@ -154,17 +154,11 @@ SplitPane subclass: View
   ]
 
   method: handleEvent: evt [
-    | evtType |
-    evtType := evt at: 'type' ifAbsent: [''].
-
-    evtType = 'mouse' ifTrue: [
-      ^self handleMouseEvent: evt
-    ].
-
-    evtType = 'key' ifFalse: [^self].
+    evt isMouse ifTrue: [^self handleMouseEvent: evt].
+    evt isKey ifFalse: [^self].
 
     "Tab — switch focus"
-    (evt at: 'key') = EventConstants keyTab ifTrue: [
+    evt key = EventConstants keyTab ifTrue: [
       focusFirst := focusFirst = true ifTrue: [false] ifFalse: [true].
       self invalidate.
       ^self
@@ -178,68 +172,40 @@ SplitPane subclass: View
   ]
 
   method: handleMouseEvent: evt [
-    | mx my btn w h splitPos localEvt |
-    mx := evt at: 'x'.
-    my := evt at: 'y'.
-    btn := evt at: 'buttons'.
+    | mx my btn w h splitPos |
+    mx := evt x.
+    my := evt y.
+    btn := evt buttons.
     w := buffer notNil ifTrue: [buffer width] ifFalse: [80].
     h := buffer notNil ifTrue: [buffer height] ifFalse: [24].
 
     orientation = #horizontal ifTrue: [
       splitPos := (w * ratio) truncated.
-      "Click on divider — drag"
       (btn = 1 and: [mx = splitPos]) ifTrue: [^self].
-      "Click left of divider or drag"
       (btn = 1 and: [(mx - splitPos) abs <= 1]) ifTrue: [
-        self ratio: (mx * 1.0 / w).
-        ^self
+        self ratio: (mx * 1.0 / w). ^self
       ].
       mx < splitPos ifTrue: [
         focusFirst := true.
-        firstCtrl notNil ifTrue: [
-          localEvt := Dictionary new.
-          localEvt at: 'type' put: 'mouse'.
-          localEvt at: 'buttons' put: btn.
-          localEvt at: 'x' put: mx.
-          localEvt at: 'y' put: my.
-          firstCtrl handleEvent: localEvt
-        ]
+        firstCtrl notNil ifTrue: [firstCtrl handleEvent: evt]
       ] ifFalse: [
         focusFirst := false.
         secondCtrl notNil ifTrue: [
-          localEvt := Dictionary new.
-          localEvt at: 'type' put: 'mouse'.
-          localEvt at: 'buttons' put: btn.
-          localEvt at: 'x' put: mx - splitPos - 1.
-          localEvt at: 'y' put: my.
-          secondCtrl handleEvent: localEvt
+          secondCtrl handleEvent: (evt withX: mx - splitPos - 1 y: my)
         ]
       ]
     ] ifFalse: [
       splitPos := (h * ratio) truncated.
       (btn = 1 and: [(my - splitPos) abs <= 1]) ifTrue: [
-        self ratio: (my * 1.0 / h).
-        ^self
+        self ratio: (my * 1.0 / h). ^self
       ].
       my < splitPos ifTrue: [
         focusFirst := true.
-        firstCtrl notNil ifTrue: [
-          localEvt := Dictionary new.
-          localEvt at: 'type' put: 'mouse'.
-          localEvt at: 'buttons' put: btn.
-          localEvt at: 'x' put: mx.
-          localEvt at: 'y' put: my.
-          firstCtrl handleEvent: localEvt
-        ]
+        firstCtrl notNil ifTrue: [firstCtrl handleEvent: evt]
       ] ifFalse: [
         focusFirst := false.
         secondCtrl notNil ifTrue: [
-          localEvt := Dictionary new.
-          localEvt at: 'type' put: 'mouse'.
-          localEvt at: 'buttons' put: btn.
-          localEvt at: 'x' put: mx.
-          localEvt at: 'y' put: my - splitPos - 1.
-          secondCtrl handleEvent: localEvt
+          secondCtrl handleEvent: (evt withX: mx y: my - splitPos - 1)
         ]
       ]
     ].

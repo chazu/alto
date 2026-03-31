@@ -62,6 +62,12 @@ App subclass: Object
     display addWindow: aWindow
   ]
 
+  method: onDesktopMenu: aBlock [
+    "Set custom desktop menu: [:display :x :y | ...]"
+    desktopMenuBlock := aBlock.
+    display onDesktopMenu: aBlock
+  ]
+
   method: run [
     "Start the event loop."
     display run

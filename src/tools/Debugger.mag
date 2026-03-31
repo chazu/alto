@@ -194,21 +194,20 @@ AltoDebugger subclass: View
   ]
 
   method: splitSource: src [
-    | result current i code |
+    "Split source string on newlines using substring extraction."
+    | result i lineStart code |
     result := Array new: 0.
-    current := ''.
+    lineStart := 0.
     i := 0.
     [i < src size] whileTrue: [
       code := (src at: i) value.
       code = 10 ifTrue: [
-        result := result copyWith: current.
-        current := ''
-      ] ifFalse: [
-        current := current, (Character value: code) asString
+        result := result copyWith: (src copyFrom: lineStart to: i).
+        lineStart := i + 1
       ].
       i := i + 1
     ].
-    result := result copyWith: current.
+    result := result copyWith: (src copyFrom: lineStart).
     sourceLines := result
   ]
 
@@ -383,20 +382,30 @@ AltoDebugger subclass: View
 
   "--- Rendering ---"
 
+  method: framePaneWidth: bufW [
+    "Left pane width, clamped to half the buffer."
+    | w |
+    w := 35.
+    w > (bufW / 2) ifTrue: [w := bufW / 2].
+    ^w
+  ]
+
+  method: framePaneHeight: bufH [
+    "Top 60% of available space for frames/source."
+    ^((bufH - 2) * 6 / 10) max: 5
+  ]
+
   method: displayOn: aCellBuffer [
     "Three-pane layout: frames (top-left), source (top-right), variables (bottom), buttons (bottom row)."
     | bufW bufH frameH srcY srcH varH varY btnY leftW rightX |
     bufW := aCellBuffer width.
     bufH := aCellBuffer height.
 
-    "Layout: left pane = 35 chars for frames, right pane = rest for source"
-    leftW := 35.
-    leftW > (bufW / 2) ifTrue: [leftW := bufW / 2].
+    leftW := self framePaneWidth: bufW.
     rightX := leftW + 1.
 
     "Vertical split: top 60% for frames/source, bottom for variables, last row for buttons"
-    frameH := (bufH - 2) * 6 / 10.
-    frameH := frameH max: 5.
+    frameH := self framePaneHeight: bufH.
     varY := frameH + 1.
     varH := bufH - frameH - 3.
     varH := varH max: 2.

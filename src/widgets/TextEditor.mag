@@ -42,33 +42,28 @@ TextEditor subclass: Object
 
   method: text [
     "Return all lines joined with newlines."
-    | result nl |
+    | nl |
     nl := String lf.
-    result := ''.
-    lines do: [:line |
-      result size > 0 ifTrue: [result := result, nl].
-      result := result, line
-    ].
-    ^result
+    ^lines inject: '' into: [:acc :line |
+      acc size = 0 ifTrue: [line] ifFalse: [acc, nl, line]
+    ]
   ]
 
   method: text: aString [
-    "Set text from a string, splitting on newlines."
-    | result current i code |
+    "Set text from a string, splitting on newlines using substring extraction."
+    | result i lineStart code |
     result := Array new: 0.
-    current := ''.
+    lineStart := 0.
     i := 0.
     [i < aString size] whileTrue: [
       code := (aString at: i) value.
       code = 10 ifTrue: [
-        result := result copyWith: current.
-        current := ''
-      ] ifFalse: [
-        current := current, (Character value: code) asString
+        result := result copyWith: (aString copyFrom: lineStart to: i).
+        lineStart := i + 1
       ].
       i := i + 1
     ].
-    result := result copyWith: current.
+    result := result copyWith: (aString copyFrom: lineStart).
     lines := result.
     cursorX := 0.
     cursorY := 0.

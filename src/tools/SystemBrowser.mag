@@ -293,13 +293,19 @@ SystemBrowser subclass: View
   method: selectedMethod [ ^browserModel selectedMethod ]
   method: focusedPane [ ^focusedPane ]
 
+  method: listPaneHeight [ ^10 ]
+
+  method: paneWidthFor: totalWidth [
+    ^totalWidth // 3
+  ]
+
   method: handleMouseLocalX: x y: y buttons: btn [
     | paneWidth paneHeight |
     btn = 1 ifFalse: [^self].
+    paneHeight := self listPaneHeight.
     paneWidth := 26.
-    paneHeight := 10.
     parentWindow notNil ifTrue: [
-      paneWidth := (parentWindow frame width - 2) // 3
+      paneWidth := self paneWidthFor: parentWindow frame width - 2
     ].
 
     "Only handle clicks in the top pane area"
@@ -483,8 +489,8 @@ SystemBrowser subclass: View
 
   method: displayOn: aCellBuffer [
     | paneWidth paneHeight codeHeight |
-    paneWidth := aCellBuffer width // 3.
-    paneHeight := 10.
+    paneWidth := self paneWidthFor: aCellBuffer width.
+    paneHeight := self listPaneHeight.
     codeHeight := aCellBuffer height - paneHeight.
 
     "Reallocate cached buffers only if dimensions changed"
