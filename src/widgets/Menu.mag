@@ -2,11 +2,12 @@ namespace: 'Alto'
 import: 'Go'
 
 "Menu — a popup menu that appears at a given screen position.
+ Uses a ListView internally for item rendering, selection, and keyboard nav.
  Created via Menu open:at:on:callback: and dismissed by clicking
  an item, clicking outside, or pressing Escape."
 
 Menu subclass: View
-  instanceVars: items callback display parentWindow normalStyle reverseStyle selectedIndex
+  instanceVars: listView callback display parentWindow
 
   classMethod: new [
     | instance |
@@ -42,21 +43,22 @@ Menu subclass: View
 
   method: initialize [
     super initialize.
-    items := #().
+    listView := ListView items: #() onSelect: nil.
     callback := nil.
     display := nil.
-    parentWindow := nil.
-    normalStyle := Go::Terminal newStyle.
-    reverseStyle := (Go::Terminal newStyle) reverse: true.
-    selectedIndex := -1
+    parentWindow := nil
   ]
 
-  method: privateItems: anArray [ items := anArray ]
+  method: privateItems: anArray [
+    listView items: anArray
+  ]
+
   method: privateCallback: aBlock [ callback := aBlock ]
   method: display: aDisplay [ display := aDisplay ]
   method: display [ ^display ]
   method: parentWindow: aWindow [ parentWindow := aWindow ]
   method: parentWindow [ ^parentWindow ]
+  method: items [ ^listView items ]
 
   method: handleEvent: evt [
     | evtType keyCode mx my btn |
@@ -68,7 +70,7 @@ Menu subclass: View
       my := evt at: 'y'.
       btn = 1 ifTrue: [
         "Click on an item"
-        (my >= 0 and: [my < items size]) ifTrue: [
+        (my >= 0 and: [my < listView items size]) ifTrue: [
           self selectItem: my
         ] ifFalse: [
           self close
@@ -80,22 +82,22 @@ Menu subclass: View
     evtType = 'key' ifTrue: [
       keyCode := evt at: 'key'.
       "Escape — dismiss"
-      keyCode = 27 ifTrue: [^self close].
+      keyCode = EventConstants keyEscape ifTrue: [^self close].
       "Up arrow"
-      keyCode = 257 ifTrue: [
-        selectedIndex > 0 ifTrue: [selectedIndex := selectedIndex - 1].
-        selectedIndex < 0 ifTrue: [selectedIndex := 0].
+      keyCode = EventConstants keyUp ifTrue: [
+        listView moveUp.
         self invalidate. ^self
       ].
       "Down arrow"
-      keyCode = 258 ifTrue: [
-        selectedIndex < (items size - 1) ifTrue: [selectedIndex := selectedIndex + 1].
-        selectedIndex < 0 ifTrue: [selectedIndex := 0].
+      keyCode = EventConstants keyDown ifTrue: [
+        listView moveDown.
         self invalidate. ^self
       ].
       "Enter — select"
-      keyCode = 13 ifTrue: [
-        selectedIndex >= 0 ifTrue: [self selectItem: selectedIndex].
+      keyCode = EventConstants keyEnter ifTrue: [
+        listView selectedItem notNil ifTrue: [
+          self selectItem: listView selectedIndex
+        ].
         ^self
       ]
     ]
@@ -103,8 +105,8 @@ Menu subclass: View
 
   method: selectItem: idx [
     | item |
-    idx < items size ifTrue: [
-      item := items at: idx.
+    idx < listView items size ifTrue: [
+      item := listView items at: idx.
       self close.
       callback notNil ifTrue: [callback value: item]
     ]
@@ -115,22 +117,5 @@ Menu subclass: View
   ]
 
   method: displayOn: aCellBuffer [
-    | i itemStr style j charCode |
-    i := 0.
-    [i < items size and: [i < aCellBuffer height]] whileTrue: [
-      itemStr := items at: i.
-      style := (i = selectedIndex) ifTrue: [reverseStyle] ifFalse: [normalStyle].
-      "Fill full width with style"
-      j := 0.
-      [j < aCellBuffer width] whileTrue: [
-        j < itemStr size ifTrue: [
-          charCode := (itemStr at: j) value.
-          aCellBuffer putChar: charCode x: j y: i style: style
-        ] ifFalse: [
-          aCellBuffer putChar: 32 x: j y: i style: style
-        ].
-        j := j + 1
-      ].
-      i := i + 1
-    ]
+    listView displayOn: aCellBuffer
   ]

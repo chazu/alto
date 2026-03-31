@@ -1,0 +1,196 @@
+namespace: 'Alto'
+import: 'Go'
+
+"BoxLayout — unified horizontal/vertical layout container.
+ Replaces HBox and VBox with a single class parameterised by orientation.
+
+ Usage:
+   hbox := BoxLayout horizontal.
+   hbox addChild: sidebarList weight: 1.
+   hbox addChild: mainContent weight: 3.
+
+   vbox := BoxLayout vertical.
+   vbox addChild: headerLabel.
+   vbox addChild: listView weight: 3.
+   vbox addChild: statusLabel.
+
+ Children without an explicit weight get weight 1.
+ Space is divided proportionally by weight along the layout axis.
+ The focused child receives key events. Tab cycles focus.
+"
+
+BoxLayout subclass: View
+  instanceVars: children weights focusedIndex childBufs orientation
+
+  classMethod: horizontal [
+    | instance |
+    instance := super new.
+    instance initWithOrientation: #horizontal.
+    ^instance
+  ]
+
+  classMethod: vertical [
+    | instance |
+    instance := super new.
+    instance initWithOrientation: #vertical.
+    ^instance
+  ]
+
+  classMethod: new [
+    "Default to horizontal for backwards compatibility."
+    ^self horizontal
+  ]
+
+  method: initWithOrientation: anOrientation [
+    super initialize.
+    orientation := anOrientation.
+    children := Array new: 0.
+    weights := Array new: 0.
+    focusedIndex := 0.
+    childBufs := Array new: 0
+  ]
+
+  method: orientation [ ^orientation ]
+  method: children [ ^children ]
+  method: focusedIndex [ ^focusedIndex ]
+
+  method: addChild: aView [
+    children := children copyWith: aView.
+    weights := weights copyWith: 1.
+    childBufs := childBufs copyWith: nil.
+    self invalidate
+  ]
+
+  method: addChild: aView weight: aWeight [
+    children := children copyWith: aView.
+    weights := weights copyWith: aWeight.
+    childBufs := childBufs copyWith: nil.
+    self invalidate
+  ]
+
+  method: displayOn: aCellBuffer [
+    | w h totalWeight pos i childSize childBuf remaining span |
+    w := aCellBuffer width.
+    h := aCellBuffer height.
+    children size = 0 ifTrue: [^self].
+
+    "The span is the dimension we divide: width for horizontal, height for vertical."
+    orientation = #horizontal
+      ifTrue: [span := w]
+      ifFalse: [span := h].
+
+    "Calculate total weight"
+    totalWeight := 0.
+    i := 0.
+    [i < weights size] whileTrue: [
+      totalWeight := totalWeight + (weights at: i).
+      i := i + 1
+    ].
+    totalWeight = 0 ifTrue: [totalWeight := 1].
+
+    "Layout children along the axis"
+    pos := 0.
+    remaining := span.
+    i := 0.
+    [i < children size] whileTrue: [
+      i = (children size - 1)
+        ifTrue: [childSize := remaining]
+        ifFalse: [
+          childSize := (span * (weights at: i) * 1.0 / totalWeight) truncated.
+          childSize := childSize max: 1.
+          childSize := childSize min: remaining
+        ].
+
+      childSize > 0 ifTrue: [
+        "Get or create child buffer"
+        childBuf := childBufs at: i.
+        orientation = #horizontal
+          ifTrue: [
+            (childBuf isNil or: [childBuf width ~= childSize or: [childBuf height ~= h]]) ifTrue: [
+              childBuf := CellBuffer width: childSize height: h.
+              childBufs at: i put: childBuf
+            ].
+            childBuf clear.
+            (children at: i) displayOn: childBuf.
+            childBuf blitInto: aCellBuffer atX: pos y: 0
+          ]
+          ifFalse: [
+            (childBuf isNil or: [childBuf width ~= w or: [childBuf height ~= childSize]]) ifTrue: [
+              childBuf := CellBuffer width: w height: childSize.
+              childBufs at: i put: childBuf
+            ].
+            childBuf clear.
+            (children at: i) displayOn: childBuf.
+            childBuf blitInto: aCellBuffer atX: 0 y: pos
+          ]
+      ].
+
+      pos := pos + childSize.
+      remaining := remaining - childSize.
+      i := i + 1
+    ]
+  ]
+
+  method: handleEvent: evt [
+    | evtType keyCode |
+    evtType := evt at: 'type' ifAbsent: [''].
+
+    evtType = 'key' ifTrue: [
+      keyCode := evt at: 'key'.
+      "Tab — cycle focus"
+      keyCode = EventConstants keyTab ifTrue: [
+        children size > 0 ifTrue: [
+          focusedIndex := (focusedIndex + 1) \\ children size
+        ].
+        self invalidate.
+        ^self
+      ]
+    ].
+
+    "Delegate to focused child"
+    (focusedIndex >= 0 and: [focusedIndex < children size]) ifTrue: [
+      (children at: focusedIndex) handleEvent: evt
+    ].
+    self invalidate
+  ]
+
+  method: handleMouseLocalX: x y: y buttons: btn [
+    "Route mouse to the child under the pointer along the layout axis."
+    | w h totalWeight cPos i childSize hitCoord span |
+    buffer isNil ifTrue: [^self].
+    w := buffer width.
+    h := buffer height.
+    children size = 0 ifTrue: [^self].
+
+    orientation = #horizontal
+      ifTrue: [span := w. hitCoord := x]
+      ifFalse: [span := h. hitCoord := y].
+
+    totalWeight := 0.
+    i := 0.
+    [i < weights size] whileTrue: [
+      totalWeight := totalWeight + (weights at: i).
+      i := i + 1
+    ].
+    totalWeight = 0 ifTrue: [totalWeight := 1].
+
+    cPos := 0.
+    i := 0.
+    [i < children size] whileTrue: [
+      i = (children size - 1)
+        ifTrue: [childSize := span - cPos]
+        ifFalse: [
+          childSize := (span * (weights at: i) * 1.0 / totalWeight) truncated.
+          childSize := childSize max: 1
+        ].
+      (hitCoord >= cPos and: [hitCoord < (cPos + childSize)]) ifTrue: [
+        focusedIndex := i.
+        orientation = #horizontal
+          ifTrue: [(children at: i) handleMouseLocalX: x - cPos y: y buttons: btn]
+          ifFalse: [(children at: i) handleMouseLocalX: x y: y - cPos buttons: btn].
+        ^self
+      ].
+      cPos := cPos + childSize.
+      i := i + 1
+    ]
+  ]

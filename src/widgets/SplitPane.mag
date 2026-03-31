@@ -51,7 +51,7 @@ SplitPane subclass: View
     secondCtrl := nil.
     ratio := 0.5.
     focusFirst := true.
-    dividerStyle := (Go::Terminal newStyle) dim: true.
+    dividerStyle := Theme dividerStyle.
     firstBuf := nil.
     secondBuf := nil.
     minRatio := 0.1.
@@ -164,7 +164,7 @@ SplitPane subclass: View
     evtType = 'key' ifFalse: [^self].
 
     "Tab — switch focus"
-    (evt at: 'key') = 9 ifTrue: [
+    (evt at: 'key') = EventConstants keyTab ifTrue: [
       focusFirst := focusFirst = true ifTrue: [false] ifFalse: [true].
       self invalidate.
       ^self

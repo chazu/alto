@@ -2,12 +2,12 @@ namespace: 'Alto'
 import: 'Go'
 
 "Inspector — shows an object's instance variables and their values.
- Left pane: field names. Right pane: selected value detail.
+ Left pane: field names (using ListWidget). Right pane: selected value detail.
  Enter drills down into the selected value, opening a new Inspector.
  Supports Dictionary, Array, and arbitrary objects."
 
 Inspector subclass: View
-  instanceVars: target fieldNames fieldValues fieldObjects selectedIndex scrollOffset display parentWindow focusOnList normalStyle reverseStyle dimStyle
+  instanceVars: target fieldNames fieldValues fieldObjects fieldListWidget display parentWindow focusOnList
 
   classMethod: new [
     | instance |
@@ -42,14 +42,10 @@ Inspector subclass: View
     fieldNames := Array new: 0.
     fieldValues := Array new: 0.
     fieldObjects := Array new: 0.
-    selectedIndex := 0.
-    scrollOffset := 0.
+    fieldListWidget := ListWidget items: #() onSelect: nil.
     display := nil.
     parentWindow := nil.
-    focusOnList := true.
-    normalStyle := Go::Terminal newStyle.
-    reverseStyle := (Go::Terminal newStyle) reverse: true.
-    dimStyle := (Go::Terminal newStyle) dim: true
+    focusOnList := true
   ]
 
   method: privateTarget: anObject [ target := anObject ]
@@ -59,8 +55,8 @@ Inspector subclass: View
   method: target [ ^target ]
   method: fieldNames [ ^fieldNames ]
   method: fieldValues [ ^fieldValues ]
-  method: selectedIndex [ ^selectedIndex ]
-  method: scrollOffset [ ^scrollOffset ]
+  method: selectedIndex [ ^fieldListWidget selectedIndex ]
+  method: scrollOffset [ ^fieldListWidget scrollOffset ]
   method: parentWindow [ ^parentWindow ]
   method: focusOnList [ ^focusOnList ]
 
@@ -141,14 +137,16 @@ Inspector subclass: View
 
     fieldNames := keys.
     fieldValues := vals.
-    fieldObjects := objs
+    fieldObjects := objs.
+    fieldListWidget items: fieldNames
   ]
 
   method: drillDown [
     "Open a new Inspector on the selected field's actual object."
-    | obj className |
-    selectedIndex >= fieldObjects size ifTrue: [^self].
-    obj := fieldObjects at: selectedIndex.
+    | obj className selIdx |
+    selIdx := fieldListWidget selectedIndex.
+    selIdx >= fieldObjects size ifTrue: [^self].
+    obj := fieldObjects at: selIdx.
     obj isNil ifTrue: [^self].
     "Skip drill-down into Class objects — they cause render issues"
     className := ''.
@@ -162,7 +160,7 @@ Inspector subclass: View
   ]
 
   method: handleEvent: evt [
-    | evtType keyCode visibleHeight |
+    | evtType keyCode |
     evtType := evt at: 'type' ifAbsent: [''].
 
     evtType = 'mouse' ifTrue: [
@@ -175,43 +173,34 @@ Inspector subclass: View
     evtType = 'key' ifFalse: [^self].
     keyCode := evt at: 'key'.
 
-    keyCode = 27 ifTrue: [
+    keyCode = EventConstants keyEscape ifTrue: [
       display notNil ifTrue: [display removeWindow: parentWindow].
       ^self
     ].
 
-    keyCode = 9 ifTrue: [
+    keyCode = EventConstants keyTab ifTrue: [
       focusOnList := focusOnList = true ifTrue: [false] ifFalse: [true].
       self invalidate. ^self
     ].
 
-    keyCode = 13 ifTrue: [
+    keyCode = EventConstants keyEnter ifTrue: [
       (focusOnList = true) ifTrue: [self drillDown].
       ^self
     ].
 
-    keyCode = 257 ifTrue: [
+    "Delegate up/down to ListWidget when focused on list"
+    keyCode = EventConstants keyUp ifTrue: [
       (focusOnList = true) ifTrue: [
-        selectedIndex > 0 ifTrue: [
-          selectedIndex := selectedIndex - 1.
-          selectedIndex < scrollOffset ifTrue: [scrollOffset := selectedIndex].
-          self invalidate
-        ]
+        fieldListWidget moveUp.
+        self invalidate
       ].
       ^self
     ].
 
-    keyCode = 258 ifTrue: [
+    keyCode = EventConstants keyDown ifTrue: [
       (focusOnList = true) ifTrue: [
-        selectedIndex < (fieldNames size - 1) ifTrue: [
-          selectedIndex := selectedIndex + 1.
-          visibleHeight := 18.
-          parentWindow notNil ifTrue: [visibleHeight := parentWindow frame height - 2].
-          selectedIndex >= (scrollOffset + visibleHeight) ifTrue: [
-            scrollOffset := selectedIndex - visibleHeight + 1
-          ].
-          self invalidate
-        ]
+        fieldListWidget moveDown.
+        self invalidate
       ].
       ^self
     ]
@@ -219,7 +208,7 @@ Inspector subclass: View
 
 
   method: handleMouse: evt [
-    | btn mx my listWidth clickedIndex |
+    | btn mx my listWidth |
     btn := evt at: 'buttons'.
     mx := evt at: 'x'.
     my := evt at: 'y'.
@@ -228,13 +217,10 @@ Inspector subclass: View
     listWidth := 22.
 
     mx < listWidth ifTrue: [
-      "Click in field list"
+      "Click in field list — delegate to ListWidget"
       focusOnList := true.
-      clickedIndex := scrollOffset + my.
-      (clickedIndex >= 0 and: [clickedIndex < fieldNames size]) ifTrue: [
-        selectedIndex := clickedIndex.
-        self invalidate
-      ]
+      fieldListWidget handleClickAtY: my.
+      self invalidate
     ] ifFalse: [
       "Click in value area"
       focusOnList := false.
@@ -243,7 +229,7 @@ Inspector subclass: View
   ]
 
   method: displayOn: aCellBuffer [
-    | listWidth bufWidth bufHeight i itemIndex fieldStr valStr style j charCode rightX valueLines lineIdx lineStr rightW typeStr hint |
+    | listWidth bufWidth bufHeight selectedIdx valStr rightX valueLines lineIdx lineStr rightW typeStr hint j i itemIndex fieldStr style |
     listWidth := 22.
     bufWidth := aCellBuffer width.
     bufHeight := aCellBuffer height.
@@ -251,50 +237,45 @@ Inspector subclass: View
     "Draw vertical separator"
     i := 0.
     [i < bufHeight] whileTrue: [
-      aCellBuffer putChar: 9474 x: listWidth y: i style: dimStyle.
+      aCellBuffer putChar: 9474 x: listWidth y: i style: Theme dimStyle.
       i := i + 1
     ].
 
-    "Left pane: field names with selection highlight"
-    i := 0.
-    [i < bufHeight] whileTrue: [
-      itemIndex := scrollOffset + i.
-      itemIndex < fieldNames size ifTrue: [
-        fieldStr := fieldNames at: itemIndex.
-        style := (itemIndex = selectedIndex and: [focusOnList = true])
-          ifTrue: [reverseStyle]
-          ifFalse: [normalStyle].
-        j := 0.
-        [j < listWidth] whileTrue: [
-          j < fieldStr size ifTrue: [
-            charCode := (fieldStr at: j) value.
-            aCellBuffer putChar: charCode x: j y: i style: style
-          ] ifFalse: [
-            aCellBuffer putChar: 32 x: j y: i style: style
-          ].
-          j := j + 1
-        ]
-      ].
-      i := i + 1
+    "Left pane: field names rendered by ListWidget"
+    selectedIdx := fieldListWidget selectedIndex.
+    (focusOnList = true) ifTrue: [
+      "When focused, delegate rendering to ListWidget"
+      fieldListWidget renderInto: aCellBuffer atX: 0 y: 0 width: listWidth height: bufHeight
+    ] ifFalse: [
+      "When not focused, render without highlight"
+      i := 0.
+      [i < bufHeight] whileTrue: [
+        itemIndex := fieldListWidget scrollOffset + i.
+        itemIndex < fieldNames size ifTrue: [
+          fieldStr := fieldNames at: itemIndex.
+          aCellBuffer putStringFilled: fieldStr x: 0 y: i style: Theme normalStyle width: listWidth
+        ].
+        i := i + 1
+      ]
     ].
 
     "Right pane: selected value detail (word-wrapped)"
     rightX := listWidth + 1.
-    selectedIndex < fieldValues size ifTrue: [
+    selectedIdx < fieldValues size ifTrue: [
       rightW := bufWidth - rightX.
-      valStr := fieldValues at: selectedIndex.
+      valStr := fieldValues at: selectedIdx.
       valueLines := self wrapText: valStr width: rightW.
 
       "Show type on first line"
       typeStr := ''.
       [
-        selectedIndex < fieldObjects size ifTrue: [
-          typeStr := '(', ('', (fieldObjects at: selectedIndex) class name), ')'
+        selectedIdx < fieldObjects size ifTrue: [
+          typeStr := '(', ('', (fieldObjects at: selectedIdx) class name), ')'
         ]
       ] on: Exception do: [:e | typeStr := '' ].
       j := 0.
       [j < typeStr size and: [rightX + j < bufWidth]] whileTrue: [
-        aCellBuffer putChar: (typeStr at: j) value x: rightX + j y: 0 style: dimStyle.
+        aCellBuffer putChar: (typeStr at: j) value x: rightX + j y: 0 style: Theme dimStyle.
         j := j + 1
       ].
 
@@ -304,7 +285,7 @@ Inspector subclass: View
         lineStr := valueLines at: lineIdx.
         j := 0.
         [j < lineStr size and: [rightX + j < bufWidth]] whileTrue: [
-          aCellBuffer putChar: (lineStr at: j) value x: rightX + j y: lineIdx + 1 style: normalStyle.
+          aCellBuffer putChar: (lineStr at: j) value x: rightX + j y: lineIdx + 1 style: Theme normalStyle.
           j := j + 1
         ].
         lineIdx := lineIdx + 1
@@ -315,7 +296,7 @@ Inspector subclass: View
     hint := 'Enter=drill down  Tab=switch pane  Esc=close'.
     j := 0.
     [j < hint size and: [j < bufWidth]] whileTrue: [
-      aCellBuffer putChar: (hint at: j) value x: j y: bufHeight - 1 style: dimStyle.
+      aCellBuffer putChar: (hint at: j) value x: j y: bufHeight - 1 style: Theme dimStyle.
       j := j + 1
     ]
   ]

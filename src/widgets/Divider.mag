@@ -49,7 +49,7 @@ Divider subclass: View
   method: initialize [
     super initialize.
     orientation := #horizontal.
-    dividerStyle := Go::Terminal newStyle
+    dividerStyle := Theme dividerStyle
   ]
 
   method: orientation [ ^orientation ]

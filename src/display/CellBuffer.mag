@@ -18,7 +18,7 @@ CellBuffer subclass: Object
     | sz |
     width := w.
     height := h.
-    defaultStyle := Go::Terminal newStyle.
+    defaultStyle := Theme normalStyle.
     sz := w * h.
     chars := Array new: sz withAll: 32.
     styles := Array new: sz withAll: defaultStyle
@@ -86,6 +86,16 @@ CellBuffer subclass: Object
       ch := (str at: i) value.
       self putChar: ch x: x + i y: y style: style.
       i := i + 1
+    ]
+  ]
+
+  method: putStringFilled: str x: x y: y style: style width: width [
+    | padStart padEnd |
+    self putString: str x: x y: y style: style.
+    padStart := x + str size.
+    padEnd := x + width.
+    padStart to: padEnd - 1 do: [:i |
+      self putChar: 32 x: i y: y style: style
     ]
   ]
 

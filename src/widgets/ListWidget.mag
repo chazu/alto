@@ -1,19 +1,39 @@
 namespace: 'Alto'
 import: 'Go'
 
-"ListView — reusable scrollable list with selection, keyboard nav, and mouse click.
- Used by SystemBrowser, Inspector, Debugger, and Menu for list panes.
- Renders items with Theme reverseStyle for selected, normalStyle for others.
- Supports custom item labels via labelBlock."
+"ListWidget — a reusable scrollable list with selection, keyboard navigation,
+ mouse click support, and an optional selection callback.
+ Encapsulates the common list-with-selection pattern used by SystemBrowser,
+ Inspector, Debugger, and Menu.
 
-ListView subclass: View
-  instanceVars: items selectedIndex scrollOffset onSelectBlock labelBlock visibleHeight
+ Interface:
+   items: anArray          — set the items to display
+   selectedIndex           — get the current selection index
+   selectedIndex: anIndex  — set the selection index (clamped)
+   selectedItem            — get the currently selected item (or nil)
+   onSelect: aBlock        — set callback invoked with the selected item
+   labelBlock: aBlock      — optional block to convert items to display strings
+   selectByValue: aValue   — select the item matching aValue
+   displayOn: aCellBuffer  — render into the buffer (full-pane mode)
+   renderInto:atX:y:width:height: — render as a sub-pane of a larger view
+   handleEvent: evt        — handle key and mouse events via EventConstants
+   handleClickAtY: y       — handle a translated mouse click
+   moveUp / moveDown       — programmatic selection movement"
 
-  classMethod: items: anArray onSelect: aBlock [
+ListWidget subclass: View
+  instanceVars: items selectedIndex scrollOffset onSelect labelBlock visibleHeight
+
+  classMethod: new [
     | instance |
     instance := super new.
     instance initialize.
-    instance privateItems: anArray.
+    ^instance
+  ]
+
+  classMethod: items: anArray onSelect: aBlock [
+    | instance |
+    instance := self new.
+    instance items: anArray.
     instance onSelect: aBlock.
     ^instance
   ]
@@ -22,22 +42,22 @@ ListView subclass: View
     items := Array new: 0.
     selectedIndex := 0.
     scrollOffset := 0.
-    onSelectBlock := nil.
+    onSelect := nil.
     labelBlock := nil.
     visibleHeight := 0
   ]
 
-  method: privateItems: anArray [ items := anArray ]
+  "--- Accessors ---"
   method: items [ ^items ]
   method: selectedIndex [ ^selectedIndex ]
   method: scrollOffset [ ^scrollOffset ]
 
-  method: onSelect: aBlock [ onSelectBlock := aBlock ]
-
-  method: labelBlock: aBlock [
-    "Set a block that converts an item to its display string.
-     If nil, items are displayed as-is."
-    labelBlock := aBlock
+  method: items: newItems [
+    "Set list items, resetting selection and scroll to top."
+    items := newItems.
+    selectedIndex := 0.
+    scrollOffset := 0.
+    self invalidate
   ]
 
   method: selectedIndex: anIndex [
@@ -56,12 +76,15 @@ ListView subclass: View
     ^items at: selectedIndex
   ]
 
-  method: items: newItems [
-    "Set list items, resetting selection and scroll to top."
-    items := newItems.
-    selectedIndex := 0.
-    scrollOffset := 0.
-    self invalidate
+  method: onSelect: aBlock [
+    "Set the callback block invoked with the selected item on Enter or click."
+    onSelect := aBlock
+  ]
+
+  method: labelBlock: aBlock [
+    "Set a block that converts an item to its display string.
+     If nil, items are displayed via string concatenation."
+    labelBlock := aBlock
   ]
 
   method: selectByValue: aValue [
@@ -82,6 +105,7 @@ ListView subclass: View
     self invalidate
   ]
 
+  "--- Internal helpers ---"
   method: labelForItem: anItem [
     "Return the display string for an item."
     labelBlock notNil ifTrue: [^labelBlock value: anItem].
@@ -111,6 +135,7 @@ ListView subclass: View
     scrollOffset < 0 ifTrue: [scrollOffset := 0]
   ]
 
+  "--- Navigation ---"
   method: moveUp [
     "Move selection up by one."
     selectedIndex > 0 ifTrue: [selectedIndex := selectedIndex - 1].
@@ -125,9 +150,10 @@ ListView subclass: View
     self invalidate
   ]
 
+  "--- Rendering ---"
   method: displayOn: aCellBuffer [
     "Render list items with scroll and selection highlight.
-     Uses putStringFilled for full-width selection highlighting."
+     Uses putStringFilled for full-width highlighting."
     | i itemIndex itemStr style |
     visibleHeight := aCellBuffer height.
     self ensureSelectionVisible.
@@ -136,7 +162,9 @@ ListView subclass: View
       itemIndex := scrollOffset + i.
       itemIndex < items size ifTrue: [
         itemStr := self labelForItem: (items at: itemIndex).
-        style := itemIndex = selectedIndex ifTrue: [Theme reverseStyle] ifFalse: [Theme normalStyle].
+        style := itemIndex = selectedIndex
+          ifTrue: [Theme reverseStyle]
+          ifFalse: [Theme normalStyle].
         aCellBuffer putStringFilled: itemStr x: 0 y: i style: style width: aCellBuffer width
       ].
       i := i + 1
@@ -163,31 +191,9 @@ ListView subclass: View
     ]
   ]
 
-  method: handleClickAtY: y [
-    "Handle a mouse click at row y (relative to this list's rendering origin).
-     Used when the parent translates coordinates for a sub-pane."
-    | clickedIndex |
-    clickedIndex := scrollOffset + y.
-    (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
-      selectedIndex := clickedIndex.
-      self ensureSelectionVisible.
-      self invalidate.
-      onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem]
-    ]
-  ]
-
-  method: handleMouseLocalX: x y: y buttons: btn [
-    | clickedIndex |
-    btn = 1 ifFalse: [^self].
-    clickedIndex := scrollOffset + y.
-    (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
-      selectedIndex := clickedIndex.
-      self invalidate.
-      onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem]
-    ]
-  ]
-
+  "--- Event handling ---"
   method: handleEvent: evt [
+    "Handle key and mouse events using EventConstants."
     | keyCode btn mx my |
 
     "Handle mouse events"
@@ -216,7 +222,7 @@ ListView subclass: View
 
     "Enter — trigger selection callback"
     keyCode = EventConstants keyEnter ifTrue: [
-      onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem].
+      onSelect notNil ifTrue: [onSelect value: self selectedItem].
       ^self
     ].
 
@@ -225,5 +231,31 @@ ListView subclass: View
       selectedIndex := -1.
       self invalidate.
       ^self
+    ]
+  ]
+
+  method: handleMouseLocalX: x y: y buttons: btn [
+    "Handle a mouse click at local coordinates."
+    | clickedIndex |
+    btn = 1 ifFalse: [^self].
+    clickedIndex := scrollOffset + y.
+    (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
+      selectedIndex := clickedIndex.
+      self ensureSelectionVisible.
+      self invalidate.
+      onSelect notNil ifTrue: [onSelect value: self selectedItem]
+    ]
+  ]
+
+  method: handleClickAtY: y [
+    "Handle a mouse click at row y (relative to this list's rendering origin).
+     Used when the parent translates coordinates for a sub-pane."
+    | clickedIndex |
+    clickedIndex := scrollOffset + y.
+    (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
+      selectedIndex := clickedIndex.
+      self ensureSelectionVisible.
+      self invalidate.
+      onSelect notNil ifTrue: [onSelect value: self selectedItem]
     ]
   ]

@@ -50,8 +50,8 @@ ScrollBar subclass: View
     visibleItems := 0.
     offset := 0.
     onScrollBlock := nil.
-    trackStyle := Go::Terminal newStyle.
-    thumbStyle := (Go::Terminal newStyle) reverse: true
+    trackStyle := Theme normalStyle.
+    thumbStyle := Theme reverseStyle
   ]
 
   method: orientation [ ^orientation ]

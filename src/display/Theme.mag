@@ -1,0 +1,36 @@
+namespace: 'Alto'
+import: 'Go'
+
+"Theme — standard named styles for the Alto UI.
+ Centralizes all Go::Terminal newStyle calls so widgets
+ share a single source of truth for visual appearance."
+
+Theme subclass: Object
+
+  classMethod: normalStyle [
+    ^Go::Terminal newStyle
+  ]
+
+  classMethod: reverseStyle [
+    ^(Go::Terminal newStyle) reverse: true
+  ]
+
+  classMethod: selectedStyle [
+    ^(Go::Terminal newStyle) reverse: true
+  ]
+
+  classMethod: dimStyle [
+    ^(Go::Terminal newStyle) dim: true
+  ]
+
+  classMethod: boldStyle [
+    ^(Go::Terminal newStyle) bold: true
+  ]
+
+  classMethod: borderStyle [
+    ^Go::Terminal newStyle
+  ]
+
+  classMethod: dividerStyle [
+    ^(Go::Terminal newStyle) dim: true
+  ]

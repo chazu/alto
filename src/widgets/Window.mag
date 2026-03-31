@@ -25,7 +25,7 @@ Window subclass: Object
       frame := nil.
       buffer := nil.
       dragState := nil.
-      borderStyle := Go::Terminal newStyle.
+      borderStyle := Theme borderStyle.
       contentBuf := nil
   ]
 
@@ -35,7 +35,7 @@ Window subclass: Object
       contentController := aController.
       frame := aRect.
       buffer := CellBuffer width: aRect width height: aRect height.
-      borderStyle := Go::Terminal newStyle.
+      borderStyle := Theme borderStyle.
       contentBuf := CellBuffer width: aRect width - 2 height: aRect height - 2.
       dragState := nil
   ]

@@ -3,10 +3,11 @@ import: 'Go'
 
 "Debugger — three-pane post-mortem debugger: stack frames, source, variables.
  Uses the VM's Debugger class for stack/variable inspection.
- Control buttons: Resume, Step Over, Step Into, Step Out."
+ Control buttons: Resume, Step Over, Step Into, Step Out.
+ Frame and variable lists use ListView for selection and rendering."
 
 AltoDebugger subclass: View
-  instanceVars: errorMessage frames variables allFrameVars selectedFrame focusedPane normalStyle reverseStyle dimStyle display parentWindow frameScrollOffset varScrollOffset sourceLines sourceScrollOffset selectedVar buttonLabels selectedButton
+  instanceVars: errorMessage frames variables allFrameVars selectedFrame focusedPane display parentWindow frameListView varListView sourceLines sourceScrollOffset buttonLabels selectedButton
 
   classMethod: new [
     | instance |
@@ -84,22 +85,48 @@ AltoDebugger subclass: View
     allFrameVars := #().
     selectedFrame := 0.
     focusedPane := 0.
-    normalStyle := Go::Terminal newStyle.
-    reverseStyle := (Go::Terminal newStyle) reverse: true.
-    dimStyle := (Go::Terminal newStyle) dim: true.
     display := nil.
     parentWindow := nil.
-    frameScrollOffset := 0.
-    varScrollOffset := 0.
     sourceLines := #('').
     sourceScrollOffset := 0.
-    selectedVar := 0.
     buttonLabels := #('Resume' 'Step Over' 'Step Into' 'Step Out').
-    selectedButton := 0
+    selectedButton := 0.
+    frameListView := ListView items: #() onSelect: nil.
+    frameListView labelBlock: [:frameDict | self frameLabelFor: frameDict].
+    varListView := ListView items: #() onSelect: nil.
+    varListView labelBlock: [:varDict | self varLabelFor: varDict]
+  ]
+
+  method: frameLabelFor: frameDict [
+    "Format a stack frame dict as a display label."
+    | label line |
+    label := (frameDict at: 'class' ifAbsent: ['']), '>>', (frameDict at: 'method' ifAbsent: ['']).
+    line := frameDict at: 'line' ifAbsent: [0].
+    line > 0 ifTrue: [label := label, ':', line printString].
+    (frameDict at: 'isBlock' ifAbsent: [false]) = true ifTrue: [
+      label := label, ' []'
+    ].
+    ^label
+  ]
+
+  method: varLabelFor: varDict [
+    "Format a variable dict as a display label."
+    | nameStr valStr typeStr label |
+    nameStr := varDict at: #name ifAbsent: ['?'].
+    valStr := varDict at: #value ifAbsent: [''].
+    typeStr := varDict at: #type ifAbsent: [''].
+    label := nameStr, ' = ', valStr.
+    typeStr size > 0 ifTrue: [
+      label := label, '  (', typeStr, ')'
+    ].
+    ^label
   ]
 
   method: privateErrorMessage: msg [ errorMessage := msg ]
-  method: privateFrames: arr [ frames := arr ]
+  method: privateFrames: arr [
+    frames := arr.
+    frameListView items: frames
+  ]
   method: privateAllFrameVars: arr [ allFrameVars := arr ]
   method: display: d [ display := d ]
   method: display [ ^display ]
@@ -114,8 +141,7 @@ AltoDebugger subclass: View
     ] ifFalse: [
       variables := #()
     ].
-    selectedVar := 0.
-    varScrollOffset := 0
+    varListView items: variables
   ]
 
   method: selectFrame: idx [
@@ -123,6 +149,7 @@ AltoDebugger subclass: View
     idx < 0 ifTrue: [idx := 0].
     idx >= frames size ifTrue: [idx := frames size - 1].
     selectedFrame := idx.
+    frameListView selectedIndex: idx.
     self loadVariablesForFrame: idx.
     self updateSource
   ]
@@ -217,9 +244,10 @@ AltoDebugger subclass: View
       newStack := Debugger getCallStack.
       newStack isNil ifTrue: [newStack := #()].
       frames := newStack.
+      frameListView items: frames.
       allFrameVars := AltoDebugger captureAllVariables: frames.
       selectedFrame := 0.
-      frameScrollOffset := 0.
+      frameListView selectedIndex: 0.
       frames size > 0 ifTrue: [
         self loadVariablesForFrame: 0.
         self updateSource
@@ -254,36 +282,32 @@ AltoDebugger subclass: View
     mod := evt at: 'mod' ifAbsent: [0].
 
     "Escape — close debugger"
-    keyCode = 27 ifTrue: [^self closeDebugger].
+    keyCode = EventConstants keyEscape ifTrue: [^self closeDebugger].
 
     "Tab — cycle panes: 0=frames, 1=source, 2=variables, 3=buttons"
-    keyCode = 9 ifTrue: [
+    keyCode = EventConstants keyTab ifTrue: [
       focusedPane := (focusedPane + 1) \\ 4.
       self invalidate. ^self
     ].
 
     "Up arrow"
-    keyCode = 257 ifTrue: [
+    keyCode = EventConstants keyUp ifTrue: [
       focusedPane = 0 ifTrue: [
         selectedFrame > 0 ifTrue: [
-          self selectFrame: selectedFrame - 1.
-          selectedFrame < frameScrollOffset ifTrue: [frameScrollOffset := selectedFrame]
+          self selectFrame: selectedFrame - 1
         ]
       ].
       focusedPane = 1 ifTrue: [
         sourceScrollOffset > 0 ifTrue: [sourceScrollOffset := sourceScrollOffset - 1]
       ].
       focusedPane = 2 ifTrue: [
-        selectedVar > 0 ifTrue: [
-          selectedVar := selectedVar - 1.
-          selectedVar < varScrollOffset ifTrue: [varScrollOffset := selectedVar]
-        ]
+        varListView moveUp
       ].
       self invalidate. ^self
     ].
 
     "Down arrow"
-    keyCode = 258 ifTrue: [
+    keyCode = EventConstants keyDown ifTrue: [
       focusedPane = 0 ifTrue: [
         selectedFrame < (frames size - 1) ifTrue: [
           self selectFrame: selectedFrame + 1
@@ -293,30 +317,28 @@ AltoDebugger subclass: View
         sourceScrollOffset := sourceScrollOffset + 1
       ].
       focusedPane = 2 ifTrue: [
-        selectedVar < (variables size - 1) ifTrue: [
-          selectedVar := selectedVar + 1
-        ]
+        varListView moveDown
       ].
       self invalidate. ^self
     ].
 
     "Left/Right arrow — navigate buttons when focused on button bar"
-    (keyCode = 259 and: [focusedPane = 3]) ifTrue: [
+    (keyCode = EventConstants keyRight and: [focusedPane = 3]) ifTrue: [
       selectedButton > 0 ifTrue: [selectedButton := selectedButton - 1].
       self invalidate. ^self
     ].
-    (keyCode = 260 and: [focusedPane = 3]) ifTrue: [
+    (keyCode = EventConstants keyLeft and: [focusedPane = 3]) ifTrue: [
       selectedButton < (buttonLabels size - 1) ifTrue: [selectedButton := selectedButton + 1].
       self invalidate. ^self
     ].
 
     "Enter — activate button or inspect variable"
-    keyCode = 13 ifTrue: [
+    keyCode = EventConstants keyEnter ifTrue: [
       focusedPane = 3 ifTrue: [^self executeButton: selectedButton].
       focusedPane = 2 ifTrue: [
         "Inspect selected variable"
-        selectedVar < variables size ifTrue: [
-          varDict := variables at: selectedVar.
+        varListView selectedItem notNil ifTrue: [
+          varDict := varListView selectedItem.
           valStr := varDict at: #value ifAbsent: [''].
           Transcript show: (varDict at: #name ifAbsent: ['']), ' = ', valStr
         ]
@@ -375,12 +397,12 @@ AltoDebugger subclass: View
     varH := varH max: 2.
     btnY := bufH - 1.
 
-    "Draw stack frames (top-left)"
+    "Draw stack frames (top-left) using frameListView"
     self renderFrames: aCellBuffer fromY: 0 height: frameH width: leftW.
 
     "Vertical separator"
     0 to: frameH - 1 do: [:y |
-      aCellBuffer putChar: 9474 x: leftW y: y style: dimStyle
+      aCellBuffer putChar: 9474 x: leftW y: y style: Theme dimStyle
     ].
 
     "Draw source (top-right)"
@@ -388,17 +410,17 @@ AltoDebugger subclass: View
 
     "Horizontal separator"
     0 to: bufW - 1 do: [:x |
-      aCellBuffer putChar: 9472 x: x y: frameH style: dimStyle
+      aCellBuffer putChar: 9472 x: x y: frameH style: Theme dimStyle
     ].
     "Intersection"
-    aCellBuffer putChar: 9532 x: leftW y: frameH style: dimStyle.
+    aCellBuffer putChar: 9532 x: leftW y: frameH style: Theme dimStyle.
 
-    "Draw variables (below separator)"
+    "Draw variables (below separator) using varListView"
     self renderVariables: aCellBuffer fromY: varY height: varH width: bufW.
 
     "Horizontal separator before buttons"
     0 to: bufW - 1 do: [:x |
-      aCellBuffer putChar: 9472 x: x y: btnY - 1 style: dimStyle
+      aCellBuffer putChar: 9472 x: x y: btnY - 1 style: Theme dimStyle
     ].
 
     "Draw buttons (bottom row)"
@@ -406,47 +428,22 @@ AltoDebugger subclass: View
   ]
 
   method: renderFrames: buf fromY: startY height: h width: w [
-    | i frameIdx frameDict label style line j headerStyle |
+    | headerStyle |
     "Header"
-    headerStyle := (Go::Terminal newStyle) bold: true.
+    headerStyle := Theme boldStyle.
     buf putString: 'Stack Frames' x: 0 y: startY style: headerStyle.
     (focusedPane = 0) ifTrue: [
       buf putString: ' *' x: 12 y: startY style: headerStyle
     ].
 
-    i := 1.
-    [i < h] whileTrue: [
-      frameIdx := frameScrollOffset + i - 1.
-      frameIdx < frames size ifTrue: [
-        frameDict := frames at: frameIdx.
-        label := (frameDict at: 'class' ifAbsent: ['']), '>>', (frameDict at: 'method' ifAbsent: ['']).
-        line := frameDict at: 'line' ifAbsent: [0].
-        line > 0 ifTrue: [label := label, ':', line printString].
-        (frameDict at: 'isBlock' ifAbsent: [false]) = true ifTrue: [
-          label := label, ' []'
-        ].
-
-        style := (frameIdx = selectedFrame and: [focusedPane = 0])
-          ifTrue: [reverseStyle] ifFalse: [normalStyle].
-
-        j := 0.
-        [j < w] whileTrue: [
-          j < label size ifTrue: [
-            buf putChar: (label at: j) value x: j y: startY + i style: style
-          ] ifFalse: [
-            buf putChar: 32 x: j y: startY + i style: style
-          ].
-          j := j + 1
-        ]
-      ].
-      i := i + 1
-    ]
+    "Render frame list via ListView (starting at row 1 to leave room for header)"
+    frameListView renderInto: buf atX: 0 y: startY + 1 width: w height: h - 1
   ]
 
   method: renderSource: buf fromX: ox fromY: startY height: h width: w [
-    | i lineIdx lineStr j style currentLine headerStyle numStr srcStart k fillX |
+    | i lineIdx lineStr j style currentLine headerStyle numStr srcStart k |
     "Header"
-    headerStyle := (Go::Terminal newStyle) bold: true.
+    headerStyle := Theme boldStyle.
     buf putString: 'Source' x: ox y: startY style: headerStyle.
     (focusedPane = 1) ifTrue: [
       buf putString: ' *' x: ox + 6 y: startY style: headerStyle
@@ -463,7 +460,7 @@ AltoDebugger subclass: View
       lineIdx := sourceScrollOffset + i - 1.
       lineIdx < sourceLines size ifTrue: [
         lineStr := sourceLines at: lineIdx.
-        style := (lineIdx = currentLine) ifTrue: [reverseStyle] ifFalse: [normalStyle].
+        style := (lineIdx = currentLine) ifTrue: [Theme reverseStyle] ifFalse: [Theme normalStyle].
 
         "Line number"
         numStr := (lineIdx + 1) printString.
@@ -471,7 +468,7 @@ AltoDebugger subclass: View
         numStr := numStr, ' '.
         j := 0.
         [j < numStr size and: [j < w]] whileTrue: [
-          buf putChar: (numStr at: j) value x: ox + j y: startY + i style: dimStyle.
+          buf putChar: (numStr at: j) value x: ox + j y: startY + i style: Theme dimStyle.
           j := j + 1
         ].
 
@@ -484,11 +481,7 @@ AltoDebugger subclass: View
         ].
         "Fill rest for highlight"
         (lineIdx = currentLine) ifTrue: [
-          fillX := srcStart + k.
-          [fillX < w] whileTrue: [
-            buf putChar: 32 x: ox + fillX y: startY + i style: reverseStyle.
-            fillX := fillX + 1
-          ]
+          buf putStringFilled: '' x: ox + srcStart + k y: startY + i style: Theme reverseStyle width: w - srcStart - k
         ]
       ].
       i := i + 1
@@ -496,42 +489,16 @@ AltoDebugger subclass: View
   ]
 
   method: renderVariables: buf fromY: startY height: h width: w [
-    | i varIdx varDict nameStr valStr typeStr label style j headerStyle |
+    | headerStyle |
     "Header"
-    headerStyle := (Go::Terminal newStyle) bold: true.
+    headerStyle := Theme boldStyle.
     buf putString: 'Variables' x: 0 y: startY style: headerStyle.
     (focusedPane = 2) ifTrue: [
       buf putString: ' *' x: 9 y: startY style: headerStyle
     ].
 
-    i := 1.
-    [i < h] whileTrue: [
-      varIdx := varScrollOffset + i - 1.
-      varIdx < variables size ifTrue: [
-        varDict := variables at: varIdx.
-        nameStr := varDict at: #name ifAbsent: ['?'].
-        valStr := varDict at: #value ifAbsent: [''].
-        typeStr := varDict at: #type ifAbsent: [''].
-        label := nameStr, ' = ', valStr.
-        typeStr size > 0 ifTrue: [
-          label := label, '  (', typeStr, ')'
-        ].
-
-        style := (varIdx = selectedVar and: [focusedPane = 2])
-          ifTrue: [reverseStyle] ifFalse: [normalStyle].
-
-        j := 0.
-        [j < w] whileTrue: [
-          j < label size ifTrue: [
-            buf putChar: (label at: j) value x: j y: startY + i style: style
-          ] ifFalse: [
-            buf putChar: 32 x: j y: startY + i style: style
-          ].
-          j := j + 1
-        ]
-      ].
-      i := i + 1
-    ]
+    "Render variable list via ListView (starting at row 1 for header)"
+    varListView renderInto: buf atX: 0 y: startY + 1 width: w height: h - 1
   ]
 
   method: renderButtons: buf atY: y width: w [
@@ -542,7 +509,7 @@ AltoDebugger subclass: View
       label := buttonLabels at: i.
       padded := '[ ', label, ' ]'.
       style := (i = selectedButton and: [focusedPane = 3])
-        ifTrue: [reverseStyle] ifFalse: [normalStyle].
+        ifTrue: [Theme reverseStyle] ifFalse: [Theme normalStyle].
       j := 0.
       [j < padded size and: [btnX + j < w]] whileTrue: [
         buf putChar: (padded at: j) value x: btnX + j y: y style: style.

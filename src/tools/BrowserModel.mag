@@ -1,0 +1,75 @@
+namespace: 'Alto'
+import: 'Go'
+
+"BrowserModel — Model for SystemBrowser state.
+ Holds selections and list data; fires changed: notifications
+ so that dependents (the browser view, list panes) can update."
+
+BrowserModel subclass: Model
+  instanceVars: selectedCategory selectedClass selectedMethod categoryNames classNames methodNames
+
+  classMethod: new [
+    | instance |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  method: initialize [
+    super initialize.
+    selectedCategory := nil.
+    selectedClass := nil.
+    selectedMethod := nil.
+    categoryNames := Array new: 0.
+    classNames := Array new: 0.
+    methodNames := Array new: 0
+  ]
+
+  "--- Selection getters ---"
+  method: selectedCategory [ ^selectedCategory ]
+  method: selectedClass [ ^selectedClass ]
+  method: selectedMethod [ ^selectedMethod ]
+
+  "--- Data getters ---"
+  method: categoryNames [ ^categoryNames ]
+  method: classNames [ ^classNames ]
+  method: methodNames [ ^methodNames ]
+
+  "--- Selection setters (fire changed:) ---"
+  method: selectedCategory: aString [
+    selectedCategory := aString.
+    self changed: 'selectedCategory'
+  ]
+
+  method: selectedClass: aString [
+    selectedClass := aString.
+    self changed: 'selectedClass'
+  ]
+
+  method: selectedMethod: aString [
+    selectedMethod := aString.
+    self changed: 'selectedMethod'
+  ]
+
+  "--- Data setters (fire changed:) ---"
+  method: categoryNames: anArray [
+    categoryNames := anArray.
+    self changed: 'categoryNames'
+  ]
+
+  method: classNames: anArray [
+    classNames := anArray.
+    self changed: 'classNames'
+  ]
+
+  method: methodNames: anArray [
+    methodNames := anArray.
+    self changed: 'methodNames'
+  ]
+
+  "--- Silent setters (no notification, for batch updates) ---"
+  method: silentSelectedCategory: aString [ selectedCategory := aString ]
+  method: silentSelectedClass: aString [ selectedClass := aString ]
+  method: silentSelectedMethod: aString [ selectedMethod := aString ]
+  method: silentClassNames: anArray [ classNames := anArray ]
+  method: silentMethodNames: anArray [ methodNames := anArray ]

@@ -2,7 +2,7 @@ namespace: 'Alto'
 import: 'Go'
 
 Transcript subclass: View
-  instanceVars: lines maxLines scrollOffset display parentWindow textStyle
+  instanceVars: lines maxLines scrollOffset display parentWindow
   classVars: Current
 
   classMethod: new [
@@ -38,8 +38,7 @@ Transcript subclass: View
       maxLines := 1000.
       scrollOffset := 0.
       display := nil.
-      parentWindow := nil.
-      textStyle := Go::Terminal newStyle
+      parentWindow := nil
   ]
 
   method: appendLine: aString [
@@ -57,15 +56,15 @@ Transcript subclass: View
     | keyCode |
     (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
     keyCode := evt at: 'key'.
-    keyCode = 257 ifTrue: [  "Up"
+    keyCode = EventConstants keyUp ifTrue: [  "Up"
       scrollOffset := (scrollOffset - 1) max: 0.
       self invalidate
     ].
-    keyCode = 258 ifTrue: [  "Down"
+    keyCode = EventConstants keyDown ifTrue: [  "Down"
       scrollOffset := (scrollOffset + 1) min: ((lines size - 1) max: 0).
       self invalidate
     ].
-    keyCode = 27 ifTrue: [  "Escape"
+    keyCode = EventConstants keyEscape ifTrue: [  "Escape"
       display notNil ifTrue: [display removeWindow: parentWindow]
     ]
   ]
@@ -82,7 +81,7 @@ Transcript subclass: View
       lineIndex := startOffset + i.
       lineIndex < lines size ifTrue: [
         lineStr := lines at: lineIndex.
-        aCellBuffer putString: lineStr x: 0 y: i style: textStyle
+        aCellBuffer putString: lineStr x: 0 y: i style: Theme normalStyle
       ].
       i := i + 1
     ]

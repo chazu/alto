@@ -1,7 +1,7 @@
 namespace: 'Alto'
 import: 'Go'
 
-"Dashboard — multi-pane layout demo using HBox, VBox, and styled widgets.
+"Dashboard — multi-pane layout demo using BoxLayout, SplitPane, and styled widgets.
  Run: mag build --full -o alto && ./alto -m Alto::DashboardApp.start"
 
 StatusView subclass: View

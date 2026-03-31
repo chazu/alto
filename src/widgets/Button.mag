@@ -38,8 +38,8 @@ Button subclass: View
     super initialize.
     label := ''.
     action := nil.
-    normalStyle := Go::Terminal newStyle.
-    pressedStyle := (Go::Terminal newStyle) reverse: true.
+    normalStyle := Theme normalStyle.
+    pressedStyle := Theme reverseStyle.
     focused := false
   ]
 
@@ -111,7 +111,7 @@ Button subclass: View
     keyCode := evt at: 'key'.
 
     "Enter or Space activates"
-    (keyCode = 13 or: [keyCode = 32]) ifTrue: [
+    (keyCode = EventConstants keyEnter or: [keyCode = EventConstants keySpace]) ifTrue: [
       action notNil ifTrue: [action value]
     ]
   ]

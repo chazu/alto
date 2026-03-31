@@ -46,7 +46,7 @@ Display subclass: Object
     f := w frame.
     f notNil ifTrue: [
       | clearStyle |
-      clearStyle := Go::Terminal newStyle.
+      clearStyle := Theme normalStyle.
       (f y) to: (f y + f height - 1) do: [:row |
         (row >= 0 and: [row < screenH]) ifTrue: [
           (f x) to: (f x + f width - 1) do: [:col |
@@ -136,7 +136,7 @@ Display subclass: Object
       fourth := result at: 3.
 
       evtDict := Dictionary new.
-      keyCode = -3 ifTrue: [
+      keyCode = EventConstants eventResize ifTrue: [
         "Resize event: runeVal=width, mod=height"
         screenW := runeVal.
         screenH := mod.
@@ -146,7 +146,7 @@ Display subclass: Object
         screen sync.
         self render
       ] ifFalse: [
-        keyCode = -2 ifTrue: [
+        keyCode = EventConstants eventMouse ifTrue: [
           evtDict at: 'type' put: 'mouse'.
           evtDict at: 'buttons' put: runeVal.
           evtDict at: 'x' put: mod.
@@ -169,7 +169,7 @@ Display subclass: Object
           ] ifFalse: [
             "No windows — Escape quits"
             (evtDict at: 'type' ifAbsent: ['']) = 'key' ifTrue: [
-              (evtDict at: 'key') = 27 ifTrue: [self stop]
+              (evtDict at: 'key') = EventConstants keyEscape ifTrue: [self stop]
             ]
           ].
           self render
@@ -288,7 +288,7 @@ Display subclass: Object
     "Clear screen cache where a window currently sits."
     | f clearStyle idx |
     f := win frame.
-    clearStyle := Go::Terminal newStyle.
+    clearStyle := Theme normalStyle.
     f y to: f y + f height - 1 do: [:row |
       (row >= 0 and: [row < screenH]) ifTrue: [
         f x to: f x + f width - 1 do: [:col |
