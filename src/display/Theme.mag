@@ -6,31 +6,46 @@ import: 'Go'
  share a single source of truth for visual appearance."
 
 Theme subclass: Object
+  classVars: CachedNormal CachedReverse CachedDim CachedBold CachedDivider
 
   classMethod: normalStyle [
-    ^Go::Terminal newStyle
+    CachedNormal isNil ifTrue: [CachedNormal := Go::Terminal newStyle].
+    ^CachedNormal
   ]
 
   classMethod: reverseStyle [
-    ^(Go::Terminal newStyle) reverse: true
+    CachedReverse isNil ifTrue: [CachedReverse := (Go::Terminal newStyle) reverse: true].
+    ^CachedReverse
   ]
 
   classMethod: selectedStyle [
-    ^(Go::Terminal newStyle) reverse: true
+    ^self reverseStyle
   ]
 
   classMethod: dimStyle [
-    ^(Go::Terminal newStyle) dim: true
+    CachedDim isNil ifTrue: [CachedDim := (Go::Terminal newStyle) dim: true].
+    ^CachedDim
   ]
 
   classMethod: boldStyle [
-    ^(Go::Terminal newStyle) bold: true
+    CachedBold isNil ifTrue: [CachedBold := (Go::Terminal newStyle) bold: true].
+    ^CachedBold
   ]
 
   classMethod: borderStyle [
-    ^Go::Terminal newStyle
+    ^self normalStyle
   ]
 
   classMethod: dividerStyle [
-    ^(Go::Terminal newStyle) dim: true
+    CachedDivider isNil ifTrue: [CachedDivider := (Go::Terminal newStyle) dim: true].
+    ^CachedDivider
+  ]
+
+  classMethod: resetCache [
+    "Call if terminal restarts or theme changes."
+    CachedNormal := nil.
+    CachedReverse := nil.
+    CachedDim := nil.
+    CachedBold := nil.
+    CachedDivider := nil
   ]

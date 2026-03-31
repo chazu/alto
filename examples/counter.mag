@@ -38,15 +38,15 @@ CounterView subclass: View
     keyCode := evt at: 'key'.
     runeVal := evt at: 'rune' ifAbsent: [0].
 
-    "Up arrow or +"
-    (keyCode = 257 or: [runeVal = 43]) ifTrue: [
+    "Up arrow or '+'"
+    (keyCode = EventConstants keyUp or: [runeVal = 43]) ifTrue: [
       count := count + 1. self invalidate. ^self
     ].
-    "Down arrow or -"
-    (keyCode = 258 or: [runeVal = 45]) ifTrue: [
+    "Down arrow or '-'"
+    (keyCode = EventConstants keyDown or: [runeVal = 45]) ifTrue: [
       count := count - 1. self invalidate. ^self
     ].
-    "R to reset"
+    "r/R to reset"
     (runeVal = 114 or: [runeVal = 82]) ifTrue: [
       count := 0. self invalidate. ^self
     ]

@@ -109,7 +109,7 @@ Display subclass: Object
               idx := sy * screenW + sx.
               prevCh := screenChars at: idx.
               prevSt := screenStyles at: idx.
-              (ch = prevCh and: [prevSt notNil and: [st equals: prevSt]]) ifFalse: [
+              (ch = prevCh and: [prevSt notNil and: [st = prevSt]]) ifFalse: [
                 screen setContent: sx _: sy _: ch _: st.
                 screenChars at: idx put: ch.
                 screenStyles at: idx put: st

@@ -63,6 +63,15 @@ Rectangle subclass: Object
       ^Rectangle x: maxX y: maxY width: minRight - maxX height: minBottom - maxY
   ]
 
+  method: = other [
+    other isNil ifTrue: [^false].
+    ^x = other x and: [y = other y] and: [width = other width] and: [height = other height]
+  ]
+
+  method: hash [
+    ^((x hash bitXor: y hash) bitXor: width hash) bitXor: height hash
+  ]
+
   classMethod: x: anX y: aY width: aW height: aH [
       | r |
       r := self new.

@@ -323,11 +323,11 @@ AltoDebugger subclass: View
     ].
 
     "Left/Right arrow — navigate buttons when focused on button bar"
-    (keyCode = EventConstants keyRight and: [focusedPane = 3]) ifTrue: [
+    (keyCode = EventConstants keyLeft and: [focusedPane = 3]) ifTrue: [
       selectedButton > 0 ifTrue: [selectedButton := selectedButton - 1].
       self invalidate. ^self
     ].
-    (keyCode = EventConstants keyLeft and: [focusedPane = 3]) ifTrue: [
+    (keyCode = EventConstants keyRight and: [focusedPane = 3]) ifTrue: [
       selectedButton < (buttonLabels size - 1) ifTrue: [selectedButton := selectedButton + 1].
       self invalidate. ^self
     ].

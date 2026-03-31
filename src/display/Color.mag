@@ -141,6 +141,11 @@ Style subclass: Object
   ]
 
   "Equality — delegates to Go style"
-  method: equals: other [
+  method: = other [
+    other isNil ifTrue: [^false].
     ^goStyle equals: other goStyle
+  ]
+
+  method: equals: other [
+    ^self = other
   ]
