@@ -95,8 +95,8 @@ TodoListView subclass: View
 
   method: handleEvent: evt [
     | keyCode |
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
     model isNil ifTrue: [^self].
 
     "Up"
@@ -159,10 +159,10 @@ TodoInputView subclass: View
 
   method: handleEvent: evt [
     | keyCode runeVal mod text |
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
-    runeVal := evt at: 'rune' ifAbsent: [0].
-    mod := evt at: 'mod' ifAbsent: [0].
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
+    runeVal := evt rune.
+    mod := evt mod.
 
     "Enter — add item"
     keyCode = 13 ifTrue: [

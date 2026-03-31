@@ -277,13 +277,12 @@ AltoDebugger subclass: View
   "--- Event handling ---"
 
   method: handleEvent: evt [
-    | evtType keyCode mod varDict valStr |
-    evtType := evt at: 'type' ifAbsent: [''].
+    | keyCode mod varDict valStr |
 
-    evtType = 'mouse' ifTrue: [^self handleMouse: evt].
-    evtType = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
-    mod := evt at: 'mod' ifAbsent: [0].
+    evt isMouse ifTrue: [^self handleMouse: evt].
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
+    mod := evt mod.
 
     "Escape — close debugger"
     keyCode = EventConstants keyEscape ifTrue: [^self closeDebugger].
@@ -353,9 +352,9 @@ AltoDebugger subclass: View
 
   method: handleMouse: evt [
     | mx my btn bufH btnX i label |
-    btn := evt at: 'buttons'.
-    mx := evt at: 'x'.
-    my := evt at: 'y'.
+    btn := evt buttons.
+    mx := evt x.
+    my := evt y.
     btn = 1 ifFalse: [^self].
 
     "Check if click is on a button in the bottom row"

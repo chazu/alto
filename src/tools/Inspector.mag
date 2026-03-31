@@ -160,18 +160,17 @@ Inspector subclass: View
   ]
 
   method: handleEvent: evt [
-    | evtType keyCode |
-    evtType := evt at: 'type' ifAbsent: [''].
+    | keyCode |
 
-    evtType = 'mouse' ifTrue: [
+    evt isMouse ifTrue: [
       [self handleMouse: evt] on: Exception do: [:e |
         Transcript show: 'INSP mouse err: ', e messageText
       ].
       ^self
     ].
 
-    evtType = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
 
     keyCode = EventConstants keyEscape ifTrue: [
       display notNil ifTrue: [display removeWindow: parentWindow].
@@ -211,9 +210,9 @@ Inspector subclass: View
 
   method: handleMouse: evt [
     | btn mx my listWidth |
-    btn := evt at: 'buttons'.
-    mx := evt at: 'x'.
-    my := evt at: 'y'.
+    btn := evt buttons.
+    mx := evt x.
+    my := evt y.
     btn = 1 ifFalse: [^self].
 
     listWidth := self listPaneWidth.

@@ -46,11 +46,18 @@ TextEditor>>text uses inject:into: for joining.
 
 ## Priority 3: Design Debt (Lower urgency, valuable long-term)
 
-### 3.1 Document or implement the Controller separation
-**Files:** `src/mvc/`, all tools in `src/tools/`
-**Problem:** PLAN.md describes MVC with a separate Controller class, but in practice View and Controller are merged — tools like `SystemBrowser` subclass `View` but handle all events themselves. `Window>>handleEvent:` delegates to `contentController`, but it's usually the same object as `contentView`.
-**Fix:** Either: (a) document the intentional merge as a design decision, or (b) extract keyboard/mouse handling into Controller subclasses for proper MVC.
-**Effort:** Large if implementing, small if just documenting.
+### ~~3.1 Controller separation — decided against, formalized instead~~ DONE
+After analysis of ST-80 history and modern Smalltalk consensus (Morphic, Spec2, etc.):
+Controllers solved input *scheduling* in 1981; modern event dispatch makes them redundant.
+Every successor (Self, Squeak, Pharo, Cocoa, React) dropped separate Controllers.
+
+Instead:
+- View base class now has `handleEvent:` as a documented no-op — View is both visual and
+  input handler, no separate Controller needed.
+- All handlers migrated from dictionary protocol to typed event accessors (`evt isKey`,
+  `evt key`, `evt isMouse`, `evt x`, `evt buttons`).
+- Window gains convenience `title:content:frame:` constructor (view = controller).
+- `Window>>contentController:` slot kept for cases like SplitPane where delegation differs.
 
 ### ~~3.2 Standardize new/initialize protocol~~ DONE
 Display (`initDisplay`), Window (`initDefaults`), and Style (`initDefault`) all renamed to

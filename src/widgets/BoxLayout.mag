@@ -132,19 +132,13 @@ BoxLayout subclass: View
   ]
 
   method: handleEvent: evt [
-    | evtType keyCode |
-    evtType := evt at: 'type' ifAbsent: [''].
-
-    evtType = 'key' ifTrue: [
-      keyCode := evt at: 'key'.
-      "Tab — cycle focus"
-      keyCode = EventConstants keyTab ifTrue: [
-        children size > 0 ifTrue: [
-          focusedIndex := (focusedIndex + 1) \\ children size
-        ].
-        self invalidate.
-        ^self
-      ]
+    "Tab cycles focus; everything else delegates to focused child."
+    (evt isKey and: [evt key = EventConstants keyTab]) ifTrue: [
+      children size > 0 ifTrue: [
+        focusedIndex := (focusedIndex + 1) \\ children size
+      ].
+      self invalidate.
+      ^self
     ].
 
     "Delegate to focused child"

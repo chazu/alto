@@ -348,20 +348,16 @@ SystemBrowser subclass: View
   ]
 
   method: handleEvent: evt [
-    | keyCode runeVal btn mx my pane |
+    | keyCode runeVal pane |
 
-    "Handle mouse events"
-    (evt at: 'type' ifAbsent: ['']) = 'mouse' ifTrue: [
-      btn := evt at: 'buttons'.
-      mx := evt at: 'x'.
-      my := evt at: 'y'.
-      self handleMouseLocalX: mx y: my buttons: btn.
+    evt isMouse ifTrue: [
+      self handleMouseLocalX: evt x y: evt y buttons: evt buttons.
       ^self
     ].
 
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
-    runeVal := evt at: 'rune'.
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
+    runeVal := evt rune.
 
     "Escape — close"
     keyCode = EventConstants keyEscape ifTrue: [
@@ -378,7 +374,7 @@ SystemBrowser subclass: View
 
     "When code pane is focused, route all keys to code editor"
     focusedPane = 3 ifTrue: [
-      ^self handleCodeKey: keyCode rune: runeVal mod: (evt at: 'mod' ifAbsent: [0])
+      ^self handleCodeKey: keyCode rune: runeVal mod: evt mod
     ].
 
     "Arrow keys — delegate to focused pane"

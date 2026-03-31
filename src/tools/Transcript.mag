@@ -54,8 +54,8 @@ Transcript subclass: View
 
   method: handleEvent: evt [
     | keyCode |
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
     keyCode = EventConstants keyUp ifTrue: [  "Up"
       scrollOffset := (scrollOffset - 1) max: 0.
       self invalidate

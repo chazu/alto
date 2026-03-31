@@ -105,13 +105,9 @@ Button subclass: View
   ]
 
   method: handleEvent: evt [
-    | evtType keyCode |
-    evtType := evt at: 'type' ifAbsent: [''].
-    evtType = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
-
+    evt isKey ifFalse: [^self].
     "Enter or Space activates"
-    (keyCode = EventConstants keyEnter or: [keyCode = EventConstants keySpace]) ifTrue: [
+    (evt key = EventConstants keyEnter or: [evt key = EventConstants keySpace]) ifTrue: [
       action notNil ifTrue: [action value]
     ]
   ]

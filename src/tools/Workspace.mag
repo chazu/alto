@@ -41,23 +41,19 @@ Workspace subclass: View
     | keyCode runeVal mod |
 
     "Handle mouse events"
-    (evt at: 'type' ifAbsent: ['']) = 'mouse' ifTrue: [
-      | btn mx my |
-      btn := evt at: 'buttons'.
-      mx := evt at: 'x'.
-      my := evt at: 'y'.
-      btn = 1 ifTrue: [
-        editor handleClick: mx y: my.
+    evt isMouse ifTrue: [
+      evt buttons = 1 ifTrue: [
+        editor handleClick: evt x y: evt y.
         self invalidate
       ].
       ^self
     ].
 
     "Key events"
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
-    runeVal := evt at: 'rune'.
-    mod := evt at: 'mod' ifAbsent: [0].
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
+    runeVal := evt rune.
+    mod := evt mod.
 
     "Escape — close this window"
     keyCode = EventConstants keyEscape ifTrue: [

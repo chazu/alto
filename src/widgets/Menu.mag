@@ -61,17 +61,10 @@ Menu subclass: View
   method: items [ ^listView items ]
 
   method: handleEvent: evt [
-    | evtType keyCode mx my btn |
-    evtType := evt at: 'type' ifAbsent: [''].
-
-    evtType = 'mouse' ifTrue: [
-      btn := evt at: 'buttons'.
-      mx := evt at: 'x'.
-      my := evt at: 'y'.
-      btn = 1 ifTrue: [
-        "Click on an item"
-        (my >= 0 and: [my < listView items size]) ifTrue: [
-          self selectItem: my
+    evt isMouse ifTrue: [
+      evt buttons = 1 ifTrue: [
+        (evt y >= 0 and: [evt y < listView items size]) ifTrue: [
+          self selectItem: evt y
         ] ifFalse: [
           self close
         ]
@@ -79,27 +72,13 @@ Menu subclass: View
       ^self
     ].
 
-    evtType = 'key' ifTrue: [
-      keyCode := evt at: 'key'.
-      "Escape — dismiss"
-      keyCode = EventConstants keyEscape ifTrue: [^self close].
-      "Up arrow"
-      keyCode = EventConstants keyUp ifTrue: [
-        listView moveUp.
-        self invalidate. ^self
-      ].
-      "Down arrow"
-      keyCode = EventConstants keyDown ifTrue: [
-        listView moveDown.
-        self invalidate. ^self
-      ].
-      "Enter — select"
-      keyCode = EventConstants keyEnter ifTrue: [
-        listView selectedItem notNil ifTrue: [
-          self selectItem: listView selectedIndex
-        ].
-        ^self
-      ]
+    evt isKey ifFalse: [^self].
+    evt key = EventConstants keyEscape ifTrue: [^self close].
+    evt key = EventConstants keyUp ifTrue: [listView moveUp. self invalidate. ^self].
+    evt key = EventConstants keyDown ifTrue: [listView moveDown. self invalidate. ^self].
+    evt key = EventConstants keyEnter ifTrue: [
+      listView selectedItem notNil ifTrue: [self selectItem: listView selectedIndex].
+      ^self
     ]
   ]
 

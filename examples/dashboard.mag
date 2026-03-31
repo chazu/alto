@@ -94,8 +94,8 @@ LogView subclass: View
 
   method: handleEvent: evt [
     | keyCode |
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
     keyCode = 257 ifTrue: [
       scrollOffset > 0 ifTrue: [scrollOffset := scrollOffset - 1].
       self invalidate

@@ -62,6 +62,12 @@ View subclass: Object
       needsRedraw := aBoolean
   ]
 
+  method: handleEvent: evt [
+      "Default: do nothing. Subclasses override for input handling.
+       View is both the visual and input handler — no separate Controller needed."
+      ^self
+  ]
+
   method: handleMouseLocalX: x y: y buttons: btn [
       ^self
   ]

@@ -34,9 +34,9 @@ CounterView subclass: View
 
   method: handleEvent: evt [
     | keyCode runeVal |
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
-    runeVal := evt at: 'rune' ifAbsent: [0].
+    evt isKey ifFalse: [^self].
+    keyCode := evt key.
+    runeVal := evt rune.
 
     "Up arrow or '+'"
     (keyCode = EventConstants keyUp or: [runeVal = 43]) ifTrue: [

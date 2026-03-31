@@ -188,42 +188,18 @@ ListView subclass: View
   ]
 
   method: handleEvent: evt [
-    | keyCode btn mx my |
-
-    "Handle mouse events"
-    (evt at: 'type' ifAbsent: ['']) = 'mouse' ifTrue: [
-      btn := evt at: 'buttons'.
-      mx := evt at: 'x'.
-      my := evt at: 'y'.
-      self handleMouseLocalX: mx y: my buttons: btn.
+    evt isMouse ifTrue: [
+      self handleMouseLocalX: evt x y: evt y buttons: evt buttons.
       ^self
     ].
 
-    (evt at: 'type' ifAbsent: ['']) = 'key' ifFalse: [^self].
-    keyCode := evt at: 'key'.
-
-    "Up arrow"
-    keyCode = EventConstants keyUp ifTrue: [
-      self moveUp.
-      ^self
+    evt isKey ifFalse: [^self].
+    evt key = EventConstants keyUp ifTrue: [self moveUp. ^self].
+    evt key = EventConstants keyDown ifTrue: [self moveDown. ^self].
+    evt key = EventConstants keyEnter ifTrue: [
+      onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem]. ^self
     ].
-
-    "Down arrow"
-    keyCode = EventConstants keyDown ifTrue: [
-      self moveDown.
-      ^self
-    ].
-
-    "Enter — trigger selection callback"
-    keyCode = EventConstants keyEnter ifTrue: [
-      onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem].
-      ^self
-    ].
-
-    "Escape — deselect"
-    keyCode = EventConstants keyEscape ifTrue: [
-      selectedIndex := -1.
-      self invalidate.
-      ^self
+    evt key = EventConstants keyEscape ifTrue: [
+      selectedIndex := -1. self invalidate. ^self
     ]
   ]

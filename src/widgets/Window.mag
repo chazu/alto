@@ -11,6 +11,11 @@ Window subclass: Object
       ^win
   ]
 
+  classMethod: title: aString content: aView frame: aRect [
+      "Convenience: view handles its own events (the common case)."
+      ^self title: aString content: aView controller: aView frame: aRect
+  ]
+
   classMethod: new [
       | instance |
       instance := super new.
