@@ -7,7 +7,7 @@ import: 'Go'
  Frame and variable lists use ListView for selection and rendering."
 
 AltoDebugger subclass: View
-  instanceVars: errorMessage frames variables allFrameVars selectedFrame focusedPane display parentWindow frameListView varListView sourceLines sourceScrollOffset buttonLabels selectedButton
+  instanceVars: errorMessage frames variables allFrameVars selectedFrame focusedPane display parentWindow frameListView varListView sourceLines sourceScrollOffset buttonLabels selectedButton classLookup
 
   classMethod: new [
     | instance |
@@ -91,6 +91,7 @@ AltoDebugger subclass: View
     sourceScrollOffset := 0.
     buttonLabels := #('Resume' 'Step Over' 'Step Into' 'Step Out').
     selectedButton := 0.
+    classLookup := nil.
     frameListView := ListView items: #() onSelect: nil.
     frameListView labelBlock: [:frameDict | self frameLabelFor: frameDict].
     varListView := ListView items: #() onSelect: nil.
@@ -180,12 +181,16 @@ AltoDebugger subclass: View
   ]
 
   method: findClassNamed: name [
-    | nameStr |
+    "Look up a class by name using a cached dictionary for O(1) lookup."
+    classLookup isNil ifTrue: [self buildClassLookup].
+    ^classLookup at: name ifAbsent: [false]
+  ]
+
+  method: buildClassLookup [
+    classLookup := Dictionary new.
     Class allClassesSorted do: [:cls |
-      nameStr := '', cls name.
-      nameStr = name ifTrue: [^cls]
-    ].
-    ^false
+      classLookup at: ('', cls name) put: cls
+    ]
   ]
 
   method: splitSource: src [

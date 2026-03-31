@@ -52,7 +52,7 @@ SystemBrowser subclass: View
     cachedMethodBuf := nil.
     cachedCodeBuf := nil.
     allClassNames := Array new: 0.
-    classObjects := Array new: 0.
+    classObjects := Dictionary new.
     codeEditor := TextEditor new.
 
     "Initialize model state (use silent setters for batch init, then notify)"
@@ -70,22 +70,18 @@ SystemBrowser subclass: View
   method: browserModel [ ^browserModel ]
 
   method: buildClassList [
-    "Populate parallel arrays of class names and class objects."
+    "Populate class name array and name→object dictionary for O(1) lookup."
     Class allClassesSorted do: [:cls |
-      allClassNames := allClassNames copyWith: ('', cls name).
-      classObjects := classObjects copyWith: cls
+      | nameStr |
+      nameStr := '', cls name.
+      allClassNames := allClassNames copyWith: nameStr.
+      classObjects at: nameStr put: cls
     ]
   ]
 
   method: classObjectForName: aName [
     "Look up a class object by name. Returns the class or false if not found."
-    | i |
-    i := 0.
-    [i < allClassNames size] whileTrue: [
-      (allClassNames at: i) = aName ifTrue: [^classObjects at: i].
-      i := i + 1
-    ].
-    ^false
+    ^classObjects at: aName ifAbsent: [false]
   ]
 
   method: classesForCategory: aCategoryName [

@@ -2,12 +2,12 @@ namespace: 'Alto'
 import: 'Go'
 
 "Inspector — shows an object's instance variables and their values.
- Left pane: field names (using ListWidget). Right pane: selected value detail.
+ Left pane: field names (using ListView). Right pane: selected value detail.
  Enter drills down into the selected value, opening a new Inspector.
  Supports Dictionary, Array, and arbitrary objects."
 
 Inspector subclass: View
-  instanceVars: target fieldNames fieldValues fieldObjects fieldListWidget display parentWindow focusOnList
+  instanceVars: target fieldNames fieldValues fieldObjects fieldList display parentWindow focusOnList
 
   classMethod: new [
     | instance |
@@ -42,7 +42,7 @@ Inspector subclass: View
     fieldNames := Array new: 0.
     fieldValues := Array new: 0.
     fieldObjects := Array new: 0.
-    fieldListWidget := ListWidget items: #() onSelect: nil.
+    fieldList := ListView items: #() onSelect: nil.
     display := nil.
     parentWindow := nil.
     focusOnList := true
@@ -55,8 +55,8 @@ Inspector subclass: View
   method: target [ ^target ]
   method: fieldNames [ ^fieldNames ]
   method: fieldValues [ ^fieldValues ]
-  method: selectedIndex [ ^fieldListWidget selectedIndex ]
-  method: scrollOffset [ ^fieldListWidget scrollOffset ]
+  method: selectedIndex [ ^fieldList selectedIndex ]
+  method: scrollOffset [ ^fieldList scrollOffset ]
   method: parentWindow [ ^parentWindow ]
   method: focusOnList [ ^focusOnList ]
 
@@ -138,13 +138,13 @@ Inspector subclass: View
     fieldNames := keys.
     fieldValues := vals.
     fieldObjects := objs.
-    fieldListWidget items: fieldNames
+    fieldList items: fieldNames
   ]
 
   method: drillDown [
     "Open a new Inspector on the selected field's actual object."
     | obj className selIdx |
-    selIdx := fieldListWidget selectedIndex.
+    selIdx := fieldList selectedIndex.
     selIdx >= fieldObjects size ifTrue: [^self].
     obj := fieldObjects at: selIdx.
     obj isNil ifTrue: [^self].
@@ -188,10 +188,10 @@ Inspector subclass: View
       ^self
     ].
 
-    "Delegate up/down to ListWidget when focused on list"
+    "Delegate up/down to ListView when focused on list"
     keyCode = EventConstants keyUp ifTrue: [
       (focusOnList = true) ifTrue: [
-        fieldListWidget moveUp.
+        fieldList moveUp.
         self invalidate
       ].
       ^self
@@ -199,7 +199,7 @@ Inspector subclass: View
 
     keyCode = EventConstants keyDown ifTrue: [
       (focusOnList = true) ifTrue: [
-        fieldListWidget moveDown.
+        fieldList moveDown.
         self invalidate
       ].
       ^self
@@ -217,9 +217,9 @@ Inspector subclass: View
     listWidth := 22.
 
     mx < listWidth ifTrue: [
-      "Click in field list — delegate to ListWidget"
+      "Click in field list — delegate to ListView"
       focusOnList := true.
-      fieldListWidget handleClickAtY: my.
+      fieldList handleClickAtY: my.
       self invalidate
     ] ifFalse: [
       "Click in value area"
@@ -241,16 +241,16 @@ Inspector subclass: View
       i := i + 1
     ].
 
-    "Left pane: field names rendered by ListWidget"
-    selectedIdx := fieldListWidget selectedIndex.
+    "Left pane: field names rendered by ListView"
+    selectedIdx := fieldList selectedIndex.
     (focusOnList = true) ifTrue: [
-      "When focused, delegate rendering to ListWidget"
-      fieldListWidget renderInto: aCellBuffer atX: 0 y: 0 width: listWidth height: bufHeight
+      "When focused, delegate rendering to ListView"
+      fieldList renderInto: aCellBuffer atX: 0 y: 0 width: listWidth height: bufHeight
     ] ifFalse: [
       "When not focused, render without highlight"
       i := 0.
       [i < bufHeight] whileTrue: [
-        itemIndex := fieldListWidget scrollOffset + i.
+        itemIndex := fieldList scrollOffset + i.
         itemIndex < fieldNames size ifTrue: [
           fieldStr := fieldNames at: itemIndex.
           aCellBuffer putStringFilled: fieldStr x: 0 y: i style: Theme normalStyle width: listWidth
