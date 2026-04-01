@@ -36,6 +36,11 @@ Label subclass: View
       ^style
   ]
 
+  method: handleEvent: evt [
+      "Labels are non-interactive — ignore all events."
+      ^false
+  ]
+
   classMethod: new [
       | instance |
       instance := super new.
