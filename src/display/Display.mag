@@ -5,7 +5,7 @@ import: 'Go'
  Caches window renders and only updates dirty windows + changed screen cells."
 
 Display subclass: Object
-  instanceVars: screen windows running screenW screenH screenChars screenStyles draggingWindow dragOffsetX dragOffsetY resizingWindow desktopMenuBlock
+  instanceVars: screen windows running screenW screenH screenChars screenStyles draggingWindow dragOffsetX dragOffsetY resizingWindow desktopMenuBlock deferredBlocks
 
   classMethod: new [
     | d |
@@ -37,7 +37,8 @@ Display subclass: Object
     dragOffsetX := 0.
     dragOffsetY := 0.
     resizingWindow := nil.
-    desktopMenuBlock := nil
+    desktopMenuBlock := nil.
+    deferredBlocks := Array new: 0
   ]
 
   method: onDesktopMenu: aBlock [
@@ -129,24 +130,57 @@ Display subclass: Object
     screen show
   ]
 
+  method: defer: aBlock [
+    "Schedule aBlock to run on the UI goroutine (next poll timeout).
+     Safe to call from any goroutine. The event loop polls with a 1-second
+     timeout, so deferred blocks execute within 1 second of being queued.
+     Note: if multiple goroutines call defer: concurrently, use external
+     synchronization. Safe for single-writer (one background goroutine) patterns."
+    deferredBlocks := deferredBlocks copyWith: aBlock
+  ]
+
+  method: processDeferredActions [
+    "Drain and execute all deferred blocks. Called on the UI goroutine."
+    | pending |
+    deferredBlocks size = 0 ifTrue: [^self].
+    pending := deferredBlocks.
+    deferredBlocks := Array new: 0.
+    pending do: [:block | block value]
+  ]
+
   method: run [
-    "Main event loop."
+    "Main event loop. Uses pollKeyEventTimeout: so deferred actions
+     from background goroutines are processed on each timeout tick
+     without flooding the event queue with synthetic events."
     | result keyCode runeVal mod fourth evt |
     running := true.
-    self render.
+    [self render] on: Exception do: [:e | ].
     [running] whileTrue: [
-      result := screen pollKeyEvent.
+      "Process any pending deferred actions on every iteration"
+      [self processDeferredActions] on: Exception do: [:e | ].
+
+      result := screen pollKeyEventTimeout: 500.
       keyCode := result at: 0.
       runeVal := result at: 1.
       mod := result at: 2.
       fourth := result at: 3.
 
+      "Timeout — just re-render (deferred actions already processed above)"
+      keyCode = EventConstants eventWakeup ifTrue: [
+        [self render] on: Exception do: [:e | ]
+      ] ifFalse: [
       keyCode = EventConstants eventResize ifTrue: [
         self handleResize: runeVal height: mod
       ] ifFalse: [
-        evt := self buildEvent: keyCode rune: runeVal mod: mod fourth: fourth.
-        self dispatchWithErrorRecovery: evt
-      ]
+        "Ctrl-C always quits — framework-level escape hatch.
+         tcell sends Ctrl-C as keyCode=3 (tcell.KeyCtrlC)."
+        keyCode = 3 ifTrue: [
+          self stop
+        ] ifFalse: [
+          evt := self buildEvent: keyCode rune: runeVal mod: mod fourth: fourth.
+          self dispatchWithErrorRecovery: evt
+        ]
+      ]]
     ].
     screen fini
   ]
@@ -172,12 +206,14 @@ Display subclass: Object
   ]
 
   method: dispatchWithErrorRecovery: evt [
-    "Dispatch an event to the appropriate window, with debugger on error."
+    "Dispatch an event to the appropriate window, with debugger on error.
+     Skip debugger if we're shutting down (running=false) to avoid trapping the user."
     [
       self dispatchEvent: evt.
       self render
     ] on: Exception do: [:e |
       | errStack errVars |
+      running ifFalse: [^self].  "Shutting down — don't open debugger"
       Transcript show: 'Error: ', e messageText.
       errStack := Compiler captureCallStack.
       errVars := AltoDebugger captureAllVariables: errStack.

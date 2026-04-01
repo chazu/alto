@@ -22,6 +22,7 @@ EventConstants subclass: Object
   "--- Event types ---"
   classMethod: eventMouse   [ ^-2 ]
   classMethod: eventResize  [ ^-3 ]
+  classMethod: eventWakeup  [ ^-4 ]
 
   "--- Modifier masks ---"
   classMethod: modCtrl      [ ^2 ]

@@ -221,6 +221,23 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
+	screenClass.AddPrimitiveMethod(v.Selectors, "pollKeyEventTimeout:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr.(*vm.VM)
+		goVal, ok := v.GetGoObject(receiver)
+		if !ok {
+			return vm.Nil
+		}
+		self := goVal.(*pkg.Screen)
+		arg0 := int(args[0].SmallInt())
+		r0, r1, r2, r3 := self.PollKeyEventTimeout(arg0)
+		arr := make([]vm.Value, 4)
+		arr[0] = v.GoToValue(r0)
+		arr[1] = v.GoToValue(r1)
+		arr[2] = v.GoToValue(r2)
+		arr[3] = v.GoToValue(r3)
+		return v.NewArrayWithElements(arr)
+	})
+
 	// Skipped: Screen.PostEvent (unconvertible parameter type: github.com/gdamore/tcell/v2.Event)
 	screenClass.AddPrimitiveMethod(v.Selectors, "postEventKey:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
 		v := vmPtr.(*vm.VM)

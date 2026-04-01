@@ -64,6 +64,15 @@ ListView subclass: View
     self invalidate
   ]
 
+  method: updateItems: newItems [
+    "Replace items while preserving selection and scroll position.
+     Attempts to keep the same selectedIndex, clamped to new bounds."
+    items := newItems.
+    self clampSelection.
+    self ensureSelectionVisible.
+    self invalidate
+  ]
+
   method: selectByValue: aValue [
     "Select the item matching aValue. If not found, clamp to 0."
     | i |

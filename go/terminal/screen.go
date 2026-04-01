@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/pprof"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 )
@@ -101,6 +102,51 @@ func (s *Screen) PollKeyEvent() (int, int, int, int) {
 			return -2, int(e.Buttons()), x, y
 		case *tcell.EventResize:
 			w, h := e.Size()
+			return -3, w, h, 0
+		default:
+			continue
+		}
+	}
+}
+
+// PollKeyEventTimeout polls for an event with a timeout in milliseconds.
+// Returns (-4, 0, 0, 0) on timeout (wakeup/tick), otherwise same as PollKeyEvent.
+// Uses a cancellable sentinel goroutine to avoid event queue flooding.
+func (s *Screen) PollKeyEventTimeout(timeoutMs int) (int, int, int, int) {
+	// cancelled is closed when a real event arrives before the timeout,
+	// preventing the sentinel from being posted.
+	cancelled := make(chan struct{})
+
+	go func() {
+		select {
+		case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
+			// Timeout — post sentinel to unblock PollEvent
+			ev := tcell.NewEventKey(tcell.Key(-4), 0, tcell.ModNone)
+			s.screen.PostEvent(ev)
+		case <-cancelled:
+			// Real event arrived first — don't post sentinel
+		}
+	}()
+
+	for {
+		ev := s.screen.PollEvent()
+		switch e := ev.(type) {
+		case *tcell.EventKey:
+			k := int(e.Key())
+			if k == -4 {
+				// Timeout sentinel
+				return -4, 0, 0, 0
+			}
+			// Real key event — cancel the pending sentinel
+			close(cancelled)
+			return k, int(e.Rune()), int(e.Modifiers()), 0
+		case *tcell.EventMouse:
+			x, y := e.Position()
+			close(cancelled)
+			return -2, int(e.Buttons()), x, y
+		case *tcell.EventResize:
+			w, h := e.Size()
+			close(cancelled)
 			return -3, w, h, 0
 		default:
 			continue
