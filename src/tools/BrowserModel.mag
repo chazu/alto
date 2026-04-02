@@ -6,10 +6,10 @@ import: 'Go'
  so that dependents (the browser view, list panes) can update."
 
 BrowserModel subclass: Model
-  instanceVars: selectedCategory selectedClass selectedMethod categoryNames classNames methodNames
+  instanceVars: selectedCategory <String> selectedClass <String> selectedMethod <String> categoryNames <Array> classNames <Array> methodNames <Array>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<BrowserModel> [
+    | instance <BrowserModel> |
     instance := super new.
     instance initialize.
     ^instance
@@ -26,50 +26,50 @@ BrowserModel subclass: Model
   ]
 
   "--- Selection getters ---"
-  method: selectedCategory [ ^selectedCategory ]
-  method: selectedClass [ ^selectedClass ]
-  method: selectedMethod [ ^selectedMethod ]
+  method: selectedCategory ^<String> [ ^selectedCategory ]
+  method: selectedClass ^<String> [ ^selectedClass ]
+  method: selectedMethod ^<String> [ ^selectedMethod ]
 
   "--- Data getters ---"
-  method: categoryNames [ ^categoryNames ]
-  method: classNames [ ^classNames ]
-  method: methodNames [ ^methodNames ]
+  method: categoryNames ^<Array> [ ^categoryNames ]
+  method: classNames ^<Array> [ ^classNames ]
+  method: methodNames ^<Array> [ ^methodNames ]
 
   "--- Selection setters (fire changed:) ---"
-  method: selectedCategory: aString [
+  method: selectedCategory: aString <String> [
     selectedCategory := aString.
     self changed: 'selectedCategory'
   ]
 
-  method: selectedClass: aString [
+  method: selectedClass: aString <String> [
     selectedClass := aString.
     self changed: 'selectedClass'
   ]
 
-  method: selectedMethod: aString [
+  method: selectedMethod: aString <String> [
     selectedMethod := aString.
     self changed: 'selectedMethod'
   ]
 
   "--- Data setters (fire changed:) ---"
-  method: categoryNames: anArray [
+  method: categoryNames: anArray <Array> [
     categoryNames := anArray.
     self changed: 'categoryNames'
   ]
 
-  method: classNames: anArray [
+  method: classNames: anArray <Array> [
     classNames := anArray.
     self changed: 'classNames'
   ]
 
-  method: methodNames: anArray [
+  method: methodNames: anArray <Array> [
     methodNames := anArray.
     self changed: 'methodNames'
   ]
 
   "--- Silent setters (no notification, for batch updates) ---"
-  method: silentSelectedCategory: aString [ selectedCategory := aString ]
-  method: silentSelectedClass: aString [ selectedClass := aString ]
-  method: silentSelectedMethod: aString [ selectedMethod := aString ]
-  method: silentClassNames: anArray [ classNames := anArray ]
-  method: silentMethodNames: anArray [ methodNames := anArray ]
+  method: silentSelectedCategory: aString <String> [ selectedCategory := aString ]
+  method: silentSelectedClass: aString <String> [ selectedClass := aString ]
+  method: silentSelectedMethod: aString <String> [ selectedMethod := aString ]
+  method: silentClassNames: anArray <Array> [ classNames := anArray ]
+  method: silentMethodNames: anArray <Array> [ methodNames := anArray ]

@@ -8,35 +8,35 @@ import: 'Go'
 Theme subclass: Object
   classVars: CachedNormal CachedReverse CachedDim CachedBold CachedDivider
 
-  classMethod: normalStyle [
+  classMethod: normalStyle ^<Dynamic> [
     CachedNormal isNil ifTrue: [CachedNormal := Go::Terminal newStyle].
     ^CachedNormal
   ]
 
-  classMethod: reverseStyle [
+  classMethod: reverseStyle ^<Dynamic> [
     CachedReverse isNil ifTrue: [CachedReverse := (Go::Terminal newStyle) reverse: true].
     ^CachedReverse
   ]
 
-  classMethod: selectedStyle [
+  classMethod: selectedStyle ^<Dynamic> [
     ^self reverseStyle
   ]
 
-  classMethod: dimStyle [
+  classMethod: dimStyle ^<Dynamic> [
     CachedDim isNil ifTrue: [CachedDim := (Go::Terminal newStyle) dim: true].
     ^CachedDim
   ]
 
-  classMethod: boldStyle [
+  classMethod: boldStyle ^<Dynamic> [
     CachedBold isNil ifTrue: [CachedBold := (Go::Terminal newStyle) bold: true].
     ^CachedBold
   ]
 
-  classMethod: borderStyle [
+  classMethod: borderStyle ^<Dynamic> [
     ^self normalStyle
   ]
 
-  classMethod: dividerStyle [
+  classMethod: dividerStyle ^<Dynamic> [
     CachedDivider isNil ifTrue: [CachedDivider := (Go::Terminal newStyle) dim: true].
     ^CachedDivider
   ]

@@ -5,10 +5,10 @@ import: 'Go'
  Run: mag build --full -o alto && ./alto -m Alto::CounterApp.start"
 
 CounterView subclass: View
-  instanceVars: count titleStyle countStyle hintStyle
+  instanceVars: count <Integer> titleStyle <Dynamic> countStyle <Dynamic> hintStyle <Dynamic>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<CounterView> [
+    | instance <CounterView> |
     instance := super new.
     instance initialize.
     ^instance
@@ -17,13 +17,13 @@ CounterView subclass: View
   method: initialize [
     super initialize.
     count := 0.
-    titleStyle := (Go::Terminal newStyle) bold: true.
-    countStyle := ((Go::Terminal newStyle) foreground: (Go::V2 getColor: 'green')) bold: true.
-    hintStyle := (Go::Terminal newStyle) dim: true
+    titleStyle := Theme boldStyle.
+    countStyle := (Style fg: Color green) bold goStyle.
+    hintStyle := Theme dimStyle
   ]
 
-  method: displayOn: aCellBuffer [
-    | countStr |
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | countStr <String> |
     aCellBuffer putString: 'Counter' x: 0 y: 0 style: titleStyle.
     aCellBuffer putString: '-------' x: 0 y: 1 style: hintStyle.
     countStr := count printString.
@@ -32,8 +32,8 @@ CounterView subclass: View
     aCellBuffer putString: 'R to reset, Escape to quit' x: 0 y: 6 style: hintStyle
   ]
 
-  method: handleEvent: evt [
-    | keyCode runeVal |
+  method: handleEvent: evt <Event> [
+    | keyCode <Integer> runeVal <Integer> |
     evt isKey ifFalse: [^self].
     keyCode := evt key.
     runeVal := evt rune.
@@ -54,7 +54,7 @@ CounterView subclass: View
 
 CounterApp subclass: Object
   classMethod: start [
-    | app view |
+    | app <App> view <CounterView> |
     view := CounterView new.
     app := App new.
     app openWindow: 'Counter' content: view controller: view.

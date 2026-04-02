@@ -13,18 +13,18 @@ import: 'Go'
 "
 
 SplitPane subclass: View
-  instanceVars: orientation firstView secondView firstCtrl secondCtrl ratio focusFirst dividerStyle firstBuf secondBuf minRatio maxRatio
+  instanceVars: orientation <Symbol> firstView <View> secondView <View> firstCtrl <View> secondCtrl <View> ratio <Float> focusFirst <Boolean> dividerStyle <Dynamic> firstBuf <CellBuffer> secondBuf <CellBuffer> minRatio <Float> maxRatio <Float>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<SplitPane> [
+    | instance <SplitPane> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: horizontal: first and: second [
+  classMethod: horizontal: first <View> and: second <View> ^<SplitPane> [
     "Left-right split."
-    | sp |
+    | sp <SplitPane> |
     sp := self new.
     sp orientation: #horizontal.
     sp privateFirst: first.
@@ -32,9 +32,9 @@ SplitPane subclass: View
     ^sp
   ]
 
-  classMethod: vertical: first and: second [
+  classMethod: vertical: first <View> and: second <View> ^<SplitPane> [
     "Top-bottom split."
-    | sp |
+    | sp <SplitPane> |
     sp := self new.
     sp orientation: #vertical.
     sp privateFirst: first.
@@ -58,39 +58,39 @@ SplitPane subclass: View
     maxRatio := 0.9
   ]
 
-  method: orientation [ ^orientation ]
-  method: orientation: sym [ orientation := sym ]
-  method: ratio [ ^ratio ]
-  method: focusFirst [ ^focusFirst ]
-  method: firstView [ ^firstView ]
-  method: secondView [ ^secondView ]
+  method: orientation ^<Symbol> [ ^orientation ]
+  method: orientation: sym <Symbol> [ orientation := sym ]
+  method: ratio ^<Float> [ ^ratio ]
+  method: focusFirst ^<Boolean> [ ^focusFirst ]
+  method: firstView ^<View> [ ^firstView ]
+  method: secondView ^<View> [ ^secondView ]
 
-  method: privateFirst: aView [
+  method: privateFirst: aView <View> [
     firstView := aView.
     firstCtrl := aView
   ]
 
-  method: privateSecond: aView [
+  method: privateSecond: aView <View> [
     secondView := aView.
     secondCtrl := aView
   ]
 
-  method: firstController: aCtrl [ firstCtrl := aCtrl ]
-  method: secondController: aCtrl [ secondCtrl := aCtrl ]
+  method: firstController: aCtrl <View> [ firstCtrl := aCtrl ]
+  method: secondController: aCtrl <View> [ secondCtrl := aCtrl ]
 
-  method: ratio: aNumber [
+  method: ratio: aNumber <Float> [
     ratio := aNumber max: minRatio.
     ratio := ratio min: maxRatio.
     self invalidate
   ]
 
-  method: dividerStyle: aGoStyle [
+  method: dividerStyle: aGoStyle <Dynamic> [
     dividerStyle := aGoStyle.
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
-    | w h splitPos firstW firstH secondW secondH secondX secondY i |
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | w <Integer> h <Integer> splitPos <Integer> firstW <Integer> firstH <Integer> secondW <Integer> secondH <Integer> secondX <Integer> secondY <Integer> i <Integer> |
     w := aCellBuffer width.
     h := aCellBuffer height.
 
@@ -153,13 +153,20 @@ SplitPane subclass: View
     ]
   ]
 
-  method: handleEvent: evt [
+  method: updateChildFocus [
+    "Tell children whether they have focus."
+    firstView notNil ifTrue: [firstView focused: focusFirst = true].
+    secondView notNil ifTrue: [secondView focused: focusFirst = false]
+  ]
+
+  method: handleEvent: evt <Event> [
     evt isMouse ifTrue: [^self handleMouseEvent: evt].
     evt isKey ifFalse: [^self].
 
     "Tab — switch focus"
     evt key = EventConstants keyTab ifTrue: [
       focusFirst := focusFirst = true ifTrue: [false] ifFalse: [true].
+      self updateChildFocus.
       self invalidate.
       ^self
     ].
@@ -171,8 +178,8 @@ SplitPane subclass: View
     self invalidate
   ]
 
-  method: handleMouseEvent: evt [
-    | mx my btn w h splitPos |
+  method: handleMouseEvent: evt <Event> [
+    | mx <Integer> my <Integer> btn <Integer> w <Integer> h <Integer> splitPos <Integer> |
     mx := evt x.
     my := evt y.
     btn := evt buttons.
@@ -187,9 +194,11 @@ SplitPane subclass: View
       ].
       mx < splitPos ifTrue: [
         focusFirst := true.
+        self updateChildFocus.
         firstCtrl notNil ifTrue: [firstCtrl handleEvent: evt]
       ] ifFalse: [
         focusFirst := false.
+        self updateChildFocus.
         secondCtrl notNil ifTrue: [
           secondCtrl handleEvent: (evt withX: mx - splitPos - 1 y: my)
         ]
@@ -201,9 +210,11 @@ SplitPane subclass: View
       ].
       my < splitPos ifTrue: [
         focusFirst := true.
+        self updateChildFocus.
         firstCtrl notNil ifTrue: [firstCtrl handleEvent: evt]
       ] ifFalse: [
         focusFirst := false.
+        self updateChildFocus.
         secondCtrl notNil ifTrue: [
           secondCtrl handleEvent: (evt withX: mx y: my - splitPos - 1)
         ]

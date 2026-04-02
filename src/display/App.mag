@@ -22,10 +22,10 @@ import: 'Go'
 "
 
 App subclass: Object
-  instanceVars: display desktopMenuBlock
+  instanceVars: display <Display> desktopMenuBlock <Block>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<App> [
+    | instance <App> |
     instance := super new.
     instance initialize.
     ^instance
@@ -36,11 +36,11 @@ App subclass: Object
     desktopMenuBlock := nil
   ]
 
-  method: display [ ^display ]
+  method: display ^<Display> [ ^display ]
 
-  method: openWindow: aTitle content: aView controller: aCtrl [
+  method: openWindow: aTitle <String> content: aView <View> controller: aCtrl <Object> ^<Window> [
     "Open a window sized to fill most of the screen."
-    | screenSize w h frame window |
+    | screenSize <Array> w <Integer> h <Integer> frame <Rectangle> window <Window> |
     screenSize := display screen size.
     w := (screenSize at: 0) - 2.
     h := (screenSize at: 1) - 2.
@@ -50,19 +50,19 @@ App subclass: Object
     ^window
   ]
 
-  method: openWindow: aTitle content: aView controller: aCtrl frame: aRect [
+  method: openWindow: aTitle <String> content: aView <View> controller: aCtrl <Object> frame: aRect <Rectangle> ^<Window> [
     "Open a window with an explicit frame."
-    | window |
+    | window <Window> |
     window := Window title: aTitle content: aView controller: aCtrl frame: aRect.
     display addWindow: window.
     ^window
   ]
 
-  method: addWindow: aWindow [
+  method: addWindow: aWindow <Window> [
     display addWindow: aWindow
   ]
 
-  method: onDesktopMenu: aBlock [
+  method: onDesktopMenu: aBlock <Block> [
     "Set custom desktop menu: [:display :x :y | ...]"
     desktopMenuBlock := aBlock.
     display onDesktopMenu: aBlock
@@ -77,6 +77,6 @@ App subclass: Object
     display stop
   ]
 
-  method: screenSize [
+  method: screenSize ^<Array> [
     ^display screen size
   ]

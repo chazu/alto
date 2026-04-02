@@ -2,27 +2,27 @@ namespace: 'Alto'
 import: 'Go'
 
 Transcript subclass: View
-  instanceVars: lines maxLines scrollOffset display parentWindow
+  instanceVars: lines <Array> maxLines <Integer> scrollOffset <Integer> display <Display> parentWindow <Window>
   classVars: Current
 
-  classMethod: new [
-      | instance |
+  classMethod: new ^<Transcript> [
+      | instance <Transcript> |
       instance := super new.
       instance initialize.
       ^instance
   ]
 
-  classMethod: current [
+  classMethod: current ^<Transcript> [
       Current isNil ifTrue: [Current := self new].
       ^Current
   ]
 
-  classMethod: show: aString [
+  classMethod: show: aString <String> [
       self current appendLine: aString
   ]
 
-  classMethod: open: aDisplay [
-      | frame transcript window |
+  classMethod: open: aDisplay <Display> ^<Transcript> [
+      | frame <Rectangle> transcript <Transcript> window <Window> |
       frame := Rectangle x: 1 y: 22 width: 60 height: 10.
       transcript := self current.
       transcript display: aDisplay.
@@ -34,26 +34,22 @@ Transcript subclass: View
 
   method: initialize [
       super initialize.
-      lines := Array new: 0.
+      lines := ArrayList new.
       maxLines := 1000.
       scrollOffset := 0.
       display := nil.
       parentWindow := nil
   ]
 
-  method: appendLine: aString [
-      | trimStart |
-      lines := lines copyWith: aString.
-      (lines size > maxLines) ifTrue: [
-        trimStart := lines size - maxLines.
-        lines := lines copyFrom: trimStart to: lines size
-      ].
+  method: appendLine: aString <String> [
+      lines add: aString.
+      [lines size > maxLines] whileTrue: [lines removeAt: 0].
       scrollOffset := (lines size - 1) max: 0.
       self invalidate
   ]
 
-  method: handleEvent: evt [
-    | keyCode |
+  method: handleEvent: evt <Event> [
+    | keyCode <Integer> |
     evt isKey ifFalse: [^self].
     keyCode := evt key.
     keyCode = EventConstants keyUp ifTrue: [  "Up"
@@ -69,8 +65,8 @@ Transcript subclass: View
     ]
   ]
 
-  method: displayOn: aCellBuffer [
-    | visibleHeight i lineIndex lineStr startOffset |
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | visibleHeight <Integer> i <Integer> lineIndex <Integer> lineStr <String> startOffset <Integer> |
     visibleHeight := aCellBuffer height.
     startOffset := (lines size - visibleHeight) max: 0.
     scrollOffset < startOffset ifTrue: [
@@ -87,22 +83,22 @@ Transcript subclass: View
     ]
   ]
 
-  method: parentWindow: aWindow [
+  method: parentWindow: aWindow <Window> [
       parentWindow := aWindow
   ]
 
-  method: display: aDisplay [
+  method: display: aDisplay <Display> [
       display := aDisplay
   ]
 
-  method: lines [
+  method: lines ^<Array> [
       ^lines
   ]
 
-  method: maxLines [
+  method: maxLines ^<Integer> [
       ^maxLines
   ]
 
-  method: scrollOffset [
+  method: scrollOffset ^<Integer> [
       ^scrollOffset
   ]

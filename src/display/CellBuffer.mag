@@ -5,17 +5,17 @@ import: 'Go'
  Two parallel arrays: chars (integer codes) and styles (Style objects)."
 
 CellBuffer subclass: Object
-  instanceVars: chars styles width height defaultStyle
+  instanceVars: chars <Array> styles <Array> width <Integer> height <Integer> defaultStyle <Dynamic>
 
-  classMethod: width: w height: h [
-    | buf |
+  classMethod: width: w <Integer> height: h <Integer> ^<CellBuffer> [
+    | buf <CellBuffer> |
     buf := self new.
     buf initWidth: w height: h.
     ^buf
   ]
 
-  method: initWidth: w height: h [
-    | sz |
+  method: initWidth: w <Integer> height: h <Integer> [
+    | sz <Integer> |
     width := w.
     height := h.
     defaultStyle := Theme normalStyle.
@@ -24,35 +24,35 @@ CellBuffer subclass: Object
     styles := Array new: sz withAll: defaultStyle
   ]
 
-  method: width [ ^width ]
-  method: height [ ^height ]
-  method: charsArray [ ^chars ]
-  method: stylesArray [ ^styles ]
+  method: width ^<Integer> [ ^width ]
+  method: height ^<Integer> [ ^height ]
+  method: charsArray ^<Array> [ ^chars ]
+  method: stylesArray ^<Array> [ ^styles ]
 
-  method: indexX: x y: y [
+  method: indexX: x <Integer> y: y <Integer> ^<Integer> [
     "Returns 0-based index, or -1 if out of bounds."
     (x < 0 or: [x >= width]) ifTrue: [^-1].
     (y < 0 or: [y >= height]) ifTrue: [^-1].
     ^y * width + x
   ]
 
-  method: charAt: x y: y [
-    | idx |
+  method: charAt: x <Integer> y: y <Integer> ^<Integer> [
+    | idx <Integer> |
     idx := self indexX: x y: y.
     idx < 0 ifTrue: [^32].
     ^chars at: idx
   ]
 
-  method: styleAt: x y: y [
-    | idx |
+  method: styleAt: x <Integer> y: y <Integer> ^<Dynamic> [
+    | idx <Integer> |
     idx := self indexX: x y: y.
     idx < 0 ifTrue: [^defaultStyle].
     ^styles at: idx
   ]
 
-  method: cellAt: x y: y [
+  method: cellAt: x <Integer> y: y <Integer> ^<Dictionary> [
     "Legacy compatibility — returns a Dictionary."
-    | idx d |
+    | idx <Integer> d <Dictionary> |
     idx := self indexX: x y: y.
     idx < 0 ifTrue: [^nil].
     d := Dictionary new.
@@ -61,16 +61,16 @@ CellBuffer subclass: Object
     ^d
   ]
 
-  method: putChar: ch x: x y: y style: style [
-    | idx |
+  method: putChar: ch <Integer> x: x <Integer> y: y <Integer> style: style <Dynamic> [
+    | idx <Integer> |
     idx := self indexX: x y: y.
     idx < 0 ifTrue: [^self].
     chars at: idx put: ch.
     style notNil ifTrue: [styles at: idx put: style]
   ]
 
-  method: putCell: aCell x: x y: y [
-    | idx |
+  method: putCell: aCell <Dictionary> x: x <Integer> y: y <Integer> [
+    | idx <Integer> |
     idx := self indexX: x y: y.
     idx < 0 ifTrue: [^self].
     aCell notNil ifTrue: [
@@ -79,8 +79,8 @@ CellBuffer subclass: Object
     ]
   ]
 
-  method: putString: str x: x y: y style: style [
-    | i ch |
+  method: putString: str <String> x: x <Integer> y: y <Integer> style: style <Dynamic> [
+    | i <Integer> ch <Integer> |
     i := 0.
     [i < str size] whileTrue: [
       ch := (str at: i) value.
@@ -89,8 +89,8 @@ CellBuffer subclass: Object
     ]
   ]
 
-  method: putStringFilled: str x: x y: y style: style width: width [
-    | padStart padEnd |
+  method: putStringFilled: str <String> x: x <Integer> y: y <Integer> style: style <Dynamic> width: width <Integer> [
+    | padStart <Integer> padEnd <Integer> |
     self putString: str x: x y: y style: style.
     padStart := x + str size.
     padEnd := x + width.
@@ -99,8 +99,8 @@ CellBuffer subclass: Object
     ]
   ]
 
-  method: drawBox: rect style: style [
-    | rx ry rw rh i |
+  method: drawBox: rect <Rectangle> style: style <Dynamic> [
+    | rx <Integer> ry <Integer> rw <Integer> rh <Integer> i <Integer> |
     rx := rect x.
     ry := rect y.
     rw := rect width.
@@ -124,15 +124,19 @@ CellBuffer subclass: Object
   ]
 
   method: clear [
-    | sz |
+    | sz <Integer> i <Integer> |
     sz := width * height.
-    chars := Array new: sz withAll: 32.
-    styles := Array new: sz withAll: defaultStyle
+    i := 0.
+    [i < sz] whileTrue: [
+      chars at: i put: 32.
+      styles at: i put: defaultStyle.
+      i := i + 1
+    ]
   ]
 
-  method: blitInto: destBuf atX: offsetX y: offsetY [
+  method: blitInto: destBuf <CellBuffer> atX: offsetX <Integer> y: offsetY <Integer> [
     "Copy this buffer into destBuf at the given offset. No Dictionary boxing."
-    | row col ch st |
+    | row <Integer> col <Integer> ch <Integer> st <Dynamic> |
     row := 0.
     [row < height] whileTrue: [
       col := 0.
@@ -146,8 +150,8 @@ CellBuffer subclass: Object
     ]
   ]
 
-  method: clearRect: rect [
-    | rx ry rw rh cx cy |
+  method: clearRect: rect <Rectangle> [
+    | rx <Integer> ry <Integer> rw <Integer> rh <Integer> cx <Integer> cy <Integer> |
     rx := rect x.
     ry := rect y.
     rw := rect width.

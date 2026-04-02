@@ -2,38 +2,40 @@ namespace: 'Alto'
 import: 'Go'
 
 Model subclass: Object
-  instanceVars: dependents
+  instanceVars: dependents <ArrayList>
 
   method: initialize [
-      dependents := Array new: 0
+      dependents := ArrayList new
   ]
 
-  method: dependents [
+  method: dependents ^<ArrayList> [
       ^dependents
   ]
 
-  method: dependents: anArray [
-      dependents := anArray
+  method: dependents: aCollection <Object> [
+      dependents := aCollection
   ]
 
-  method: addDependent: obj [
-      dependents := dependents copyWith: obj
+  method: addDependent: obj <Object> [
+      dependents add: obj
   ]
 
-  method: removeDependent: obj [
-      dependents := dependents reject: [:d | d = obj]
+  method: removeDependent: obj <Object> [
+      | idx <Integer> |
+      idx := dependents indexOf: obj.
+      idx notNil ifTrue: [dependents removeAt: idx]
   ]
 
   method: changed [
       dependents do: [:dep | dep update: nil]
   ]
 
-  method: changed: aspect [
+  method: changed: aspect <Object> [
       dependents do: [:dep | dep update: aspect]
   ]
 
-  classMethod: new [
-      | instance |
+  classMethod: new ^<Model> [
+      | instance <Model> |
       instance := super new.
       instance initialize.
       ^instance

@@ -2,58 +2,58 @@ namespace: 'Alto'
 import: 'Go'
 
 Rectangle subclass: Object
-  instanceVars: x y width height
+  instanceVars: x <Integer> y <Integer> width <Integer> height <Integer>
 
-  method: x [
+  method: x ^<Integer> [
       ^x
   ]
 
-  method: y [
+  method: y ^<Integer> [
       ^y
   ]
 
-  method: width [
+  method: width ^<Integer> [
       ^width
   ]
 
-  method: height [
+  method: height ^<Integer> [
       ^height
   ]
 
-  method: x: aValue [
+  method: x: aValue <Integer> [
       x := aValue
   ]
 
-  method: y: aValue [
+  method: y: aValue <Integer> [
       y := aValue
   ]
 
-  method: width: aValue [
+  method: width: aValue <Integer> [
       width := aValue
   ]
 
-  method: height: aValue [
+  method: height: aValue <Integer> [
       height := aValue
   ]
 
-  method: right [
+  method: right ^<Integer> [
       ^x + width
   ]
 
-  method: bottom [
+  method: bottom ^<Integer> [
       ^y + height
   ]
 
-  method: extent [
+  method: extent ^<Array> [
       ^{width. height}
   ]
 
-  method: containsPointX: px y: py [
+  method: containsPointX: px <Integer> y: py <Integer> ^<Boolean> [
       ^px >= x and: [px < (x + width)] and: [py >= y] and: [py < (y + height)]
   ]
 
-  method: intersect: other [
-      | maxX maxY minRight minBottom |
+  method: intersect: other <Rectangle> ^<Rectangle> [
+      | maxX <Integer> maxY <Integer> minRight <Integer> minBottom <Integer> |
       maxX := x max: other x.
       maxY := y max: other y.
       minRight := x + width min: other x + other width.
@@ -63,17 +63,17 @@ Rectangle subclass: Object
       ^Rectangle x: maxX y: maxY width: minRight - maxX height: minBottom - maxY
   ]
 
-  method: = other [
+  method: = other <Rectangle> ^<Boolean> [
     other isNil ifTrue: [^false].
     ^x = other x and: [y = other y] and: [width = other width] and: [height = other height]
   ]
 
-  method: hash [
+  method: hash ^<Integer> [
     ^((x hash bitXor: y hash) bitXor: width hash) bitXor: height hash
   ]
 
-  classMethod: x: anX y: aY width: aW height: aH [
-      | r |
+  classMethod: x: anX <Integer> y: aY <Integer> width: aW <Integer> height: aH <Integer> ^<Rectangle> [
+      | r <Rectangle> |
       r := self new.
       r x: anX.
       r y: aY.

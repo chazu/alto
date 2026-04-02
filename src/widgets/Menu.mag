@@ -7,17 +7,17 @@ import: 'Go'
  an item, clicking outside, or pressing Escape."
 
 Menu subclass: View
-  instanceVars: listView callback display parentWindow
+  instanceVars: listView <ListView> callback <Block> display <Display> parentWindow <Window>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<Menu> [
+    | instance <Menu> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: open: itemArray at: aPoint on: aDisplay callback: aBlock [
-    | menu frame menuWidth menuHeight window |
+  classMethod: open: itemArray <Array> at: aPoint <Array> on: aDisplay <Display> callback: aBlock <Block> ^<Menu> [
+    | menu <Menu> frame <Rectangle> menuWidth <Integer> menuHeight <Integer> window <Window> |
     menu := Menu new.
     menu privateItems: itemArray.
     menu privateCallback: aBlock.
@@ -31,8 +31,8 @@ Menu subclass: View
     ^menu
   ]
 
-  classMethod: maxItemWidth: itemArray [
-    | max len |
+  classMethod: maxItemWidth: itemArray <Array> ^<Integer> [
+    | max <Integer> len <Integer> |
     max := 8.
     itemArray do: [:item |
       len := item size.
@@ -49,18 +49,18 @@ Menu subclass: View
     parentWindow := nil
   ]
 
-  method: privateItems: anArray [
+  method: privateItems: anArray <Array> [
     listView items: anArray
   ]
 
-  method: privateCallback: aBlock [ callback := aBlock ]
-  method: display: aDisplay [ display := aDisplay ]
-  method: display [ ^display ]
-  method: parentWindow: aWindow [ parentWindow := aWindow ]
-  method: parentWindow [ ^parentWindow ]
-  method: items [ ^listView items ]
+  method: privateCallback: aBlock <Block> [ callback := aBlock ]
+  method: display: aDisplay <Display> [ display := aDisplay ]
+  method: display ^<Display> [ ^display ]
+  method: parentWindow: aWindow <Window> [ parentWindow := aWindow ]
+  method: parentWindow ^<Window> [ ^parentWindow ]
+  method: items ^<Array> [ ^listView items ]
 
-  method: handleEvent: evt [
+  method: handleEvent: evt <Event> [
     evt isMouse ifTrue: [
       evt buttons = 1 ifTrue: [
         (evt y >= 0 and: [evt y < listView items size]) ifTrue: [
@@ -82,8 +82,8 @@ Menu subclass: View
     ]
   ]
 
-  method: selectItem: idx [
-    | item |
+  method: selectItem: idx <Integer> [
+    | item <String> |
     idx < listView items size ifTrue: [
       item := listView items at: idx.
       self close.
@@ -95,6 +95,6 @@ Menu subclass: View
     display notNil ifTrue: [display removeWindow: parentWindow]
   ]
 
-  method: displayOn: aCellBuffer [
+  method: displayOn: aCellBuffer <CellBuffer> [
     listView displayOn: aCellBuffer
   ]

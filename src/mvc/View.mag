@@ -2,40 +2,41 @@ namespace: 'Alto'
 import: 'Go'
 
 View subclass: Object
-  instanceVars: model bounds buffer needsRedraw
+  instanceVars: model <Model> bounds <Rectangle> buffer <CellBuffer> needsRedraw <Boolean> focused <Boolean>
 
   method: initialize [
       model := nil.
       bounds := nil.
       buffer := nil.
-      needsRedraw := true
+      needsRedraw := true.
+      focused := false
   ]
 
-  method: model: aModel [
+  method: model: aModel <Model> [
       model notNil ifTrue: [model removeDependent: self].
       model := aModel.
       aModel notNil ifTrue: [aModel addDependent: self]
   ]
 
-  method: model [
+  method: model ^<Model> [
       ^model
   ]
 
-  method: bounds: aRect [
+  method: bounds: aRect <Rectangle> [
       bounds := aRect.
       aRect notNil ifTrue: [buffer := CellBuffer width: aRect width height: aRect height].
       self invalidate
   ]
 
-  method: bounds [
+  method: bounds ^<Rectangle> [
       ^bounds
   ]
 
-  method: buffer [
+  method: buffer ^<CellBuffer> [
       ^buffer
   ]
 
-  method: displayOn: aCellBuffer [
+  method: displayOn: aCellBuffer <CellBuffer> ^<Self> [
       ^self
   ]
 
@@ -43,7 +44,7 @@ View subclass: Object
       needsRedraw := true
   ]
 
-  method: update: aspect [
+  method: update: aspect <Object> [
       self invalidate
   ]
 
@@ -54,26 +55,60 @@ View subclass: Object
       ]
   ]
 
-  method: needsRedraw [
+  method: needsRedraw ^<Boolean> [
       ^needsRedraw
   ]
 
-  method: needsRedraw: aBoolean [
+  method: needsRedraw: aBoolean <Boolean> [
       needsRedraw := aBoolean
   ]
 
-  method: handleEvent: evt [
+  "--- Focus protocol ---"
+  method: focused ^<Boolean> [
+      ^focused
+  ]
+
+  method: focused: aBoolean <Boolean> [
+      focused := aBoolean.
+      self invalidate
+  ]
+
+  "--- Size hints for layout containers ---"
+  method: preferredWidth ^<Integer> [
+      "Return preferred width in cells, or nil for flexible (fill available space)."
+      ^nil
+  ]
+
+  method: preferredHeight ^<Integer> [
+      "Return preferred height in cells, or nil for flexible (fill available space)."
+      ^nil
+  ]
+
+  method: minWidth ^<Integer> [
+      "Return minimum width in cells. Default: 1."
+      ^1
+  ]
+
+  method: minHeight ^<Integer> [
+      "Return minimum height in cells. Default: 1."
+      ^1
+  ]
+
+  method: handleEvent: evt <Event> ^<Self> [
       "Default: do nothing. Subclasses override for input handling.
        View is both the visual and input handler — no separate Controller needed."
       ^self
   ]
 
-  method: handleMouseLocalX: x y: y buttons: btn [
+  method: handleMouseLocalX: x <Integer> y: y <Integer> buttons: btn <Integer> ^<Self> [
+      "DEPRECATED: Use handleEvent: with MouseEvent instead.
+       Containers should translate coordinates via MouseEvent withX:y:
+       and call handleEvent: on children."
       ^self
   ]
 
-  classMethod: new [
-      | instance |
+  classMethod: new ^<View> [
+      | instance <View> |
       instance := super new.
       instance initialize.
       ^instance

@@ -1,0 +1,122 @@
+namespace: 'Alto'
+import: 'Go'
+
+"TextField — single-line text input widget.
+ Wraps TextEditor constrained to one line. Supports an onSubmit callback.
+ Usage:
+   field := TextField new.
+   field placeholder: 'Enter name...'.
+   field onSubmit: [:text | Transcript show: text].
+"
+
+TextField subclass: View
+  instanceVars: editor <TextEditor> onSubmitBlock <Block> placeholder <String>
+
+  classMethod: new ^<TextField> [
+    | instance <TextField> |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  method: initialize [
+    super initialize.
+    editor := TextEditor new.
+    onSubmitBlock := nil.
+    placeholder := ''
+  ]
+
+  method: text ^<String> [
+    ^editor lines at: 0
+  ]
+
+  method: text: aString <String> [
+    editor lines at: 0 put: aString.
+    editor cursorX: aString size.
+    self invalidate
+  ]
+
+  method: clear [
+    editor lines at: 0 put: ''.
+    editor cursorX: 0.
+    self invalidate
+  ]
+
+  method: placeholder: aString <String> [
+    placeholder := aString.
+    self invalidate
+  ]
+
+  method: onSubmit: aBlock <Block> [
+    onSubmitBlock := aBlock
+  ]
+
+  method: preferredHeight ^<Integer> [ ^1 ]
+
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | lineStr <String> style <Dynamic> i <Integer> ch <Integer> curX <Integer> |
+    lineStr := editor lines at: 0.
+    curX := editor cursorX.
+
+    "Show placeholder if empty and not focused"
+    (lineStr size = 0 and: [focused not]) ifTrue: [
+      aCellBuffer putStringFilled: placeholder x: 0 y: 0 style: Theme dimStyle width: aCellBuffer width.
+      ^self
+    ].
+
+    "Render text with cursor"
+    style := Theme normalStyle.
+    i := 0.
+    [i < lineStr size and: [i < aCellBuffer width]] whileTrue: [
+      ch := (lineStr at: i) value.
+      (focused and: [i = curX])
+        ifTrue: [aCellBuffer putChar: ch x: i y: 0 style: Theme reverseStyle]
+        ifFalse: [aCellBuffer putChar: ch x: i y: 0 style: style].
+      i := i + 1
+    ].
+
+    "Cursor at end of text"
+    (focused and: [curX >= lineStr size and: [curX < aCellBuffer width]]) ifTrue: [
+      aCellBuffer putChar: 32 x: curX y: 0 style: Theme reverseStyle
+    ]
+  ]
+
+  method: handleEvent: evt <Event> [
+    evt isMouse ifTrue: [
+      evt buttons = 1 ifTrue: [
+        editor cursorX: (evt x min: (editor lines at: 0) size).
+        self invalidate
+      ].
+      ^self
+    ].
+
+    evt isKey ifFalse: [^self].
+
+    "Enter — submit"
+    evt key = EventConstants keyEnter ifTrue: [
+      onSubmitBlock notNil ifTrue: [onSubmitBlock value: self text].
+      ^self
+    ].
+
+    "Block newline insertion — suppress Enter in the editor"
+    "All other keys delegate to editor, but suppress line splits"
+    (evt key = EventConstants keyRune or: [
+      evt key = EventConstants keyBackspace or: [
+        evt key = EventConstants keyDelete or: [
+          evt key = EventConstants keyLeft or: [
+            evt key = EventConstants keyRight or: [
+              (EventConstants isCtrl: evt mod)]]]]]) ifTrue: [
+      (editor handleKey: evt key rune: evt rune mod: evt mod) ifTrue: [
+        "Enforce single line — if editor split, rejoin"
+        editor lines size > 1 ifTrue: [
+          | joined <String> |
+          joined := editor lines inject: '' into: [:acc :line |
+            acc size = 0 ifTrue: [line] ifFalse: [acc, line]
+          ].
+          editor lines: (Array with: joined).
+          editor cursorX: (editor cursorX min: joined size)
+        ].
+        self invalidate
+      ]
+    ]
+  ]

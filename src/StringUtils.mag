@@ -1,0 +1,24 @@
+namespace: 'Alto'
+
+"StringUtils — shared string utilities for Alto.
+ Centralizes common string operations like line splitting."
+
+StringUtils subclass: Object
+
+  classMethod: splitLines: aString <String> ^<Array> [
+    "Split a string on newline characters (code 10). Returns an Array of Strings."
+    | result <ArrayList> i <Integer> lineStart <Integer> code <Integer> |
+    result := ArrayList new.
+    lineStart := 0.
+    i := 0.
+    [i < aString size] whileTrue: [
+      code := (aString at: i) value.
+      code = 10 ifTrue: [
+        result add: (aString copyFrom: lineStart to: i).
+        lineStart := i + 1
+      ].
+      i := i + 1
+    ].
+    result add: (aString copyFrom: lineStart).
+    ^result asArray
+  ]

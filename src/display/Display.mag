@@ -5,17 +5,17 @@ import: 'Go'
  Caches window renders and only updates dirty windows + changed screen cells."
 
 Display subclass: Object
-  instanceVars: screen windows running screenW screenH screenChars screenStyles draggingWindow dragOffsetX dragOffsetY resizingWindow desktopMenuBlock deferredBlocks
+  instanceVars: screen <Dynamic> windows <Array> running <Boolean> screenW <Integer> screenH <Integer> screenChars <Array> screenStyles <Array> draggingWindow <Window> dragOffsetX <Integer> dragOffsetY <Integer> resizingWindow <Window> desktopMenuBlock <Block> deferredBlocks <Array> wakeupPending <Boolean>
 
-  classMethod: new [
-    | d |
+  classMethod: new ^<Display> [
+    | d <Display> |
     d := super new.
     d initialize.
     ^d
   ]
 
   method: initialize [
-    | screenSize sz |
+    | screenSize <Array> sz <Integer> |
     screen := Go::Terminal newScreen.
     screen init.
     screen enableMouse.
@@ -24,7 +24,7 @@ Display subclass: Object
     screenW := screenSize at: 0.
     screenH := screenSize at: 1.
 
-    windows := Array new: 0.
+    windows := ArrayList new.
     running := false.
 
     "Screen-level char/style cache for dirty tracking"
@@ -38,21 +38,21 @@ Display subclass: Object
     dragOffsetY := 0.
     resizingWindow := nil.
     desktopMenuBlock := nil.
-    deferredBlocks := Array new: 0
+    deferredBlocks := ArrayList new.
+    wakeupPending := false
   ]
 
-  method: onDesktopMenu: aBlock [
+  method: onDesktopMenu: aBlock <Block> [
     "Set custom desktop menu handler: [:display :x :y | ...]"
     desktopMenuBlock := aBlock
   ]
 
-  method: addWindow: w [ w display: self. windows := windows copyWith: w ]
-  method: removeWindow: w [
-    | f sx sy idx |
+  method: addWindow: w <Window> [ w display: self. windows add: w ]
+  method: removeWindow: w <Window> [
+    | f <Rectangle> idx <Integer> clearStyle <Dynamic> removeIdx <Integer> |
     "Invalidate screen cache where the window was so the area gets repainted"
     f := w frame.
     f notNil ifTrue: [
-      | clearStyle |
       clearStyle := Theme normalStyle.
       (f y) to: (f y + f height - 1) do: [:row |
         (row >= 0 and: [row < screenH]) ifTrue: [
@@ -68,33 +68,35 @@ Display subclass: Object
       ].
       screen show
     ].
-    windows := windows reject: [:each | each = w]
+    removeIdx := windows indexOf: w.
+    removeIdx notNil ifTrue: [windows removeAt: removeIdx]
   ]
-  method: bringToFront: w [ self removeWindow: w. self addWindow: w ]
+  method: bringToFront: w <Window> [ self removeWindow: w. self addWindow: w. w invalidate ]
 
-  method: screen [ ^screen ]
+  method: screen ^<Dynamic> [ ^screen ]
   method: buffer [ ^nil ]
-  method: windows [ ^windows ]
+  method: windows ^<Array> [ ^windows ]
 
-  method: running [
+  method: running ^<Boolean> [
     "do it run?"
-    ^running 
+    ^running
   ]
 
   method: fullSync [
     "Force full screen repaint — clears cache and redraws everything.
      Use after display corruption (e.g. stdout writes bypassing tcell)."
-    | sz |
+    | sz <Integer> |
     sz := screenW * screenH.
     screenChars := Array new: sz withAll: -1.
     screenStyles := Array new: sz withAll: nil.
+    windows do: [:w | w invalidate].
     self render.
     screen sync
   ]
 
   method: render [
     "Render dirty windows and flush only changed cells to screen."
-    | winBuf winFrame ox oy fw fh ch st idx prevCh prevSt sx sy |
+    | winBuf <CellBuffer> winFrame <Rectangle> ox <Integer> oy <Integer> fw <Integer> fh <Integer> ch <Integer> st <Dynamic> idx <Integer> prevCh <Integer> prevSt <Dynamic> sx <Integer> sy <Integer> |
 
     "Draw each window into its buffer, then diff against screen cache"
     windows do: [:win |
@@ -130,21 +132,25 @@ Display subclass: Object
     screen show
   ]
 
-  method: defer: aBlock [
-    "Schedule aBlock to run on the UI goroutine (next poll timeout).
-     Safe to call from any goroutine. The event loop polls with a 1-second
-     timeout, so deferred blocks execute within 1 second of being queued.
-     Note: if multiple goroutines call defer: concurrently, use external
-     synchronization. Safe for single-writer (one background goroutine) patterns."
-    deferredBlocks := deferredBlocks copyWith: aBlock
+  method: defer: aBlock <Block> [
+    "Schedule aBlock to run on the UI goroutine.
+     Posts at most one wakeup event per batch — multiple defers between
+     event loop iterations are coalesced into a single wakeup.
+     Safe for single-writer (one background goroutine) patterns."
+    deferredBlocks add: aBlock.
+    wakeupPending ifFalse: [
+      wakeupPending := true.
+      screen postEventKey: EventConstants eventWakeup _: 0 _: 0
+    ]
   ]
 
   method: processDeferredActions [
     "Drain and execute all deferred blocks. Called on the UI goroutine."
-    | pending |
+    | pending <ArrayList> |
+    wakeupPending := false.
     deferredBlocks size = 0 ifTrue: [^self].
     pending := deferredBlocks.
-    deferredBlocks := Array new: 0.
+    deferredBlocks := ArrayList new.
     pending do: [:block | block value]
   ]
 
@@ -152,31 +158,29 @@ Display subclass: Object
     "Main event loop. Uses pollKeyEventTimeout: so deferred actions
      from background goroutines are processed on each timeout tick
      without flooding the event queue with synthetic events."
-    | result keyCode runeVal mod fourth evt |
+    | result <Array> keyCode <Integer> runeVal <Integer> mod <Integer> fourth <Integer> evt <Event> |
     running := true.
     [self render] on: Exception do: [:e | ].
     [running] whileTrue: [
-      "Process any pending deferred actions on every iteration"
-      [self processDeferredActions] on: Exception do: [:e | ].
-
-      result := screen pollKeyEventTimeout: 500.
+      result := screen pollKeyEvent.
       keyCode := result at: 0.
       runeVal := result at: 1.
       mod := result at: 2.
       fourth := result at: 3.
 
-      "Timeout — just re-render (deferred actions already processed above)"
+      "Wakeup event — process deferred actions, then re-render"
       keyCode = EventConstants eventWakeup ifTrue: [
-        [self render] on: Exception do: [:e | ]
+        [self processDeferredActions. self render] on: Exception do: [:e | ]
       ] ifFalse: [
       keyCode = EventConstants eventResize ifTrue: [
         self handleResize: runeVal height: mod
       ] ifFalse: [
-        "Ctrl-C always quits — framework-level escape hatch.
-         tcell sends Ctrl-C as keyCode=3 (tcell.KeyCtrlC)."
-        keyCode = 3 ifTrue: [
+        "Ctrl-C always quits — framework-level escape hatch."
+        keyCode = EventConstants keyCtrlC ifTrue: [
           self stop
         ] ifFalse: [
+          "Process any pending deferred actions before handling user input"
+          [self processDeferredActions] on: Exception do: [:e | ].
           evt := self buildEvent: keyCode rune: runeVal mod: mod fourth: fourth.
           self dispatchWithErrorRecovery: evt
         ]
@@ -185,19 +189,20 @@ Display subclass: Object
     screen fini
   ]
 
-  method: handleResize: newW height: newH [
+  method: handleResize: newW <Integer> height: newH <Integer> [
     "Handle terminal resize — rebuild screen cache and re-render."
-    | sz |
+    | sz <Integer> |
     screenW := newW.
     screenH := newH.
     sz := screenW * screenH.
     screenChars := Array new: sz withAll: -1.
     screenStyles := Array new: sz withAll: nil.
+    windows do: [:w | w invalidate].
     screen sync.
     self render
   ]
 
-  method: buildEvent: keyCode rune: runeVal mod: mod fourth: fourth [
+  method: buildEvent: keyCode <Integer> rune: runeVal <Integer> mod: mod <Integer> fourth: fourth <Integer> ^<Event> [
     "Construct a typed Event object from raw terminal input."
     keyCode = EventConstants eventMouse ifTrue: [
       ^MouseEvent x: mod y: fourth buttons: runeVal
@@ -205,14 +210,14 @@ Display subclass: Object
     ^KeyEvent key: keyCode rune: runeVal mod: mod
   ]
 
-  method: dispatchWithErrorRecovery: evt [
+  method: dispatchWithErrorRecovery: evt <Event> [
     "Dispatch an event to the appropriate window, with debugger on error.
      Skip debugger if we're shutting down (running=false) to avoid trapping the user."
     [
       self dispatchEvent: evt.
       self render
     ] on: Exception do: [:e |
-      | errStack errVars |
+      | errStack <Array> errVars <Array> |
       running ifFalse: [^self].  "Shutting down — don't open debugger"
       Transcript show: 'Error: ', e messageText.
       errStack := Compiler captureCallStack.
@@ -224,7 +229,7 @@ Display subclass: Object
     ]
   ]
 
-  method: dispatchEvent: evt [
+  method: dispatchEvent: evt <Event> [
     "Route event to the right handler."
     windows size > 0 ifTrue: [
       evt isMouse ifTrue: [
@@ -238,9 +243,9 @@ Display subclass: Object
     ]
   ]
 
-  method: dispatchMouse: evt [
+  method: dispatchMouse: evt <Event> [
     "Route mouse event — handle dragging at Display level."
-    | mx my buttons |
+    | mx <Integer> my <Integer> buttons <Integer> |
     mx := evt x.
     my := evt y.
     buttons := evt buttons.
@@ -262,24 +267,24 @@ Display subclass: Object
     self openDesktopMenuAt: mx y: my
   ]
 
-  method: handleResizeDrag: mx y: my buttons: buttons [
+  method: handleResizeDrag: mx <Integer> y: my <Integer> buttons: buttons <Integer> [
     "Continue or end a window resize drag."
-    | rf |
+    | rf <Rectangle> |
     buttons = 0 ifTrue: [resizingWindow := nil. ^self].
     rf := resizingWindow frame.
     self invalidateWindow: resizingWindow.
     resizingWindow resizeTo: mx - rf x + 1 height: my - rf y + 1
   ]
 
-  method: handleWindowDrag: mx y: my buttons: buttons [
+  method: handleWindowDrag: mx <Integer> y: my <Integer> buttons: buttons <Integer> [
     "Continue or end a window move drag."
     buttons = 0 ifTrue: [draggingWindow := nil. ^self].
     self moveWindow: draggingWindow toX: mx - dragOffsetX y: my - dragOffsetY
   ]
 
-  method: dismissMenuIfOutside: mx y: my [
+  method: dismissMenuIfOutside: mx <Integer> y: my <Integer> [
     "If topmost window is a Menu and click is outside it, dismiss."
-    | topWin topFrame |
+    | topWin <Window> topFrame <Rectangle> |
     windows size = 0 ifTrue: [^self].
     topWin := windows at: windows size - 1.
     (topWin contentController isKindOf: Menu) ifFalse: [^self].
@@ -289,9 +294,9 @@ Display subclass: Object
     self removeWindow: topWin
   ]
 
-  method: windowHitTest: evt x: mx y: my buttons: buttons [
+  method: windowHitTest: evt <Event> x: mx <Integer> y: my <Integer> buttons: buttons <Integer> ^<Boolean> [
     "Walk windows back-to-front. Returns true if a window was hit."
-    | i win f localX localY |
+    | i <Integer> win <Window> f <Rectangle> localX <Integer> localY <Integer> |
     i := windows size - 1.
     [i >= 0] whileTrue: [
       win := windows at: i.
@@ -318,7 +323,7 @@ Display subclass: Object
     ^false
   ]
 
-  method: openDesktopMenuAt: x y: y [
+  method: openDesktopMenuAt: x <Integer> y: y <Integer> [
     "Open the desktop context menu. Delegates to custom block if set."
     desktopMenuBlock notNil ifTrue: [
       ^desktopMenuBlock value: self value: x value: y
@@ -326,9 +331,9 @@ Display subclass: Object
     self defaultDesktopMenuAt: x y: y
   ]
 
-  method: defaultDesktopMenuAt: x y: y [
+  method: defaultDesktopMenuAt: x <Integer> y: y <Integer> [
     "Built-in desktop menu with standard ST-80 tools."
-    | menuItems |
+    | menuItems <Array> |
     menuItems := #('Workspace' 'System Browser' 'Transcript' 'Debugger').
     Menu open: menuItems at: (Array with: x with: y) on: self callback: [:item |
       item = 'Workspace' ifTrue: [Workspace open: self].
@@ -338,9 +343,9 @@ Display subclass: Object
     ]
   ]
 
-  method: invalidateWindow: win [
+  method: invalidateWindow: win <Window> [
     "Clear screen cache where a window currently sits."
-    | f clearStyle idx |
+    | f <Rectangle> clearStyle <Dynamic> idx <Integer> |
     f := win frame.
     clearStyle := Theme normalStyle.
     f y to: f y + f height - 1 do: [:row |
@@ -357,14 +362,15 @@ Display subclass: Object
     ]
   ]
 
-  method: moveWindow: win toX: newX y: newY [
+  method: moveWindow: win <Window> toX: newX <Integer> y: newY <Integer> [
     "Move a window, invalidating old position in screen cache."
-    | f |
+    | f <Rectangle> |
     f := win frame.
     (newX = f x and: [newY = f y]) ifTrue: [^self].
     self invalidateWindow: win.
     f x: newX.
-    f y: newY
+    f y: newY.
+    win invalidate
   ]
 
   method: stop [

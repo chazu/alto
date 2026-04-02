@@ -20,89 +20,120 @@ import: 'Go'
 "
 
 BoxLayout subclass: View
-  instanceVars: children weights focusedIndex childBufs orientation
+  instanceVars: children <Array> weights <Array> focusedIndex <Integer> childBufs <Array> orientation <Symbol>
 
-  classMethod: horizontal [
-    | instance |
+  classMethod: horizontal ^<BoxLayout> [
+    | instance <BoxLayout> |
     instance := super new.
     instance initWithOrientation: #horizontal.
     ^instance
   ]
 
-  classMethod: vertical [
-    | instance |
+  classMethod: vertical ^<BoxLayout> [
+    | instance <BoxLayout> |
     instance := super new.
     instance initWithOrientation: #vertical.
     ^instance
   ]
 
-  classMethod: new [
+  classMethod: new ^<BoxLayout> [
     "Default to horizontal for backwards compatibility."
     ^self horizontal
   ]
 
-  method: initWithOrientation: anOrientation [
+  method: initWithOrientation: anOrientation <Symbol> [
     super initialize.
     orientation := anOrientation.
-    children := Array new: 0.
-    weights := Array new: 0.
+    children := ArrayList new.
+    weights := ArrayList new.
     focusedIndex := 0.
-    childBufs := Array new: 0
+    childBufs := ArrayList new
   ]
 
-  method: orientation [ ^orientation ]
-  method: children [ ^children ]
-  method: focusedIndex [ ^focusedIndex ]
+  method: orientation ^<Symbol> [ ^orientation ]
+  method: children ^<Array> [ ^children ]
+  method: focusedIndex ^<Integer> [ ^focusedIndex ]
 
-  method: addChild: aView [
-    children := children copyWith: aView.
-    weights := weights copyWith: 1.
-    childBufs := childBufs copyWith: nil.
+  method: addChild: aView <View> [
+    children add: aView.
+    weights add: 1.
+    childBufs add: nil.
     self invalidate
   ]
 
-  method: addChild: aView weight: aWeight [
-    children := children copyWith: aView.
-    weights := weights copyWith: aWeight.
-    childBufs := childBufs copyWith: nil.
+  method: addChild: aView <View> weight: aWeight <Integer> [
+    children add: aView.
+    weights add: aWeight.
+    childBufs add: nil.
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
-    | w h totalWeight pos i childSize childBuf remaining span |
+  method: computeSizes: span <Integer> ^<Array> [
+    "Compute child sizes along the layout axis, respecting preferredSize.
+     Children with a preferred size get it first; remaining space is divided by weight."
+    | sizes <Array> i <Integer> child <View> pref <Integer> fixedTotal <Integer> flexWeight <Integer> remaining <Integer> flexSpan <Integer> |
+    sizes := Array new: children size withAll: 0.
+    fixedTotal := 0.
+    flexWeight := 0.
+
+    "First pass: assign fixed sizes, accumulate flexible weight"
+    i := 0.
+    [i < children size] whileTrue: [
+      child := children at: i.
+      pref := orientation = #horizontal ifTrue: [child preferredWidth] ifFalse: [child preferredHeight].
+      pref notNil ifTrue: [
+        pref := pref min: span.
+        sizes at: i put: pref.
+        fixedTotal := fixedTotal + pref
+      ] ifFalse: [
+        flexWeight := flexWeight + (weights at: i)
+      ].
+      i := i + 1
+    ].
+    flexWeight = 0 ifTrue: [flexWeight := 1].
+
+    "Second pass: divide remaining space among flexible children"
+    flexSpan := (span - fixedTotal) max: 0.
+    remaining := flexSpan.
+    i := 0.
+    [i < children size] whileTrue: [
+      pref := orientation = #horizontal
+        ifTrue: [(children at: i) preferredWidth]
+        ifFalse: [(children at: i) preferredHeight].
+      pref isNil ifTrue: [
+        | childSize <Integer> |
+        i = (children size - 1)
+          ifTrue: [childSize := remaining]
+          ifFalse: [
+            childSize := (flexSpan * (weights at: i) * 1.0 / flexWeight) truncated.
+            childSize := childSize max: 1.
+            childSize := childSize min: remaining
+          ].
+        sizes at: i put: childSize.
+        remaining := remaining - childSize
+      ].
+      i := i + 1
+    ].
+    ^sizes
+  ]
+
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | w <Integer> h <Integer> pos <Integer> i <Integer> childSize <Integer> childBuf <CellBuffer> span <Integer> sizes <Array> |
     w := aCellBuffer width.
     h := aCellBuffer height.
     children size = 0 ifTrue: [^self].
 
-    "The span is the dimension we divide: width for horizontal, height for vertical."
     orientation = #horizontal
       ifTrue: [span := w]
       ifFalse: [span := h].
-
-    "Calculate total weight"
-    totalWeight := 0.
-    i := 0.
-    [i < weights size] whileTrue: [
-      totalWeight := totalWeight + (weights at: i).
-      i := i + 1
-    ].
-    totalWeight = 0 ifTrue: [totalWeight := 1].
+    sizes := self computeSizes: span.
 
     "Layout children along the axis"
     pos := 0.
-    remaining := span.
     i := 0.
     [i < children size] whileTrue: [
-      i = (children size - 1)
-        ifTrue: [childSize := remaining]
-        ifFalse: [
-          childSize := (span * (weights at: i) * 1.0 / totalWeight) truncated.
-          childSize := childSize max: 1.
-          childSize := childSize min: remaining
-        ].
-
+      childSize := sizes at: i.
       childSize > 0 ifTrue: [
-        "Get or create child buffer"
         childBuf := childBufs at: i.
         orientation = #horizontal
           ifTrue: [
@@ -124,64 +155,70 @@ BoxLayout subclass: View
             childBuf blitInto: aCellBuffer atX: 0 y: pos
           ]
       ].
-
       pos := pos + childSize.
-      remaining := remaining - childSize.
       i := i + 1
     ]
   ]
 
-  method: handleEvent: evt [
-    "Tab cycles focus; everything else delegates to focused child."
+  method: updateChildFocus [
+    "Tell children whether they have focus."
+    | i <Integer> |
+    i := 0.
+    [i < children size] whileTrue: [
+      (children at: i) focused: (i = focusedIndex).
+      i := i + 1
+    ]
+  ]
+
+  method: handleEvent: evt <Event> [
+    "Tab cycles focus; mouse routes by position; keys delegate to focused child."
+
+    "Mouse — route to child under pointer"
+    evt isMouse ifTrue: [^self routeMouseEvent: evt].
+
+    "Tab cycles focus"
     (evt isKey and: [evt key = EventConstants keyTab]) ifTrue: [
       children size > 0 ifTrue: [
         focusedIndex := (focusedIndex + 1) \\ children size
       ].
+      self updateChildFocus.
       self invalidate.
       ^self
     ].
 
-    "Delegate to focused child"
+    "Delegate key to focused child"
     (focusedIndex >= 0 and: [focusedIndex < children size]) ifTrue: [
       (children at: focusedIndex) handleEvent: evt
     ].
     self invalidate
   ]
 
-  method: handleMouseLocalX: x y: y buttons: btn [
+  method: routeMouseEvent: evt <Event> [
     "Route mouse to the child under the pointer along the layout axis."
-    | w h totalWeight cPos i childSize hitCoord span |
+    | w <Integer> h <Integer> cPos <Integer> i <Integer> childSize <Integer> hitCoord <Integer> span <Integer> mx <Integer> my <Integer> sizes <Array> |
     buffer isNil ifTrue: [^self].
     w := buffer width.
     h := buffer height.
     children size = 0 ifTrue: [^self].
+    mx := evt x.
+    my := evt y.
 
     orientation = #horizontal
-      ifTrue: [span := w. hitCoord := x]
-      ifFalse: [span := h. hitCoord := y].
-
-    totalWeight := 0.
-    i := 0.
-    [i < weights size] whileTrue: [
-      totalWeight := totalWeight + (weights at: i).
-      i := i + 1
-    ].
-    totalWeight = 0 ifTrue: [totalWeight := 1].
+      ifTrue: [span := w. hitCoord := mx]
+      ifFalse: [span := h. hitCoord := my].
+    sizes := self computeSizes: span.
 
     cPos := 0.
     i := 0.
     [i < children size] whileTrue: [
-      i = (children size - 1)
-        ifTrue: [childSize := span - cPos]
-        ifFalse: [
-          childSize := (span * (weights at: i) * 1.0 / totalWeight) truncated.
-          childSize := childSize max: 1
-        ].
+      childSize := sizes at: i.
       (hitCoord >= cPos and: [hitCoord < (cPos + childSize)]) ifTrue: [
         focusedIndex := i.
+        self updateChildFocus.
         orientation = #horizontal
-          ifTrue: [(children at: i) handleMouseLocalX: x - cPos y: y buttons: btn]
-          ifFalse: [(children at: i) handleMouseLocalX: x y: y - cPos buttons: btn].
+          ifTrue: [(children at: i) handleEvent: (evt withX: mx - cPos y: my)]
+          ifFalse: [(children at: i) handleEvent: (evt withX: mx y: my - cPos)].
+        self invalidate.
         ^self
       ].
       cPos := cPos + childSize.

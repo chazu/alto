@@ -7,6 +7,26 @@ version = "0.1.0"
 dirs = ["wrap/tcell", "wrap/terminal", "src", "examples"]
 entry = "Main.start"
 
+[[target]]
+name = "hello"
+entry = "HelloApp.start"
+output = "hello"
+
+[[target]]
+name = "counter"
+entry = "CounterApp.start"
+output = "counter"
+
+[[target]]
+name = "dashboard"
+entry = "DashboardApp.start"
+output = "dashboard"
+
+[[target]]
+name = "todo"
+entry = "TodoApp.start"
+output = "todo"
+
 [go-wrap]
 output = "wrap"
 

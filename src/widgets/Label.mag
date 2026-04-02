@@ -1,57 +1,156 @@
 namespace: 'Alto'
 import: 'Go'
 
+"Label — text display widget with multi-line and alignment support.
+ Usage:
+   Label text: 'Hello'
+   Label text: 'Hello' alignment: #center
+   (Label text: 'Multi\nline') wrap: true
+"
+
 Label subclass: View
-  instanceVars: text style
+  instanceVars: text <String> style <Dynamic> alignment <Symbol> wrap <Boolean> cachedLines <Array>
 
   method: initialize [
       super initialize.
       text := ''.
-      style := nil
+      style := nil.
+      alignment := #left.
+      wrap := false.
+      cachedLines := nil
   ]
 
-  method: privateText: aString [
-      text := aString
+  method: privateText: aString <String> [
+      text := aString.
+      cachedLines := nil
   ]
 
-  method: displayOn: aCellBuffer [
-      aCellBuffer putString: text x: 0 y: 0 style: style
-  ]
-
-  method: text: newText [
+  method: text: newText <String> [
       text := newText.
+      cachedLines := nil.
       self invalidate
   ]
 
-  method: text [
-      ^text
-  ]
+  method: text ^<String> [ ^text ]
 
-  method: style: aStyle [
+  method: style: aStyle <Dynamic> [
       style := aStyle.
       self invalidate
   ]
 
-  method: style [
-      ^style
+  method: style ^<Dynamic> [ ^style ]
+
+  method: alignment: aSymbol <Symbol> [
+      "Set alignment: #left, #center, or #right."
+      alignment := aSymbol.
+      self invalidate
   ]
 
-  method: handleEvent: evt [
+  method: alignment ^<Symbol> [ ^alignment ]
+
+  method: wrap: aBoolean <Boolean> [
+      wrap := aBoolean.
+      cachedLines := nil.
+      self invalidate
+  ]
+
+  method: wrap ^<Boolean> [ ^wrap ]
+
+  method: splitLines ^<Array> [
+      "Split text on newlines. Cache the result."
+      cachedLines isNil ifTrue: [
+        cachedLines := StringUtils splitLines: text
+      ].
+      ^cachedLines
+  ]
+
+  method: wrapLines: maxWidth <Integer> ^<Array> [
+      "Split text into lines, then word-wrap each line to maxWidth."
+      | raw <Array> result <ArrayList> |
+      raw := self splitLines.
+      wrap ifFalse: [^raw].
+      maxWidth < 1 ifTrue: [^raw].
+      result := ArrayList new.
+      raw do: [:line |
+        line size <= maxWidth ifTrue: [
+          result add: line
+        ] ifFalse: [
+          | pos <Integer> |
+          pos := 0.
+          [pos < line size] whileTrue: [
+            | end <Integer> |
+            end := (pos + maxWidth) min: line size.
+            result add: (line copyFrom: pos to: end).
+            pos := end
+          ]
+        ]
+      ].
+      result isEmpty ifTrue: [^#('')].
+      ^result asArray
+  ]
+
+  method: alignedX: lineStr <String> width: w <Integer> ^<Integer> [
+      "Compute x offset for alignment."
+      alignment = #center ifTrue: [^((w - lineStr size) / 2) max: 0].
+      alignment = #right ifTrue: [^(w - lineStr size) max: 0].
+      ^0
+  ]
+
+  method: displayOn: aCellBuffer <CellBuffer> [
+      | lines <Array> w <Integer> h <Integer> i <Integer> lineStr <String> x <Integer> renderStyle <Dynamic> |
+      w := aCellBuffer width.
+      h := aCellBuffer height.
+      renderStyle := style isNil ifTrue: [Theme normalStyle] ifFalse: [style].
+      lines := self wrapLines: w.
+
+      i := 0.
+      [i < lines size and: [i < h]] whileTrue: [
+        lineStr := lines at: i.
+        x := self alignedX: lineStr width: w.
+        aCellBuffer putString: lineStr x: x y: i style: renderStyle.
+        i := i + 1
+      ]
+  ]
+
+  method: preferredHeight ^<Integer> [
+      | lines <Array> |
+      lines := self splitLines.
+      ^lines size
+  ]
+
+  method: preferredWidth ^<Integer> [
+      | lines <Array> max <Integer> |
+      lines := self splitLines.
+      max := 0.
+      lines do: [:line | line size > max ifTrue: [max := line size]].
+      ^max
+  ]
+
+  method: handleEvent: evt <Event> ^<Boolean> [
       "Labels are non-interactive — ignore all events."
       ^false
   ]
 
-  classMethod: new [
-      | instance |
+  classMethod: new ^<Label> [
+      | instance <Label> |
       instance := super new.
       instance initialize.
       ^instance
   ]
 
-  classMethod: text: aString [
-      | instance |
+  classMethod: text: aString <String> ^<Label> [
+      | instance <Label> |
       instance := super new.
       instance initialize.
       instance privateText: aString.
+      ^instance
+  ]
+
+  classMethod: text: aString <String> alignment: anAlignment <Symbol> ^<Label> [
+      | instance <Label> |
+      instance := super new.
+      instance initialize.
+      instance privateText: aString.
+      instance alignment: anAlignment.
       ^instance
   ]

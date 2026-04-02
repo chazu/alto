@@ -9,38 +9,38 @@ import: 'Go'
 "
 
 Divider subclass: View
-  instanceVars: orientation dividerStyle
+  instanceVars: orientation <Symbol> dividerStyle <Dynamic>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<Divider> [
+    | instance <Divider> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: horizontal [
-    | d |
+  classMethod: horizontal ^<Divider> [
+    | d <Divider> |
     d := self new.
     d orientation: #horizontal.
     ^d
   ]
 
-  classMethod: vertical [
-    | d |
+  classMethod: vertical ^<Divider> [
+    | d <Divider> |
     d := self new.
     d orientation: #vertical.
     ^d
   ]
 
-  classMethod: horizontalStyle: aStyle [
-    | d |
+  classMethod: horizontalStyle: aStyle <Object> ^<Divider> [
+    | d <Divider> |
     d := self horizontal.
     d dividerStyle: aStyle goStyle.
     ^d
   ]
 
-  classMethod: verticalStyle: aStyle [
-    | d |
+  classMethod: verticalStyle: aStyle <Object> ^<Divider> [
+    | d <Divider> |
     d := self vertical.
     d dividerStyle: aStyle goStyle.
     ^d
@@ -52,28 +52,38 @@ Divider subclass: View
     dividerStyle := Theme dividerStyle
   ]
 
-  method: orientation [ ^orientation ]
-  method: orientation: sym [ orientation := sym ]
+  method: orientation ^<Symbol> [ ^orientation ]
+  method: orientation: sym <Symbol> [ orientation := sym ]
 
-  method: dividerStyle: aGoStyle [
+  method: dividerStyle: aGoStyle <Dynamic> [
     dividerStyle := aGoStyle.
     self invalidate
   ]
 
-  method: style: aStyle [
+  method: style: aStyle <Object> [
     "Accept an Alto Style object"
     dividerStyle := aStyle goStyle.
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
+  method: preferredHeight ^<Integer> [
+    orientation = #horizontal ifTrue: [^1].
+    ^nil
+  ]
+
+  method: preferredWidth ^<Integer> [
+    orientation = #vertical ifTrue: [^1].
+    ^nil
+  ]
+
+  method: displayOn: aCellBuffer <CellBuffer> [
     orientation = #horizontal
       ifTrue: [self displayHorizontalOn: aCellBuffer]
       ifFalse: [self displayVerticalOn: aCellBuffer]
   ]
 
-  method: displayHorizontalOn: aCellBuffer [
-    | w i |
+  method: displayHorizontalOn: aCellBuffer <CellBuffer> [
+    | w <Integer> i <Integer> |
     w := aCellBuffer width.
     i := 0.
     [i < w] whileTrue: [
@@ -82,8 +92,8 @@ Divider subclass: View
     ]
   ]
 
-  method: displayVerticalOn: aCellBuffer [
-    | h i |
+  method: displayVerticalOn: aCellBuffer <CellBuffer> [
+    | h <Integer> i <Integer> |
     h := aCellBuffer height.
     i := 0.
     [i < h] whileTrue: [

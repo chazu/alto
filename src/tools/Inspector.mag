@@ -7,17 +7,17 @@ import: 'Go'
  Supports Dictionary, Array, and arbitrary objects."
 
 Inspector subclass: View
-  instanceVars: target fieldNames fieldValues fieldObjects fieldList display parentWindow focusOnList
+  instanceVars: target <Object> fieldNames <Array> fieldValues <Array> fieldObjects <Array> fieldList <ListView> display <Display> parentWindow <Window> focusOnList <Boolean>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<Inspector> [
+    | instance <Inspector> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: open: anObject on: aDisplay [
-    | frame inspector window offsetX offsetY title className |
+  classMethod: open: anObject <Object> on: aDisplay <Display> ^<Inspector> [
+    | frame <Rectangle> inspector <Inspector> window <Window> offsetX <Integer> offsetY <Integer> title <String> className <String> |
     inspector := self new.
     inspector privateTarget: anObject.
     inspector display: aDisplay.
@@ -48,37 +48,37 @@ Inspector subclass: View
     focusOnList := true
   ]
 
-  method: privateTarget: anObject [ target := anObject ]
-  method: parentWindow: aWindow [ parentWindow := aWindow ]
-  method: display: aDisplay [ display := aDisplay ]
-  method: display [ ^display ]
-  method: target [ ^target ]
-  method: fieldNames [ ^fieldNames ]
-  method: fieldValues [ ^fieldValues ]
-  method: selectedIndex [ ^fieldList selectedIndex ]
-  method: scrollOffset [ ^fieldList scrollOffset ]
-  method: parentWindow [ ^parentWindow ]
-  method: focusOnList [ ^focusOnList ]
+  method: privateTarget: anObject <Object> [ target := anObject ]
+  method: parentWindow: aWindow <Window> [ parentWindow := aWindow ]
+  method: display: aDisplay <Display> [ display := aDisplay ]
+  method: display ^<Display> [ ^display ]
+  method: target ^<Object> [ ^target ]
+  method: fieldNames ^<Array> [ ^fieldNames ]
+  method: fieldValues ^<Array> [ ^fieldValues ]
+  method: selectedIndex ^<Integer> [ ^fieldList selectedIndex ]
+  method: scrollOffset ^<Integer> [ ^fieldList scrollOffset ]
+  method: parentWindow ^<Window> [ ^parentWindow ]
+  method: focusOnList ^<Boolean> [ ^focusOnList ]
 
   method: buildFields [
     "Populate field names, display values, and raw object references for drill-down."
-    | keys vals objs allKeys i key varNames val className isDict isArray |
-    keys := Array new: 0.
-    vals := Array new: 0.
-    objs := Array new: 0.
+    | keys <ArrayList> vals <ArrayList> objs <ArrayList> allKeys <Array> i <Integer> key <Object> varNames <Array> val <Object> className <String> isDict <Boolean> isArray <Boolean> |
+    keys := ArrayList new.
+    vals := ArrayList new.
+    objs := ArrayList new.
 
     "Header: self and class"
-    keys := keys copyWith: 'self'.
-    [vals := vals copyWith: target printString] on: Exception do: [:e |
-      vals := vals copyWith: '??'
+    keys add: 'self'.
+    [vals add: target printString] on: Exception do: [:e |
+      vals add: '??'
     ].
-    objs := objs copyWith: target.
+    objs add: target.
 
-    keys := keys copyWith: 'class'.
-    [vals := vals copyWith: ('', target class name)] on: Exception do: [:e |
-      vals := vals copyWith: '??'
+    keys add: 'class'.
+    [vals add: ('', target class name)] on: Exception do: [:e |
+      vals add: '??'
     ].
-    objs := objs copyWith: target class.
+    objs add: target class.
 
     "Determine type safely — avoid isKindOf: which returns nil for some objects"
     isDict := false.
@@ -93,9 +93,9 @@ Inspector subclass: View
         [i < allKeys size] whileTrue: [
           key := allKeys at: i.
           val := target at: key.
-          keys := keys copyWith: key printString.
-          vals := vals copyWith: val printString.
-          objs := objs copyWith: val.
+          keys add: key printString.
+          vals add: val printString.
+          objs add: val.
           i := i + 1
         ]
       ] on: Exception do: [:e | ]
@@ -105,9 +105,9 @@ Inspector subclass: View
           i := 0.
           [i < target size] whileTrue: [
             val := target at: i.
-            keys := keys copyWith: '[', i printString, ']'.
-            vals := vals copyWith: val printString.
-            objs := objs copyWith: val.
+            keys add: '[', i printString, ']'.
+            vals add: val printString.
+            objs add: val.
             i := i + 1
           ]
         ] on: Exception do: [:e | ]
@@ -120,13 +120,13 @@ Inspector subclass: View
             [i < varNames size] whileTrue: [
               [
                 val := target instVarAt: i.
-                keys := keys copyWith: (varNames at: i).
-                vals := vals copyWith: val printString.
-                objs := objs copyWith: val
+                keys add: (varNames at: i).
+                vals add: val printString.
+                objs add: val
               ] on: Exception do: [:e |
-                keys := keys copyWith: (varNames at: i).
-                vals := vals copyWith: '<error>'.
-                objs := objs copyWith: nil
+                keys add: (varNames at: i).
+                vals add: '<error>'.
+                objs add: nil
               ].
               i := i + 1
             ]
@@ -135,15 +135,15 @@ Inspector subclass: View
       ]
     ].
 
-    fieldNames := keys.
-    fieldValues := vals.
-    fieldObjects := objs.
+    fieldNames := keys asArray.
+    fieldValues := vals asArray.
+    fieldObjects := objs asArray.
     fieldList items: fieldNames
   ]
 
   method: drillDown [
     "Open a new Inspector on the selected field's actual object."
-    | obj className selIdx |
+    | obj <Object> className <String> selIdx <Integer> |
     selIdx := fieldList selectedIndex.
     selIdx >= fieldObjects size ifTrue: [^self].
     obj := fieldObjects at: selIdx.
@@ -159,8 +159,8 @@ Inspector subclass: View
     Inspector open: obj on: display
   ]
 
-  method: handleEvent: evt [
-    | keyCode |
+  method: handleEvent: evt <Event> [
+    | keyCode <Integer> |
 
     evt isMouse ifTrue: [
       [self handleMouse: evt] on: Exception do: [:e |
@@ -206,10 +206,10 @@ Inspector subclass: View
   ]
 
 
-  method: listPaneWidth [ ^22 ]
+  method: listPaneWidth ^<Integer> [ ^22 ]
 
-  method: handleMouse: evt [
-    | btn mx my listWidth |
+  method: handleMouse: evt <Event> [
+    | btn <Integer> mx <Integer> my <Integer> listWidth <Integer> |
     btn := evt buttons.
     mx := evt x.
     my := evt y.
@@ -229,8 +229,8 @@ Inspector subclass: View
     ]
   ]
 
-  method: displayOn: aCellBuffer [
-    | listWidth bufWidth bufHeight selectedIdx valStr rightX valueLines lineIdx lineStr rightW typeStr hint j i itemIndex fieldStr style |
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | listWidth <Integer> bufWidth <Integer> bufHeight <Integer> selectedIdx <Integer> valStr <String> rightX <Integer> valueLines <Array> lineIdx <Integer> lineStr <String> rightW <Integer> typeStr <String> hint <String> j <Integer> i <Integer> itemIndex <Integer> fieldStr <String> style <Object> |
     listWidth := self listPaneWidth.
     bufWidth := aCellBuffer width.
     bufHeight := aCellBuffer height.
@@ -302,31 +302,31 @@ Inspector subclass: View
     ]
   ]
 
-  method: wrapText: aString width: maxWidth [
+  method: wrapText: aString <String> width: maxWidth <Integer> ^<Array> [
     "Simple word wrap using substring extraction — returns Array of lines."
-    | lines i lineStart lineLen code |
+    | lines <ArrayList> i <Integer> lineStart <Integer> lineLen <Integer> code <Integer> |
     maxWidth < 1 ifTrue: [^#(aString)].
-    lines := Array new: 0.
+    lines := ArrayList new.
     lineStart := 0.
     lineLen := 0.
     i := 0.
     [i < aString size] whileTrue: [
       code := (aString at: i) value.
       code = 10 ifTrue: [
-        lines := lines copyWith: (aString copyFrom: lineStart to: i).
+        lines add: (aString copyFrom: lineStart to: i).
         lineStart := i + 1.
         lineLen := 0
       ] ifFalse: [
         lineLen := lineLen + 1.
         lineLen >= maxWidth ifTrue: [
-          lines := lines copyWith: (aString copyFrom: lineStart to: i + 1).
+          lines add: (aString copyFrom: lineStart to: i + 1).
           lineStart := i + 1.
           lineLen := 0
         ]
       ].
       i := i + 1
     ].
-    lineStart < aString size ifTrue: [lines := lines copyWith: (aString copyFrom: lineStart)].
-    lines size = 0 ifTrue: [lines := #('')].
-    ^lines
+    lineStart < aString size ifTrue: [lines add: (aString copyFrom: lineStart)].
+    lines isEmpty ifTrue: [^#('')].
+    ^lines asArray
   ]

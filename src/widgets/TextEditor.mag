@@ -4,17 +4,18 @@ import: 'Go'
 "TextEditor — reusable text editing widget with cursor, selection, kill ring, scrolling.
  Used by Workspace (full editing) and SystemBrowser code pane."
 
-TextEditor subclass: Object
-  instanceVars: lines cursorX cursorY scrollOffset killBuffer markX markY markActive dirty keyMap
+TextEditor subclass: View
+  instanceVars: lines <Array> cursorX <Integer> cursorY <Integer> scrollOffset <Integer> killBuffer <Array> markX <Integer> markY <Integer> markActive <Boolean> dirty <Boolean> keyMap <Dictionary>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<TextEditor> [
+    | instance <TextEditor> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
   method: initialize [
+    super initialize.
     lines := #('').
     cursorX := 0.
     cursorY := 0.
@@ -28,43 +29,30 @@ TextEditor subclass: Object
   ]
 
   "--- Accessors ---"
-  method: lines [ ^lines ]
-  method: lines: anArray [ lines := anArray. dirty := false ]
-  method: cursorX [ ^cursorX ]
-  method: cursorX: anInt [ cursorX := anInt ]
-  method: cursorY [ ^cursorY ]
-  method: scrollOffset [ ^scrollOffset ]
-  method: markActive [ ^markActive ]
-  method: isDirty [ ^dirty ]
-  method: dirty: aBoolean [ dirty := aBoolean ]
-  method: normalStyle [ ^Theme normalStyle ]
-  method: reverseStyle [ ^Theme reverseStyle ]
+  method: lines ^<Array> [ ^lines ]
+  method: lines: anArray <Array> [ lines := anArray. dirty := false ]
+  method: cursorX ^<Integer> [ ^cursorX ]
+  method: cursorX: anInt <Integer> [ cursorX := anInt ]
+  method: cursorY ^<Integer> [ ^cursorY ]
+  method: scrollOffset ^<Integer> [ ^scrollOffset ]
+  method: markActive ^<Boolean> [ ^markActive ]
+  method: isDirty ^<Boolean> [ ^dirty ]
+  method: dirty: aBoolean <Boolean> [ dirty := aBoolean ]
+  method: normalStyle ^<Dynamic> [ ^Theme normalStyle ]
+  method: reverseStyle ^<Dynamic> [ ^Theme reverseStyle ]
 
-  method: text [
+  method: text ^<String> [
     "Return all lines joined with newlines."
-    | nl |
+    | nl <String> |
     nl := String lf.
     ^lines inject: '' into: [:acc :line |
       acc size = 0 ifTrue: [line] ifFalse: [acc, nl, line]
     ]
   ]
 
-  method: text: aString [
-    "Set text from a string, splitting on newlines using substring extraction."
-    | result i lineStart code |
-    result := Array new: 0.
-    lineStart := 0.
-    i := 0.
-    [i < aString size] whileTrue: [
-      code := (aString at: i) value.
-      code = 10 ifTrue: [
-        result := result copyWith: (aString copyFrom: lineStart to: i).
-        lineStart := i + 1
-      ].
-      i := i + 1
-    ].
-    result := result copyWith: (aString copyFrom: lineStart).
-    lines := result.
+  method: text: aString <String> [
+    "Set text from a string, splitting on newlines."
+    lines := StringUtils splitLines: aString.
     cursorX := 0.
     cursorY := 0.
     scrollOffset := 0.
@@ -92,7 +80,7 @@ TextEditor subclass: Object
     keyMap at: 'right' put: [self moveCursorRight]
   ]
 
-  method: keyNameFor: keyCode rune: runeVal mod: mod [
+  method: keyNameFor: keyCode <Integer> rune: runeVal <Integer> mod: mod <Integer> ^<String> [
     "Convert raw key/rune/mod into a string key descriptor."
     (EventConstants isCtrl: mod) ifTrue: [
       (keyCode = EventConstants keyRune and: [runeVal = EventConstants keySpace])
@@ -117,9 +105,9 @@ TextEditor subclass: Object
   ]
 
   "--- Key Handling ---"
-  method: handleKey: keyCode rune: runeVal mod: mod [
+  method: handleKey: keyCode <Integer> rune: runeVal <Integer> mod: mod <Integer> ^<Boolean> [
     "Process a key event. Returns true if handled."
-    | key action |
+    | key <String> action <Block> |
     key := self keyNameFor: keyCode rune: runeVal mod: mod.
     key notNil ifTrue: [
       action := keyMap at: key ifAbsent: [nil].
@@ -130,6 +118,22 @@ TextEditor subclass: Object
       self insertChar: runeVal. ^true
     ].
     ^false
+  ]
+
+  method: handleEvent: evt <Event> [
+    "View-protocol entry point. Dispatches mouse and key events."
+    evt isMouse ifTrue: [
+      evt buttons = 1 ifTrue: [
+        self handleClick: evt x y: evt y.
+        self invalidate
+      ].
+      ^self
+    ].
+    evt isKey ifTrue: [
+      (self handleKey: evt key rune: evt rune mod: evt mod) ifTrue: [
+        self invalidate
+      ]
+    ]
   ]
 
   "--- Extracted Key Actions ---"
@@ -157,7 +161,7 @@ TextEditor subclass: Object
 
   method: killLine [
     "Ctrl-K — kill region if active, else kill to end of line."
-    | lineStr |
+    | lineStr <String> |
     markActive ifTrue: [
       killBuffer := self regionText.
       self deleteRegion.
@@ -172,11 +176,11 @@ TextEditor subclass: Object
 
   method: yank [
     "Ctrl-Y — yank from the kill buffer."
-    | lineStr leftPart rightPart |
+    | lineStr <String> leftPart <String> rightPart <String> |
     markActive := false.
     killBuffer size = 0 ifTrue: [^self].
     killBuffer size = 1 ifTrue: [
-      | text |
+      | text <String> |
       text := killBuffer at: 0.
       lineStr := lines at: cursorY.
       leftPart := lineStr copyFrom: 0 to: cursorX.
@@ -184,7 +188,7 @@ TextEditor subclass: Object
       lines at: cursorY put: (leftPart, text, rightPart).
       cursorX := cursorX + text size
     ] ifFalse: [
-      | firstLine lastLine beforeLines afterLines middleLines |
+      | firstLine <String> lastLine <String> beforeLines <Array> afterLines <Array> middleLines <Array> |
       lineStr := lines at: cursorY.
       leftPart := lineStr copyFrom: 0 to: cursorX.
       rightPart := lineStr copyFrom: cursorX.
@@ -212,7 +216,7 @@ TextEditor subclass: Object
 
   method: nextLine [
     "Ctrl-N — move cursor to next line."
-    | lineStr |
+    | lineStr <String> |
     cursorY < (lines size - 1) ifTrue: [cursorY := cursorY + 1].
     lineStr := lines at: cursorY.
     cursorX > lineStr size ifTrue: [cursorX := lineStr size]
@@ -220,7 +224,7 @@ TextEditor subclass: Object
 
   method: previousLine [
     "Ctrl-P — move cursor to previous line."
-    | lineStr |
+    | lineStr <String> |
     cursorY > 0 ifTrue: [cursorY := cursorY - 1].
     lineStr := lines at: cursorY.
     cursorX > lineStr size ifTrue: [cursorX := lineStr size]
@@ -228,7 +232,7 @@ TextEditor subclass: Object
 
   method: splitLine [
     "Enter — split line at cursor."
-    | lineStr leftPart rightPart |
+    | lineStr <String> leftPart <String> rightPart <String> |
     lineStr := lines at: cursorY.
     leftPart := lineStr copyFrom: 0 to: cursorX.
     rightPart := lineStr copyFrom: cursorX.
@@ -241,7 +245,7 @@ TextEditor subclass: Object
 
   method: deleteBack [
     "Backspace — delete character before cursor or join lines."
-    | lineStr leftPart rightPart |
+    | lineStr <String> leftPart <String> rightPart <String> |
     cursorX > 0 ifTrue: [
       lineStr := lines at: cursorY.
       leftPart := lineStr copyFrom: 0 to: cursorX - 1.
@@ -263,7 +267,7 @@ TextEditor subclass: Object
 
   method: moveCursorUp [
     "Up arrow — move cursor up one line."
-    | lineStr |
+    | lineStr <String> |
     cursorY > 0 ifTrue: [cursorY := cursorY - 1].
     lineStr := lines at: cursorY.
     cursorX > lineStr size ifTrue: [cursorX := lineStr size]
@@ -271,7 +275,7 @@ TextEditor subclass: Object
 
   method: moveCursorDown [
     "Down arrow — move cursor down one line."
-    | lineStr |
+    | lineStr <String> |
     cursorY < (lines size - 1) ifTrue: [cursorY := cursorY + 1].
     lineStr := lines at: cursorY.
     cursorX > lineStr size ifTrue: [cursorX := lineStr size]
@@ -284,14 +288,14 @@ TextEditor subclass: Object
 
   method: moveCursorRight [
     "Right arrow — move cursor right one character."
-    | lineStr |
+    | lineStr <String> |
     lineStr := lines at: cursorY.
     cursorX < lineStr size ifTrue: [cursorX := cursorX + 1]
   ]
 
-  method: insertChar: runeVal [
+  method: insertChar: runeVal <Integer> [
     "Insert a printable character at cursor position."
-    | lineStr leftPart rightPart |
+    | lineStr <String> leftPart <String> rightPart <String> |
     lineStr := lines at: cursorY.
     leftPart := lineStr copyFrom: 0 to: cursorX.
     rightPart := lineStr copyFrom: cursorX.
@@ -301,7 +305,7 @@ TextEditor subclass: Object
   ]
 
   "--- Scroll ---"
-  method: updateScroll: visibleHeight [
+  method: updateScroll: visibleHeight <Integer> [
     cursorY < scrollOffset ifTrue: [scrollOffset := cursorY].
     cursorY >= (scrollOffset + visibleHeight) ifTrue: [
       scrollOffset := cursorY - visibleHeight + 1
@@ -309,25 +313,25 @@ TextEditor subclass: Object
   ]
 
   "--- Region/Selection ---"
-  method: regionStartY [
+  method: regionStartY ^<Integer> [
     (markY < cursorY or: [markY = cursorY and: [markX <= cursorX]])
       ifTrue: [^markY] ifFalse: [^cursorY]
   ]
-  method: regionStartX [
+  method: regionStartX ^<Integer> [
     (markY < cursorY or: [markY = cursorY and: [markX <= cursorX]])
       ifTrue: [^markX] ifFalse: [^cursorX]
   ]
-  method: regionEndY [
+  method: regionEndY ^<Integer> [
     (markY < cursorY or: [markY = cursorY and: [markX <= cursorX]])
       ifTrue: [^cursorY] ifFalse: [^markY]
   ]
-  method: regionEndX [
+  method: regionEndX ^<Integer> [
     (markY < cursorY or: [markY = cursorY and: [markX <= cursorX]])
       ifTrue: [^cursorX] ifFalse: [^markX]
   ]
 
-  method: isInRegion: col row: row [
-    | startY startX endY endX |
+  method: isInRegion: col <Integer> row: row <Integer> ^<Boolean> [
+    | startY <Integer> startX <Integer> endY <Integer> endX <Integer> |
     markActive ifFalse: [^false].
     startY := self regionStartY. startX := self regionStartX.
     endY := self regionEndY. endX := self regionEndX.
@@ -339,27 +343,28 @@ TextEditor subclass: Object
     ^true
   ]
 
-  method: regionText [
-    | startY startX endY endX result |
+  method: regionText ^<Array> [
+    | startY <Integer> startX <Integer> endY <Integer> endX <Integer> result <ArrayList> |
     startY := self regionStartY. startX := self regionStartX.
     endY := self regionEndY. endX := self regionEndX.
     startY = endY ifTrue: [
       ^Array with: ((lines at: startY) copyFrom: startX to: endX)
     ].
-    result := Array with: ((lines at: startY) copyFrom: startX).
+    result := ArrayList new.
+    result add: ((lines at: startY) copyFrom: startX).
     (startY + 1) to: endY - 1 do: [:row |
-      result := result copyWith: (lines at: row)
+      result add: (lines at: row)
     ].
-    result := result copyWith: ((lines at: endY) copyFrom: 0 to: endX).
-    ^result
+    result add: ((lines at: endY) copyFrom: 0 to: endX).
+    ^result asArray
   ]
 
   method: deleteRegion [
-    | startY startX endY endX beforePart afterPart |
+    | startY <Integer> startX <Integer> endY <Integer> endX <Integer> beforePart <String> afterPart <String> |
     startY := self regionStartY. startX := self regionStartX.
     endY := self regionEndY. endX := self regionEndX.
     startY = endY ifTrue: [
-      | line |
+      | line <String> |
       line := lines at: startY.
       lines at: startY put: (line copyFrom: 0 to: startX), (line copyFrom: endX).
     ] ifFalse: [
@@ -373,12 +378,12 @@ TextEditor subclass: Object
   ]
 
   "--- Rendering ---"
-  method: displayOn: aCellBuffer [
+  method: displayOn: aCellBuffer <CellBuffer> [
     self displayOn: aCellBuffer showCursor: true
   ]
 
-  method: displayOn: aCellBuffer showCursor: showCursor [
-    | visibleHeight i lineIndex lineStr j charCode style inRegion |
+  method: displayOn: aCellBuffer <CellBuffer> showCursor: showCursor <Boolean> [
+    | visibleHeight <Integer> i <Integer> lineIndex <Integer> lineStr <String> j <Integer> charCode <Integer> style <Dynamic> inRegion <Boolean> |
     visibleHeight := aCellBuffer height.
     self updateScroll: visibleHeight.
 
@@ -409,7 +414,7 @@ TextEditor subclass: Object
 
       "Scrollbar indicator on right edge"
       lines size > visibleHeight ifTrue: [
-        | scrollPos |
+        | scrollPos <Integer> |
         scrollPos := (scrollOffset + i) * (visibleHeight - 1) // (lines size - 1) max: 0.
         scrollPos = i ifTrue: [
           aCellBuffer putChar: 9608 x: aCellBuffer width - 1 y: i style: normalStyle
@@ -421,9 +426,9 @@ TextEditor subclass: Object
   ]
 
   "--- Mouse ---"
-  method: handleClick: x y: y [
+  method: handleClick: x <Integer> y: y <Integer> [
     "Position cursor from a click."
-    | lineIndex |
+    | lineIndex <Integer> |
     lineIndex := scrollOffset + y.
     lineIndex < lines size ifTrue: [
       cursorY := lineIndex.

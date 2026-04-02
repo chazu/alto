@@ -7,10 +7,10 @@ import: 'Go'
  Supports custom item labels via labelBlock."
 
 ListView subclass: View
-  instanceVars: items selectedIndex scrollOffset onSelectBlock labelBlock visibleHeight
+  instanceVars: items <Array> selectedIndex <Integer> scrollOffset <Integer> onSelectBlock <Block> labelBlock <Block> visibleHeight <Integer>
 
-  classMethod: items: anArray onSelect: aBlock [
-    | instance |
+  classMethod: items: anArray <Array> onSelect: aBlock <Block> ^<ListView> [
+    | instance <ListView> |
     instance := super new.
     instance initialize.
     instance privateItems: anArray.
@@ -27,20 +27,20 @@ ListView subclass: View
     visibleHeight := 0
   ]
 
-  method: privateItems: anArray [ items := anArray ]
-  method: items [ ^items ]
-  method: selectedIndex [ ^selectedIndex ]
-  method: scrollOffset [ ^scrollOffset ]
+  method: privateItems: anArray <Array> [ items := anArray ]
+  method: items ^<Array> [ ^items ]
+  method: selectedIndex ^<Integer> [ ^selectedIndex ]
+  method: scrollOffset ^<Integer> [ ^scrollOffset ]
 
-  method: onSelect: aBlock [ onSelectBlock := aBlock ]
+  method: onSelect: aBlock <Block> [ onSelectBlock := aBlock ]
 
-  method: labelBlock: aBlock [
+  method: labelBlock: aBlock <Block> [
     "Set a block that converts an item to its display string.
      If nil, items are displayed as-is."
     labelBlock := aBlock
   ]
 
-  method: selectedIndex: anIndex [
+  method: selectedIndex: anIndex <Integer> [
     "Set the selection index with bounds clamping."
     selectedIndex := anIndex.
     self clampSelection.
@@ -48,7 +48,7 @@ ListView subclass: View
     self invalidate
   ]
 
-  method: selectedItem [
+  method: selectedItem ^<Object> [
     "Return the selected item, or nil if nothing is selected."
     items size = 0 ifTrue: [^nil].
     selectedIndex < 0 ifTrue: [^nil].
@@ -56,7 +56,7 @@ ListView subclass: View
     ^items at: selectedIndex
   ]
 
-  method: items: newItems [
+  method: items: newItems <Array> [
     "Set list items, resetting selection and scroll to top."
     items := newItems.
     selectedIndex := 0.
@@ -64,7 +64,7 @@ ListView subclass: View
     self invalidate
   ]
 
-  method: updateItems: newItems [
+  method: updateItems: newItems <Array> [
     "Replace items while preserving selection and scroll position.
      Attempts to keep the same selectedIndex, clamped to new bounds."
     items := newItems.
@@ -73,9 +73,9 @@ ListView subclass: View
     self invalidate
   ]
 
-  method: selectByValue: aValue [
+  method: selectByValue: aValue <Object> [
     "Select the item matching aValue. If not found, clamp to 0."
-    | i |
+    | i <Integer> |
     i := 0.
     [i < items size] whileTrue: [
       (items at: i) = aValue ifTrue: [
@@ -91,7 +91,7 @@ ListView subclass: View
     self invalidate
   ]
 
-  method: labelForItem: anItem [
+  method: labelForItem: anItem <Object> ^<String> [
     "Return the display string for an item."
     labelBlock notNil ifTrue: [^labelBlock value: anItem].
     anItem isNil ifTrue: [^''].
@@ -107,7 +107,7 @@ ListView subclass: View
 
   method: ensureSelectionVisible [
     "Adjust scrollOffset so selectedIndex is visible."
-    | vh |
+    | vh <Integer> |
     vh := visibleHeight.
     vh = 0 ifTrue: [
       buffer notNil ifTrue: [vh := buffer height]
@@ -134,10 +134,10 @@ ListView subclass: View
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
+  method: displayOn: aCellBuffer <CellBuffer> [
     "Render list items with scroll and selection highlight.
      Uses putStringFilled for full-width selection highlighting."
-    | i itemIndex itemStr style |
+    | i <Integer> itemIndex <Integer> itemStr <String> style <Dynamic> |
     visibleHeight := aCellBuffer height.
     self ensureSelectionVisible.
     i := 0.
@@ -152,10 +152,10 @@ ListView subclass: View
     ]
   ]
 
-  method: renderInto: aCellBuffer atX: ox y: oy width: w height: h [
+  method: renderInto: aCellBuffer <CellBuffer> atX: ox <Integer> y: oy <Integer> width: w <Integer> height: h <Integer> [
     "Render the list into a region of an external buffer.
      Used when the list is a sub-pane of a larger view (e.g. Debugger, Inspector)."
-    | i itemIndex itemStr style |
+    | i <Integer> itemIndex <Integer> itemStr <String> style <Dynamic> |
     visibleHeight := h.
     self ensureSelectionVisible.
     i := 0.
@@ -172,10 +172,10 @@ ListView subclass: View
     ]
   ]
 
-  method: handleClickAtY: y [
+  method: handleClickAtY: y <Integer> [
     "Handle a mouse click at row y (relative to this list's rendering origin).
      Used when the parent translates coordinates for a sub-pane."
-    | clickedIndex |
+    | clickedIndex <Integer> |
     clickedIndex := scrollOffset + y.
     (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
       selectedIndex := clickedIndex.
@@ -185,20 +185,17 @@ ListView subclass: View
     ]
   ]
 
-  method: handleMouseLocalX: x y: y buttons: btn [
-    | clickedIndex |
-    btn = 1 ifFalse: [^self].
-    clickedIndex := scrollOffset + y.
-    (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
-      selectedIndex := clickedIndex.
-      self invalidate.
-      onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem]
-    ]
-  ]
-
-  method: handleEvent: evt [
+  method: handleEvent: evt <Event> [
     evt isMouse ifTrue: [
-      self handleMouseLocalX: evt x y: evt y buttons: evt buttons.
+      | clickedIndex <Integer> |
+      evt buttons = 1 ifFalse: [^self].
+      clickedIndex := scrollOffset + evt y.
+      (clickedIndex >= 0 and: [clickedIndex < items size]) ifTrue: [
+        selectedIndex := clickedIndex.
+        self ensureSelectionVisible.
+        self invalidate.
+        onSelectBlock notNil ifTrue: [onSelectBlock value: self selectedItem]
+      ].
       ^self
     ].
 

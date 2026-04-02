@@ -5,7 +5,7 @@ import: 'Go'
 
 Main subclass: Object
   classMethod: start [
-    | display |
+    | display <Display> |
     display := Display new.
     Transcript open: display.
     Transcript show: 'Alto started.'.

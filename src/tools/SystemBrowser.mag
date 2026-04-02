@@ -2,17 +2,17 @@ namespace: 'Alto'
 import: 'Go'
 
 SystemBrowser subclass: View
-  instanceVars: categoryList classList methodList codeView display parentWindow focusedPane cachedCatBuf cachedClassBuf cachedMethodBuf cachedCodeBuf lastPaneWidth lastPaneHeight lastCodeHeight allClassNames classObjects codeEditor browserModel
+  instanceVars: categoryList <ListView> classList <ListView> methodList <ListView> codeView <String> display <Display> parentWindow <Window> focusedPane <Integer> cachedCatBuf <CellBuffer> cachedClassBuf <CellBuffer> cachedMethodBuf <CellBuffer> cachedCodeBuf <CellBuffer> lastPaneWidth <Integer> lastPaneHeight <Integer> lastCodeHeight <Integer> allClassNames <Array> classObjects <Dictionary> codeEditor <TextEditor> browserModel <BrowserModel>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<SystemBrowser> [
+    | instance <SystemBrowser> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: open: aDisplay [
-    | frame browser window |
+  classMethod: open: aDisplay <Display> ^<SystemBrowser> [
+    | frame <Rectangle> browser <SystemBrowser> window <Window> |
     frame := Rectangle x: 0 y: 0 width: 80 height: 30.
     browser := SystemBrowser new.
     browser display: aDisplay.
@@ -23,9 +23,9 @@ SystemBrowser subclass: View
   ]
 
   method: initialize [
-    | categories |
+    | categories <Array> |
     super initialize.
-    categories := #('Kernel' 'Display' 'MVC' 'Widgets' 'Tools' 'Other').
+    categories := #('Kernel' 'Display' 'Events' 'MVC' 'Widgets' 'Tools' 'Other').
 
     "Create the model and register self as dependent (View protocol)"
     browserModel := BrowserModel new.
@@ -67,67 +67,65 @@ SystemBrowser subclass: View
     self refreshClassList
   ]
 
-  method: browserModel [ ^browserModel ]
+  method: browserModel ^<BrowserModel> [ ^browserModel ]
 
   method: buildClassList [
     "Populate class name array and name→object dictionary for O(1) lookup."
+    | list <ArrayList> |
+    list := ArrayList new.
     Class allClassesSorted do: [:cls |
-      | nameStr |
+      | nameStr <String> |
       nameStr := '', cls name.
-      allClassNames := allClassNames copyWith: nameStr.
+      list add: nameStr.
       classObjects at: nameStr put: cls
-    ]
+    ].
+    allClassNames := list asArray
   ]
 
-  method: classObjectForName: aName [
+  method: classObjectForName: aName <String> ^<Object> [
     "Look up a class object by name. Returns the class or false if not found."
     ^classObjects at: aName ifAbsent: [false]
   ]
 
-  method: classesForCategory: aCategoryName [
+  method: classesForCategory: aCategoryName <String> ^<Array> [
     "Get class names for a category."
-    | result |
-    result := Array new: 0.
+    | result <ArrayList> |
+    result := ArrayList new.
     allClassNames do: [:nameStr |
       (self categoryForClassName: nameStr) = aCategoryName ifTrue: [
-        result := result copyWith: nameStr
+        result add: nameStr
       ]
     ].
-    ^result
+    ^result asArray
   ]
 
-  method: categoryForClassName: className [
-    "Map class name to a UI category."
-    (#('Rectangle' 'CellBuffer') includes: className) ifTrue: [^'Kernel'].
-    (#('Display') includes: className) ifTrue: [^'Display'].
-    (#('Model' 'View') includes: className) ifTrue: [^'MVC'].
-    (#('Window' 'Label' 'ListView' 'Menu') includes: className) ifTrue: [^'Widgets'].
-    (#('Workspace' 'Transcript' 'SystemBrowser' 'Inspector') includes: className) ifTrue: [^'Tools'].
-    ^'Other'
+  method: categoryForClassName: className <String> ^<String> [
+    "Map class name to a UI category. Delegates to ClassRegistry."
+    ^ClassRegistry categoryForClassName: className
   ]
 
-  method: methodsForClass: aClassName [
+  method: methodsForClass: aClassName <String> ^<Array> [
     "Look up class object and get real method names.
      Returns String array for display; sourceForClass:method: converts back to Symbol for lookup."
-    | cls methods result |
+    | cls <Object> methods <Array> result <Array> |
     aClassName isNil ifTrue: [^#()].
     [
       cls := self classObjectForName: aClassName.
       cls = false ifTrue: [^#()].
       methods := cls allMethodNames.
-      result := Array new: 0.
-      methods do: [:sel | result := result copyWith: ('', sel)].
-      ^result sorted
+      result := ArrayList new.
+      methods do: [:sel | result add: ('', sel)].
+      ^result asArray sorted
     ] on: Exception do: [:e |
       Transcript show: 'Browser methods error: ', e messageText.
       ^#()
     ]
   ]
 
-  method: sourceForClass: aClassName method: aMethodName [
+  method: sourceForClass: aClassName <String> method: aMethodName <String> ^<String> [
     "Look up class object and get real source code.
      aMethodName is a String; we find the matching Symbol from allMethodNames for lookup."
-    | cls src sym methods |
+    | cls <Object> src <String> sym <Symbol> methods <Array> |
     [
       cls := self classObjectForName: aClassName.
       cls = false ifTrue: [^aClassName, ' >> #', aMethodName].
@@ -151,7 +149,7 @@ SystemBrowser subclass: View
 
   method: refreshClassList [
     "Refresh classList from model's selectedCategory. Clears class/method selections."
-    | classes |
+    | classes <Array> |
     classes := self classesForCategory: browserModel selectedCategory.
     classList items: classes.
     browserModel silentClassNames: classes.
@@ -164,7 +162,7 @@ SystemBrowser subclass: View
 
   method: refreshMethodList [
     "Refresh methodList from model's selectedClass."
-    | methods |
+    | methods <Array> |
     browserModel selectedClass isNil ifTrue: [^self].
     methods := self methodsForClass: browserModel selectedClass.
     methodList items: methods.
@@ -175,7 +173,7 @@ SystemBrowser subclass: View
 
   method: refreshCodeView [
     "Refresh code pane from model's selectedClass and selectedMethod."
-    | selClass selMethod |
+    | selClass <String> selMethod <String> |
     selClass := browserModel selectedClass.
     selMethod := browserModel selectedMethod.
     selClass isNil ifTrue: [^self].
@@ -184,7 +182,7 @@ SystemBrowser subclass: View
     codeEditor text: codeView
   ]
 
-  method: update: aspect [
+  method: update: aspect <String> [
     "Respond to model changes via the Model/View protocol."
     aspect = 'selectedCategory' ifTrue: [
       self refreshClassList.
@@ -205,7 +203,7 @@ SystemBrowser subclass: View
     self invalidate
   ]
 
-  method: handleCodeKey: keyCode rune: runeVal mod: mod [
+  method: handleCodeKey: keyCode <Integer> rune: runeVal <Integer> mod: mod <Integer> [
     "Handle key events in the code editing pane."
 
     "Tab — leave code pane (back to categories)"
@@ -234,7 +232,7 @@ SystemBrowser subclass: View
 
   method: compileAndSave [
     "Compile the edited code, install it live, and write the class back to disk."
-    | cls source sel filePath saveResult selClass |
+    | cls <Object> source <String> sel <Symbol> filePath <String> saveResult <Object> selClass <String> |
     selClass := browserModel selectedClass.
     selClass isNil ifTrue: [Transcript show: 'No class selected'. ^self].
     browserModel selectedMethod isNil ifTrue: [Transcript show: 'No method selected'. ^self].
@@ -265,9 +263,9 @@ SystemBrowser subclass: View
     ]
   ]
 
-  method: filePathForClass: className [
+  method: filePathForClass: className <String> ^<String> [
     "Derive .mag file path from class name and category."
-    | category dirMap dir |
+    | category <String> dirMap <Dictionary> dir <String> |
     category := self categoryForClassName: className.
     dirMap := Dictionary new.
     dirMap at: 'Kernel' put: 'src/display'.
@@ -280,79 +278,30 @@ SystemBrowser subclass: View
     ^dir, '/', className, '.mag'
   ]
 
-  method: display: aDisplay [ display := aDisplay ]
-  method: parentWindow: aWindow [ parentWindow := aWindow ]
-  method: parentWindow [ ^parentWindow ]
-  method: display [ ^display ]
-  method: categoryList [ ^categoryList ]
-  method: classList [ ^classList ]
-  method: methodList [ ^methodList ]
-  method: codeView [ ^codeView ]
-  method: selectedCategory [ ^browserModel selectedCategory ]
-  method: selectedClass [ ^browserModel selectedClass ]
-  method: selectedMethod [ ^browserModel selectedMethod ]
-  method: focusedPane [ ^focusedPane ]
+  method: display: aDisplay <Display> [ display := aDisplay ]
+  method: parentWindow: aWindow <Window> [ parentWindow := aWindow ]
+  method: parentWindow ^<Window> [ ^parentWindow ]
+  method: display ^<Display> [ ^display ]
+  method: categoryList ^<ListView> [ ^categoryList ]
+  method: classList ^<ListView> [ ^classList ]
+  method: methodList ^<ListView> [ ^methodList ]
+  method: codeView ^<String> [ ^codeView ]
+  method: selectedCategory ^<String> [ ^browserModel selectedCategory ]
+  method: selectedClass ^<String> [ ^browserModel selectedClass ]
+  method: selectedMethod ^<String> [ ^browserModel selectedMethod ]
+  method: focusedPane ^<Integer> [ ^focusedPane ]
 
-  method: listPaneHeight [ ^10 ]
+  method: listPaneHeight ^<Integer> [ ^10 ]
 
-  method: paneWidthFor: totalWidth [
+  method: paneWidthFor: totalWidth <Integer> ^<Integer> [
     ^totalWidth // 3
   ]
 
-  method: handleMouseLocalX: x y: y buttons: btn [
-    | paneWidth paneHeight |
-    btn = 1 ifFalse: [^self].
-    paneHeight := self listPaneHeight.
-    paneWidth := 26.
-    parentWindow notNil ifTrue: [
-      paneWidth := self paneWidthFor: parentWindow frame width - 2
-    ].
-
-    "Only handle clicks in the top pane area"
-    y >= paneHeight ifTrue: [
-      focusedPane := 3.
-      self invalidate.
-      ^self
-    ].
-
-    x < paneWidth ifTrue: [
-      "Click in category pane — delegate to categoryList"
-      focusedPane := 0.
-      categoryList selectByValue: browserModel selectedCategory.
-      categoryList handleMouseLocalX: x y: y buttons: btn.
-      categoryList selectedItem notNil ifTrue: [
-        browserModel selectedCategory: categoryList selectedItem
-      ]
-    ] ifFalse: [
-      x < (paneWidth * 2) ifTrue: [
-        "Click in class pane — delegate to classList"
-        focusedPane := 1.
-        classList handleMouseLocalX: (x - paneWidth) y: y buttons: btn.
-        classList selectedItem notNil ifTrue: [
-          browserModel selectedClass: classList selectedItem
-        ]
-      ] ifFalse: [
-        x < (paneWidth * 3) ifTrue: [
-          "Click in method pane — delegate to methodList"
-          focusedPane := 2.
-          methodList handleMouseLocalX: (x - (paneWidth * 2)) y: y buttons: btn.
-          methodList selectedItem notNil ifTrue: [
-            browserModel selectedMethod: methodList selectedItem
-          ]
-        ] ifFalse: [
-          focusedPane := 3
-        ]
-      ]
-    ].
-    self invalidate
-  ]
-
-  method: handleEvent: evt [
-    | keyCode runeVal pane |
+  method: handleEvent: evt <Event> [
+    | keyCode <Integer> runeVal <Integer> pane <Integer> |
 
     evt isMouse ifTrue: [
-      self handleMouseLocalX: evt x y: evt y buttons: evt buttons.
-      ^self
+      ^self routeMouseEvent: evt
     ].
 
     evt isKey ifFalse: [^self].
@@ -407,9 +356,60 @@ SystemBrowser subclass: View
     ]
   ]
 
-  method: handleCategoryArrow: keyCode [
+  method: routeMouseEvent: evt <Event> [
+    "Route mouse click to the appropriate list pane or code pane."
+    | x <Integer> y <Integer> paneWidth <Integer> paneHeight <Integer> |
+    evt buttons = 1 ifFalse: [^self].
+    x := evt x.
+    y := evt y.
+    paneHeight := self listPaneHeight.
+    paneWidth := 26.
+    parentWindow notNil ifTrue: [
+      paneWidth := self paneWidthFor: parentWindow frame width - 2
+    ].
+
+    "Click in code pane area"
+    y >= paneHeight ifTrue: [
+      focusedPane := 3.
+      self invalidate.
+      ^self
+    ].
+
+    x < paneWidth ifTrue: [
+      "Click in category pane"
+      focusedPane := 0.
+      categoryList selectByValue: browserModel selectedCategory.
+      categoryList handleEvent: (evt withX: x y: y).
+      categoryList selectedItem notNil ifTrue: [
+        browserModel selectedCategory: categoryList selectedItem
+      ]
+    ] ifFalse: [
+      x < (paneWidth * 2) ifTrue: [
+        "Click in class pane"
+        focusedPane := 1.
+        classList handleEvent: (evt withX: x - paneWidth y: y).
+        classList selectedItem notNil ifTrue: [
+          browserModel selectedClass: classList selectedItem
+        ]
+      ] ifFalse: [
+        x < (paneWidth * 3) ifTrue: [
+          "Click in method pane"
+          focusedPane := 2.
+          methodList handleEvent: (evt withX: x - (paneWidth * 2) y: y).
+          methodList selectedItem notNil ifTrue: [
+            browserModel selectedMethod: methodList selectedItem
+          ]
+        ] ifFalse: [
+          focusedPane := 3
+        ]
+      ]
+    ].
+    self invalidate
+  ]
+
+  method: handleCategoryArrow: keyCode <Integer> [
     "Delegate arrow navigation to categoryList ListView."
-    | items |
+    | items <Array> |
     items := categoryList items.
     items size = 0 ifTrue: [^self].
     categoryList selectByValue: browserModel selectedCategory.
@@ -418,9 +418,9 @@ SystemBrowser subclass: View
     browserModel selectedCategory: categoryList selectedItem
   ]
 
-  method: handleClassArrow: keyCode [
+  method: handleClassArrow: keyCode <Integer> [
     "Delegate arrow navigation to classList ListView."
-    | classes |
+    | classes <Array> |
     classes := classList items.
     classes size = 0 ifTrue: [^self].
     browserModel selectedClass isNil ifTrue: [
@@ -434,9 +434,9 @@ SystemBrowser subclass: View
     browserModel selectedClass: classList selectedItem
   ]
 
-  method: handleMethodArrow: keyCode [
+  method: handleMethodArrow: keyCode <Integer> [
     "Delegate arrow navigation to methodList ListView."
-    | methods |
+    | methods <Array> |
     browserModel selectedClass isNil ifTrue: [^self].
     methods := methodList items.
     methods size = 0 ifTrue: [^self].
@@ -457,7 +457,7 @@ SystemBrowser subclass: View
   ]
 
   method: selectClass [
-    | classes |
+    | classes <Array> |
     classes := self classesForCategory: browserModel selectedCategory.
     browserModel selectedClass isNil ifTrue: [
       classes size > 0 ifTrue: [
@@ -470,7 +470,7 @@ SystemBrowser subclass: View
   ]
 
   method: selectMethod [
-    | methods |
+    | methods <Array> |
     browserModel selectedClass isNil ifTrue: [^self].
     methods := self methodsForClass: browserModel selectedClass.
     browserModel selectedMethod isNil ifTrue: [
@@ -483,8 +483,8 @@ SystemBrowser subclass: View
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
-    | paneWidth paneHeight codeHeight |
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | paneWidth <Integer> paneHeight <Integer> codeHeight <Integer> |
     paneWidth := self paneWidthFor: aCellBuffer width.
     paneHeight := self listPaneHeight.
     codeHeight := aCellBuffer height - paneHeight.

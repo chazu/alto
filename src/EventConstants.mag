@@ -7,43 +7,49 @@ import: 'Go'
 EventConstants subclass: Object
 
   "--- Key codes ---"
-  classMethod: keyTab       [ ^9 ]
-  classMethod: keyEnter     [ ^13 ]
-  classMethod: keyEscape    [ ^27 ]
-  classMethod: keyBackspace [ ^8 ]
-  classMethod: keyDelete    [ ^127 ]
-  classMethod: keySpace     [ ^32 ]
-  classMethod: keyUp        [ ^257 ]
-  classMethod: keyDown      [ ^258 ]
-  classMethod: keyRight     [ ^259 ]
-  classMethod: keyLeft      [ ^260 ]
-  classMethod: keyRune      [ ^256 ]
+  classMethod: keyTab       ^<Integer> [ ^9 ]
+  classMethod: keyEnter     ^<Integer> [ ^13 ]
+  classMethod: keyEscape    ^<Integer> [ ^27 ]
+  classMethod: keyBackspace ^<Integer> [ ^8 ]
+  classMethod: keyDelete    ^<Integer> [ ^127 ]
+  classMethod: keySpace     ^<Integer> [ ^32 ]
+  classMethod: keyUp        ^<Integer> [ ^257 ]
+  classMethod: keyDown      ^<Integer> [ ^258 ]
+  classMethod: keyRight     ^<Integer> [ ^259 ]
+  classMethod: keyLeft      ^<Integer> [ ^260 ]
+  classMethod: keyRune      ^<Integer> [ ^256 ]
 
   "--- Event types ---"
-  classMethod: eventMouse   [ ^-2 ]
-  classMethod: eventResize  [ ^-3 ]
-  classMethod: eventWakeup  [ ^-4 ]
+  classMethod: eventMouse   ^<Integer> [ ^-2 ]
+  classMethod: eventResize  ^<Integer> [ ^-3 ]
+  classMethod: eventWakeup  ^<Integer> [ ^-4 ]
 
   "--- Modifier masks ---"
-  classMethod: modCtrl      [ ^2 ]
+  classMethod: modCtrl      ^<Integer> [ ^2 ]
+
+  "--- tcell Ctrl key codes (keyCode values from tcell) ---"
+  classMethod: keyCtrlC ^<Integer> [ ^3 ]
+  classMethod: keyCtrlD ^<Integer> [ ^4 ]
+  classMethod: keyCtrlO ^<Integer> [ ^15 ]
+  classMethod: keyCtrlR ^<Integer> [ ^18 ]
 
   "--- Ctrl key codes (the rune/keyCode value when Ctrl is held) ---"
-  classMethod: ctrlA [ ^65 ]
-  classMethod: ctrlC [ ^67 ]
-  classMethod: ctrlD [ ^68 ]
-  classMethod: ctrlE [ ^69 ]
-  classMethod: ctrlG [ ^71 ]
-  classMethod: ctrlK [ ^75 ]
-  classMethod: ctrlN [ ^78 ]
-  classMethod: ctrlO [ ^79 ]
-  classMethod: ctrlP [ ^80 ]
-  classMethod: ctrlR [ ^82 ]
-  classMethod: ctrlS [ ^83 ]
-  classMethod: ctrlW [ ^87 ]
-  classMethod: ctrlY [ ^89 ]
+  classMethod: ctrlA ^<Integer> [ ^65 ]
+  classMethod: ctrlC ^<Integer> [ ^67 ]
+  classMethod: ctrlD ^<Integer> [ ^68 ]
+  classMethod: ctrlE ^<Integer> [ ^69 ]
+  classMethod: ctrlG ^<Integer> [ ^71 ]
+  classMethod: ctrlK ^<Integer> [ ^75 ]
+  classMethod: ctrlN ^<Integer> [ ^78 ]
+  classMethod: ctrlO ^<Integer> [ ^79 ]
+  classMethod: ctrlP ^<Integer> [ ^80 ]
+  classMethod: ctrlR ^<Integer> [ ^82 ]
+  classMethod: ctrlS ^<Integer> [ ^83 ]
+  classMethod: ctrlW ^<Integer> [ ^87 ]
+  classMethod: ctrlY ^<Integer> [ ^89 ]
 
   "--- Helpers ---"
-  classMethod: isCtrl: mod [
+  classMethod: isCtrl: mod <Integer> ^<Boolean> [
     "Test whether the Ctrl modifier is set."
     ^(mod bitAnd: 2) > 0
   ]

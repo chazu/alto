@@ -6,7 +6,7 @@ import: 'Go'
 
 HelloApp subclass: Object
   classMethod: start [
-    | app label |
+    | app <App> label <Label> |
     label := Label text: 'Hello from Alto! Press Escape to quit.'.
     app := App new.
     app openWindow: 'Hello World' content: label controller: label.

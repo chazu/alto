@@ -2,17 +2,17 @@ namespace: 'Alto'
 import: 'Go'
 
 Workspace subclass: View
-  instanceVars: editor display parentWindow
+  instanceVars: editor <TextEditor> display <Display> parentWindow <Window>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<Workspace> [
+    | instance <Workspace> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: open: aDisplay [
-    | frame ws window |
+  classMethod: open: aDisplay <Display> ^<Workspace> [
+    | frame <Rectangle> ws <Workspace> window <Window> |
     frame := Rectangle x: 1 y: 1 width: 60 height: 20.
     ws := Workspace new.
     window := Window title: 'Workspace' content: ws controller: ws frame: frame.
@@ -28,17 +28,17 @@ Workspace subclass: View
     parentWindow := nil
   ]
 
-  method: parentWindow: aWindow [ parentWindow := aWindow ]
-  method: display: aDisplay [ display := aDisplay ]
-  method: parentWindow [ ^parentWindow ]
-  method: editor [ ^editor ]
-  method: textLines [ ^editor lines ]
-  method: cursorX [ ^editor cursorX ]
-  method: cursorY [ ^editor cursorY ]
-  method: scrollOffset [ ^editor scrollOffset ]
+  method: parentWindow: aWindow <Window> [ parentWindow := aWindow ]
+  method: display: aDisplay <Display> [ display := aDisplay ]
+  method: parentWindow ^<Window> [ ^parentWindow ]
+  method: editor ^<TextEditor> [ ^editor ]
+  method: textLines ^<Array> [ ^editor lines ]
+  method: cursorX ^<Integer> [ ^editor cursorX ]
+  method: cursorY ^<Integer> [ ^editor cursorY ]
+  method: scrollOffset ^<Integer> [ ^editor scrollOffset ]
 
-  method: handleEvent: evt [
-    | keyCode runeVal mod |
+  method: handleEvent: evt <Event> [
+    | keyCode <Integer> runeVal <Integer> mod <Integer> |
 
     "Handle mouse events"
     evt isMouse ifTrue: [
@@ -64,23 +64,23 @@ Workspace subclass: View
     ].
 
     "Ctrl-C — quit app"
-    (keyCode = 3 or: [keyCode = EventConstants ctrlC and: [EventConstants isCtrl: mod]]) ifTrue: [
+    (keyCode = EventConstants keyCtrlC or: [keyCode = EventConstants ctrlC and: [EventConstants isCtrl: mod]]) ifTrue: [
       display notNil ifTrue: [display stop].
       ^self
     ].
 
     "Ctrl-D — do-it"
-    (keyCode = 4 or: [keyCode = EventConstants ctrlD and: [EventConstants isCtrl: mod]]) ifTrue: [
+    (keyCode = EventConstants keyCtrlD or: [keyCode = EventConstants ctrlD and: [EventConstants isCtrl: mod]]) ifTrue: [
       self doIt. ^self
     ].
 
     "Ctrl-R — print-it"
-    (keyCode = 18 or: [keyCode = EventConstants ctrlR and: [EventConstants isCtrl: mod]]) ifTrue: [
+    (keyCode = EventConstants keyCtrlR or: [keyCode = EventConstants ctrlR and: [EventConstants isCtrl: mod]]) ifTrue: [
       self printIt. ^self
     ].
 
     "Ctrl-O — inspect-it"
-    (keyCode = 15 or: [keyCode = EventConstants ctrlO and: [EventConstants isCtrl: mod]]) ifTrue: [
+    (keyCode = EventConstants keyCtrlO or: [keyCode = EventConstants ctrlO and: [EventConstants isCtrl: mod]]) ifTrue: [
       self inspectIt. ^self
     ].
 
@@ -97,13 +97,13 @@ Workspace subclass: View
 
   method: doIt [
     [
-      | result |
+      | result <Object> |
       result := self evaluateSelection.
       result notNil ifTrue: [
         Transcript show: result printString
       ]
     ] on: Exception do: [:e |
-      | errStack errVars |
+      | errStack <Array> errVars <Array> |
       Transcript show: 'Error: ', e messageText.
       errStack := Compiler captureCallStack.
       errVars := AltoDebugger captureAllVariables: errStack.
@@ -116,11 +116,11 @@ Workspace subclass: View
   ]
 
   method: printIt [
-    | result resultStr |
+    | result <Object> resultStr <String> |
     [
       result := self evaluateSelection.
       result notNil ifTrue: [
-        | lineStr leftPart rightPart |
+        | lineStr <String> leftPart <String> rightPart <String> |
         resultStr := result printString.
         lineStr := editor lines at: editor cursorY.
         leftPart := lineStr copyFrom: 0 to: editor cursorX.
@@ -128,7 +128,7 @@ Workspace subclass: View
         editor lines at: editor cursorY put: (leftPart, ' ', resultStr, rightPart)
       ]
     ] on: Exception do: [:e |
-      | errStack errVars |
+      | errStack <Array> errVars <Array> |
       Transcript show: 'Error: ', e messageText.
       errStack := Compiler captureCallStack.
       errVars := AltoDebugger captureAllVariables: errStack.
@@ -139,7 +139,7 @@ Workspace subclass: View
 
   method: inspectIt [
     [
-      | result |
+      | result <Object> |
       result := self evaluateSelection.
       result notNil ifTrue: [
         display notNil ifTrue: [
@@ -147,7 +147,7 @@ Workspace subclass: View
         ]
       ]
     ] on: Exception do: [:e |
-      | errStack errVars |
+      | errStack <Array> errVars <Array> |
       Transcript show: 'Error: ', e messageText.
       errStack := Compiler captureCallStack.
       errVars := AltoDebugger captureAllVariables: errStack.
@@ -156,9 +156,9 @@ Workspace subclass: View
     self invalidate
   ]
 
-  method: evalString [
+  method: evalString ^<String> [
     "Return text to evaluate: region or current line."
-    | lines nl |
+    | lines <Array> nl <String> |
     editor markActive ifTrue: [
       lines := editor regionText.
       nl := String lf.
@@ -171,15 +171,15 @@ Workspace subclass: View
     ^nil
   ]
 
-  method: evaluateSelection [
-    | src |
+  method: evaluateSelection ^<Object> [
+    | src <String> |
     src := self evalString.
     (src isNil or: [src size = 0]) ifTrue: [^nil].
     ^Compiler evaluate: src
   ]
 
   method: triggerAutocomplete [
-    | lineStr prefix matches screenX screenY |
+    | lineStr <String> prefix <String> matches <Array> screenX <Integer> screenY <Integer> |
     editor cursorY >= editor lines size ifTrue: [^self].
     lineStr := editor lines at: editor cursorY.
     prefix := self wordBeforeCursor: lineStr.
@@ -205,8 +205,8 @@ Workspace subclass: View
     ]
   ]
 
-  method: wordBeforeCursor: lineStr [
-    | i code |
+  method: wordBeforeCursor: lineStr <String> ^<String> [
+    | i <Integer> code <Integer> |
     editor cursorX = 0 ifTrue: [^''].
     i := editor cursorX - 1.
     [i >= 0] whileTrue: [
@@ -222,34 +222,34 @@ Workspace subclass: View
     ^lineStr copyFrom: 0 to: editor cursorX
   ]
 
-  method: completionsFor: prefix [
-    | firstCharCode all results |
+  method: completionsFor: prefix <String> ^<Array> [
+    | firstCharCode <Integer> all <Array> results <ArrayList> |
     firstCharCode := (prefix at: 0) value.
     (firstCharCode >= 65 and: [firstCharCode <= 90]) ifTrue: [
       all := Class allClassesSorted.
-      results := Array new: 0.
+      results := ArrayList new.
       all do: [:cls |
-        | nameStr |
+        | nameStr <String> |
         nameStr := '', cls name.
         (self string: nameStr startsWith: prefix) ifTrue: [
-          results := results copyWith: nameStr
+          results add: nameStr
         ]
       ].
-      ^results
+      ^results asArray
     ].
-    results := Array new: 0.
+    results := ArrayList new.
     Class allClassesSorted do: [:cls |
-      | methods |
+      | methods <Array> |
       results size < 20 ifTrue: [
         [
           methods := cls allMethodNames.
           methods do: [:sel |
-            | selStr |
+            | selStr <String> |
             selStr := '', sel.
             (self string: selStr startsWith: prefix) ifTrue: [
               (results includes: selStr) ifFalse: [
                 results size < 20 ifTrue: [
-                  results := results copyWith: selStr
+                  results add: selStr
                 ]
               ]
             ]
@@ -257,11 +257,11 @@ Workspace subclass: View
         ] on: Exception do: [:e | ]
       ]
     ].
-    ^results
+    ^results asArray
   ]
 
-  method: string: str startsWith: prefix [
-    | i |
+  method: string: str <String> startsWith: prefix <String> ^<Boolean> [
+    | i <Integer> |
     prefix size > str size ifTrue: [^false].
     i := 0.
     [i < prefix size] whileTrue: [
@@ -271,8 +271,8 @@ Workspace subclass: View
     ^true
   ]
 
-  method: insertCompletion: completion prefix: prefix [
-    | lineStr beforePrefix afterCursor |
+  method: insertCompletion: completion <String> prefix: prefix <String> [
+    | lineStr <String> beforePrefix <String> afterCursor <String> |
     lineStr := editor lines at: editor cursorY.
     beforePrefix := lineStr copyFrom: 0 to: editor cursorX - prefix size.
     afterCursor := lineStr copyFrom: editor cursorX.
@@ -281,6 +281,6 @@ Workspace subclass: View
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
+  method: displayOn: aCellBuffer <CellBuffer> [
     editor displayOn: aCellBuffer
   ]

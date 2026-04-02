@@ -1,0 +1,42 @@
+namespace: 'Alto'
+
+"ClassRegistry — maps class names to UI categories for the System Browser.
+ Add new entries here when adding widgets, tools, or other classes."
+
+ClassRegistry subclass: Object
+  classVars: CategoryMap
+
+  classMethod: categoryMap ^<Dictionary> [
+    "Lazy-init the class→category mapping."
+    CategoryMap isNil ifTrue: [self buildCategoryMap].
+    ^CategoryMap
+  ]
+
+  classMethod: buildCategoryMap [
+    CategoryMap := Dictionary new.
+    "Kernel"
+    #('Rectangle' 'CellBuffer' 'StringUtils' 'ClassRegistry') do: [:n | CategoryMap at: n put: 'Kernel'].
+    "Display"
+    #('Display' 'Color' 'Style' 'Theme') do: [:n | CategoryMap at: n put: 'Display'].
+    "MVC"
+    #('Model' 'View') do: [:n | CategoryMap at: n put: 'MVC'].
+    "Events"
+    #('Event' 'KeyEvent' 'MouseEvent' 'EventConstants') do: [:n | CategoryMap at: n put: 'Events'].
+    "Widgets"
+    #('Window' 'Label' 'ListView' 'Menu' 'BoxLayout' 'SplitPane' 'Button' 'Divider' 'ScrollBar' 'TextEditor' 'TextField' 'ProgressBar') do: [:n | CategoryMap at: n put: 'Widgets'].
+    "Tools"
+    #('Workspace' 'Transcript' 'SystemBrowser' 'Inspector' 'AltoDebugger' 'BrowserModel') do: [:n | CategoryMap at: n put: 'Tools']
+  ]
+
+  classMethod: categoryForClassName: className <String> ^<String> [
+    ^self categoryMap at: className ifAbsent: ['Other']
+  ]
+
+  classMethod: register: className <String> category: aCategoryName <String> [
+    "Add or update a class→category mapping at runtime."
+    self categoryMap at: className put: aCategoryName
+  ]
+
+  classMethod: resetCache [
+    CategoryMap := nil
+  ]

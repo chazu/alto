@@ -8,94 +8,68 @@ import: 'Go'
 
 Event subclass: Object
 
-  method: isKey [ ^false ]
-  method: isMouse [ ^false ]
+  method: isKey ^<Boolean> [ ^false ]
+  method: isMouse ^<Boolean> [ ^false ]
 
-  method: dispatchTo: handler [
+  method: dispatchTo: handler <Object> [
     "Override in subclasses to call the appropriate handler method."
   ]
 
 "KeyEvent — keyboard input event."
 
 KeyEvent subclass: Event
-  instanceVars: key rune mod
+  instanceVars: key <Integer> rune <Integer> mod <Integer>
 
-  classMethod: key: aKeyCode rune: aRuneVal mod: aMod [
-    | evt |
+  classMethod: key: aKeyCode <Integer> rune: aRuneVal <Integer> mod: aMod <Integer> ^<KeyEvent> [
+    | evt <KeyEvent> |
     evt := super new.
     evt privateKey: aKeyCode rune: aRuneVal mod: aMod.
     ^evt
   ]
 
-  method: privateKey: aKeyCode rune: aRuneVal mod: aMod [
+  method: privateKey: aKeyCode <Integer> rune: aRuneVal <Integer> mod: aMod <Integer> [
     key := aKeyCode.
     rune := aRuneVal.
     mod := aMod
   ]
 
-  method: key [ ^key ]
-  method: rune [ ^rune ]
-  method: mod [ ^mod ]
-  method: isKey [ ^true ]
+  method: key ^<Integer> [ ^key ]
+  method: rune ^<Integer> [ ^rune ]
+  method: mod ^<Integer> [ ^mod ]
+  method: isKey ^<Boolean> [ ^true ]
 
-  "Dictionary compatibility — allows gradual migration"
-  method: at: aKey ifAbsent: aBlock [
-    aKey = 'type' ifTrue: [^'key'].
-    aKey = 'key' ifTrue: [^key].
-    aKey = 'rune' ifTrue: [^rune].
-    aKey = 'mod' ifTrue: [^mod].
-    ^aBlock value
-  ]
-
-  method: at: aKey [
-    ^self at: aKey ifAbsent: [nil]
-  ]
-
-  method: dispatchTo: handler [
+  method: dispatchTo: handler <Object> ^<Object> [
     ^handler handleKeyEvent: self
   ]
 
 "MouseEvent — mouse input event."
 
 MouseEvent subclass: Event
-  instanceVars: x y buttons
+  instanceVars: x <Integer> y <Integer> buttons <Integer>
 
-  classMethod: x: anX y: aY buttons: btn [
-    | evt |
+  classMethod: x: anX <Integer> y: aY <Integer> buttons: btn <Integer> ^<MouseEvent> [
+    | evt <MouseEvent> |
     evt := super new.
     evt privateX: anX y: aY buttons: btn.
     ^evt
   ]
 
-  method: privateX: anX y: aY buttons: btn [
+  method: privateX: anX <Integer> y: aY <Integer> buttons: btn <Integer> [
     x := anX.
     y := aY.
     buttons := btn
   ]
 
-  method: x [ ^x ]
-  method: y [ ^y ]
-  method: buttons [ ^buttons ]
-  method: isMouse [ ^true ]
+  method: x ^<Integer> [ ^x ]
+  method: y ^<Integer> [ ^y ]
+  method: buttons ^<Integer> [ ^buttons ]
+  method: isMouse ^<Boolean> [ ^true ]
 
-  method: withX: newX y: newY [
+  method: withX: newX <Integer> y: newY <Integer> ^<MouseEvent> [
     "Return a new MouseEvent with translated coordinates."
     ^MouseEvent x: newX y: newY buttons: buttons
   ]
 
-  "Dictionary compatibility — allows gradual migration"
-  method: at: aKey ifAbsent: aBlock [
-    aKey = 'type' ifTrue: [^'mouse'].
-    aKey = 'x' ifTrue: [^x].
-    aKey = 'y' ifTrue: [^y].
-    aKey = 'buttons' ifTrue: [^buttons].
-    ^aBlock value
-  ]
-
-  method: at: aKey [
-    ^self at: aKey ifAbsent: [nil]
-  ]
-
-  method: dispatchTo: handler [
+  method: dispatchTo: handler <Object> ^<Object> [
     ^handler handleMouseEvent: self
   ]

@@ -11,47 +11,47 @@ import: 'Go'
 "
 
 Color subclass: Object
-  instanceVars: tcellColor
+  instanceVars: tcellColor <Dynamic>
 
-  method: tcellColor [ ^tcellColor ]
-  method: tcellColor: c [ tcellColor := c ]
+  method: tcellColor ^<Dynamic> [ ^tcellColor ]
+  method: tcellColor: c <Dynamic> [ tcellColor := c ]
 
   "Named color constants — returns a tcell color value"
-  classMethod: black      [ ^Go::V2 getColor: 'black' ]
-  classMethod: red        [ ^Go::V2 getColor: 'red' ]
-  classMethod: green      [ ^Go::V2 getColor: 'green' ]
-  classMethod: yellow     [ ^Go::V2 getColor: 'yellow' ]
-  classMethod: blue       [ ^Go::V2 getColor: 'blue' ]
-  classMethod: magenta    [ ^Go::V2 getColor: 'magenta' ]
-  classMethod: cyan       [ ^Go::V2 getColor: 'cyan' ]
-  classMethod: white      [ ^Go::V2 getColor: 'white' ]
-  classMethod: darkRed    [ ^Go::V2 getColor: 'darkred' ]
-  classMethod: darkGreen  [ ^Go::V2 getColor: 'darkgreen' ]
-  classMethod: darkBlue   [ ^Go::V2 getColor: 'darkblue' ]
-  classMethod: darkCyan   [ ^Go::V2 getColor: 'darkcyan' ]
-  classMethod: grey       [ ^Go::V2 getColor: 'grey' ]
-  classMethod: darkGrey   [ ^Go::V2 getColor: 'darkgrey' ]
-  classMethod: orange     [ ^Go::V2 getColor: 'orange' ]
-  classMethod: pink       [ ^Go::V2 getColor: 'pink' ]
-  classMethod: purple     [ ^Go::V2 getColor: 'purple' ]
+  classMethod: black      ^<Dynamic> [ ^Go::V2 getColor: 'black' ]
+  classMethod: red        ^<Dynamic> [ ^Go::V2 getColor: 'red' ]
+  classMethod: green      ^<Dynamic> [ ^Go::V2 getColor: 'green' ]
+  classMethod: yellow     ^<Dynamic> [ ^Go::V2 getColor: 'yellow' ]
+  classMethod: blue       ^<Dynamic> [ ^Go::V2 getColor: 'blue' ]
+  classMethod: magenta    ^<Dynamic> [ ^Go::V2 getColor: 'magenta' ]
+  classMethod: cyan       ^<Dynamic> [ ^Go::V2 getColor: 'cyan' ]
+  classMethod: white      ^<Dynamic> [ ^Go::V2 getColor: 'white' ]
+  classMethod: darkRed    ^<Dynamic> [ ^Go::V2 getColor: 'darkred' ]
+  classMethod: darkGreen  ^<Dynamic> [ ^Go::V2 getColor: 'darkgreen' ]
+  classMethod: darkBlue   ^<Dynamic> [ ^Go::V2 getColor: 'darkblue' ]
+  classMethod: darkCyan   ^<Dynamic> [ ^Go::V2 getColor: 'darkcyan' ]
+  classMethod: grey       ^<Dynamic> [ ^Go::V2 getColor: 'grey' ]
+  classMethod: darkGrey   ^<Dynamic> [ ^Go::V2 getColor: 'darkgrey' ]
+  classMethod: orange     ^<Dynamic> [ ^Go::V2 getColor: 'orange' ]
+  classMethod: pink       ^<Dynamic> [ ^Go::V2 getColor: 'pink' ]
+  classMethod: purple     ^<Dynamic> [ ^Go::V2 getColor: 'purple' ]
 
   "RGB color — 0..255 per channel"
-  classMethod: rgb: r g: g b: b [
+  classMethod: rgb: r <Integer> g: g <Integer> b: b <Integer> ^<Dynamic> [
     ^Go::V2 newRGBColor: r _: g _: b
   ]
 
   "Hex color — integer value, e.g. 16rFF8000"
-  classMethod: hex: value [
+  classMethod: hex: value <Integer> ^<Dynamic> [
     ^Go::V2 newHexColor: value
   ]
 
   "Named color — any CSS/tcell color name string"
-  classMethod: named: aString [
+  classMethod: named: aString <String> ^<Dynamic> [
     ^Go::V2 getColor: aString
   ]
 
   "256-color palette"
-  classMethod: palette: index [
+  classMethod: palette: index <Integer> ^<Dynamic> [
     ^Go::V2 paletteColor: index
   ]
 
@@ -64,10 +64,10 @@ Color subclass: Object
 "
 
 Style subclass: Object
-  instanceVars: goStyle
+  instanceVars: goStyle <Dynamic>
 
-  classMethod: new [
-    | s |
+  classMethod: new ^<Style> [
+    | s <Style> |
     s := super new.
     s initialize.
     ^s
@@ -77,75 +77,75 @@ Style subclass: Object
     goStyle := Go::Terminal newStyle
   ]
 
-  method: goStyle [ ^goStyle ]
-  method: goStyle: s [ goStyle := s ]
+  method: goStyle ^<Dynamic> [ ^goStyle ]
+  method: goStyle: s <Dynamic> [ goStyle := s ]
 
   "Foreground color"
-  classMethod: fg: aColor [
-    | s |
+  classMethod: fg: aColor <Dynamic> ^<Style> [
+    | s <Style> |
     s := self new.
     s goStyle: (s goStyle foreground: aColor).
     ^s
   ]
 
   "Background color"
-  classMethod: bg: aColor [
-    | s |
+  classMethod: bg: aColor <Dynamic> ^<Style> [
+    | s <Style> |
     s := self new.
     s goStyle: (s goStyle background: aColor).
     ^s
   ]
 
   "Foreground + background"
-  classMethod: fg: fgColor bg: bgColor [
-    | s |
+  classMethod: fg: fgColor <Dynamic> bg: bgColor <Dynamic> ^<Style> [
+    | s <Style> |
     s := self new.
     s goStyle: ((s goStyle foreground: fgColor) background: bgColor).
     ^s
   ]
 
   "Default style (terminal defaults)"
-  classMethod: default [
+  classMethod: default ^<Style> [
     ^self new
   ]
 
   "Mutating builders — return self for chaining"
-  method: fg: aColor [
+  method: fg: aColor <Dynamic> ^<Self> [
     goStyle := goStyle foreground: aColor.
     ^self
   ]
 
-  method: bg: aColor [
+  method: bg: aColor <Dynamic> ^<Self> [
     goStyle := goStyle background: aColor.
     ^self
   ]
 
-  method: bold [
+  method: bold ^<Self> [
     goStyle := goStyle bold: true.
     ^self
   ]
 
-  method: italic [
+  method: italic ^<Self> [
     goStyle := goStyle italic: true.
     ^self
   ]
 
-  method: dim [
+  method: dim ^<Self> [
     goStyle := goStyle dim: true.
     ^self
   ]
 
-  method: reverse [
+  method: reverse ^<Self> [
     goStyle := goStyle reverse: true.
     ^self
   ]
 
   "Equality — delegates to Go style"
-  method: = other [
+  method: = other <Style> ^<Boolean> [
     other isNil ifTrue: [^false].
     ^goStyle equals: other goStyle
   ]
 
-  method: equals: other [
+  method: equals: other <Style> ^<Boolean> [
     ^self = other
   ]

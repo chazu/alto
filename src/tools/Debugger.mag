@@ -7,33 +7,33 @@ import: 'Go'
  Frame and variable lists use ListView for selection and rendering."
 
 AltoDebugger subclass: View
-  instanceVars: errorMessage frames variables allFrameVars selectedFrame focusedPane display parentWindow frameListView varListView sourceLines sourceScrollOffset buttonLabels selectedButton classLookup
+  instanceVars: errorMessage <String> frames <Array> variables <Array> allFrameVars <Array> selectedFrame <Integer> focusedPane <Integer> display <Display> parentWindow <Window> frameListView <ListView> varListView <ListView> sourceLines <Array> sourceScrollOffset <Integer> buttonLabels <Array> selectedButton <Integer> classLookup <Dictionary>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<AltoDebugger> [
+    | instance <AltoDebugger> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: openOnError: errMsg on: aDisplay [
+  classMethod: openOnError: errMsg <String> on: aDisplay <Display> ^<AltoDebugger> [
     "Open a debugger with the current call stack."
-    | stack capturedVars |
+    | stack <Array> capturedVars <Array> |
     stack := Compiler captureCallStack.
     capturedVars := self captureAllVariables: stack.
     ^self openOnError: errMsg stack: stack vars: capturedVars on: aDisplay
   ]
 
-  classMethod: openOnError: errMsg stack: aStack on: aDisplay [
+  classMethod: openOnError: errMsg <String> stack: aStack <Array> on: aDisplay <Display> ^<AltoDebugger> [
     "Open a debugger (captures variables now before stack unwinds)."
-    | capturedVars |
+    | capturedVars <Array> |
     capturedVars := self captureAllVariables: aStack.
     ^self openOnError: errMsg stack: aStack vars: capturedVars on: aDisplay
   ]
 
-  classMethod: openOnError: errMsg stack: aStack vars: capturedVars on: aDisplay [
+  classMethod: openOnError: errMsg <String> stack: aStack <Array> vars: capturedVars <Array> on: aDisplay <Display> ^<AltoDebugger> [
     "Open a debugger window with pre-captured stack and variables."
-    | dbg frame window stack screenSize w h |
+    | dbg <AltoDebugger> frame <Rectangle> window <Window> stack <Array> screenSize <Array> w <Integer> h <Integer> |
     dbg := AltoDebugger new.
     dbg display: aDisplay.
     dbg privateErrorMessage: errMsg.
@@ -60,21 +60,21 @@ AltoDebugger subclass: View
     ^dbg
   ]
 
-  classMethod: captureAllVariables: aStack [
+  classMethod: captureAllVariables: aStack <Array> ^<Array> [
     "Capture variables for every frame NOW, before the stack unwinds."
-    | result vars |
-    result := Array new: 0.
-    aStack isNil ifTrue: [^result].
+    | result <ArrayList> vars <Array> |
+    result := ArrayList new.
+    aStack isNil ifTrue: [^#()].
     0 to: aStack size - 1 do: [:idx |
       [
         vars := Debugger getVariables: idx.
         vars isNil ifTrue: [vars := #()].
-        result := result copyWith: vars
+        result add: vars
       ] on: Exception do: [:e |
-        result := result copyWith: #()
+        result add: #()
       ]
     ].
-    ^result
+    ^result asArray
   ]
 
   method: initialize [
@@ -98,9 +98,9 @@ AltoDebugger subclass: View
     varListView labelBlock: [:varDict | self varLabelFor: varDict]
   ]
 
-  method: frameLabelFor: frameDict [
+  method: frameLabelFor: frameDict <Dictionary> ^<String> [
     "Format a stack frame dict as a display label."
-    | label line |
+    | label <String> line <Integer> |
     label := (frameDict at: 'class' ifAbsent: ['']), '>>', (frameDict at: 'method' ifAbsent: ['']).
     line := frameDict at: 'line' ifAbsent: [0].
     line > 0 ifTrue: [label := label, ':', line printString].
@@ -110,9 +110,9 @@ AltoDebugger subclass: View
     ^label
   ]
 
-  method: varLabelFor: varDict [
+  method: varLabelFor: varDict <Dictionary> ^<String> [
     "Format a variable dict as a display label."
-    | nameStr valStr typeStr label |
+    | nameStr <String> valStr <String> typeStr <String> label <String> |
     nameStr := varDict at: #name ifAbsent: ['?'].
     valStr := varDict at: #value ifAbsent: [''].
     typeStr := varDict at: #type ifAbsent: [''].
@@ -123,18 +123,18 @@ AltoDebugger subclass: View
     ^label
   ]
 
-  method: privateErrorMessage: msg [ errorMessage := msg ]
-  method: privateFrames: arr [
+  method: privateErrorMessage: msg <String> [ errorMessage := msg ]
+  method: privateFrames: arr <Array> [
     frames := arr.
     frameListView items: frames
   ]
-  method: privateAllFrameVars: arr [ allFrameVars := arr ]
-  method: display: d [ display := d ]
-  method: display [ ^display ]
-  method: parentWindow: w [ parentWindow := w ]
-  method: parentWindow [ ^parentWindow ]
+  method: privateAllFrameVars: arr <Array> [ allFrameVars := arr ]
+  method: display: d <Display> [ display := d ]
+  method: display ^<Display> [ ^display ]
+  method: parentWindow: w <Window> [ parentWindow := w ]
+  method: parentWindow ^<Window> [ ^parentWindow ]
 
-  method: loadVariablesForFrame: idx [
+  method: loadVariablesForFrame: idx <Integer> [
     "Load variables for the given frame from the pre-captured cache."
     (idx >= 0 and: [idx < allFrameVars size]) ifTrue: [
       variables := allFrameVars at: idx.
@@ -145,7 +145,7 @@ AltoDebugger subclass: View
     varListView items: variables
   ]
 
-  method: selectFrame: idx [
+  method: selectFrame: idx <Integer> [
     "Select a stack frame and update variables + source."
     idx < 0 ifTrue: [idx := 0].
     idx >= frames size ifTrue: [idx := frames size - 1].
@@ -157,7 +157,7 @@ AltoDebugger subclass: View
 
   method: updateSource [
     "Update source lines for the selected frame."
-    | frameDict className methodName cls sym src |
+    | frameDict <Dictionary> className <String> methodName <String> cls <Object> sym <Symbol> src <String> |
     frames size = 0 ifTrue: [sourceLines := #(''). ^self].
     frameDict := frames at: selectedFrame.
     className := frameDict at: 'class' ifAbsent: [''].
@@ -180,7 +180,7 @@ AltoDebugger subclass: View
     ] on: Exception do: [:e | ]
   ]
 
-  method: findClassNamed: name [
+  method: findClassNamed: name <String> ^<Object> [
     "Look up a class by name using a cached dictionary for O(1) lookup."
     classLookup isNil ifTrue: [self buildClassLookup].
     ^classLookup at: name ifAbsent: [false]
@@ -193,22 +193,9 @@ AltoDebugger subclass: View
     ]
   ]
 
-  method: splitSource: src [
-    "Split source string on newlines using substring extraction."
-    | result i lineStart code |
-    result := Array new: 0.
-    lineStart := 0.
-    i := 0.
-    [i < src size] whileTrue: [
-      code := (src at: i) value.
-      code = 10 ifTrue: [
-        result := result copyWith: (src copyFrom: lineStart to: i).
-        lineStart := i + 1
-      ].
-      i := i + 1
-    ].
-    result := result copyWith: (src copyFrom: lineStart).
-    sourceLines := result
+  method: splitSource: src <String> [
+    "Split source string on newlines."
+    sourceLines := StringUtils splitLines: src
   ]
 
   "--- Control actions ---"
@@ -243,7 +230,7 @@ AltoDebugger subclass: View
 
   method: refreshState [
     "Re-read call stack and variables after a step."
-    | newStack |
+    | newStack <Array> |
     [
       newStack := Debugger getCallStack.
       newStack isNil ifTrue: [newStack := #()].
@@ -267,7 +254,7 @@ AltoDebugger subclass: View
     display notNil ifTrue: [display removeWindow: parentWindow]
   ]
 
-  method: executeButton: idx [
+  method: executeButton: idx <Integer> [
     idx = 0 ifTrue: [^self doResume].
     idx = 1 ifTrue: [^self doStepOver].
     idx = 2 ifTrue: [^self doStepInto].
@@ -276,8 +263,8 @@ AltoDebugger subclass: View
 
   "--- Event handling ---"
 
-  method: handleEvent: evt [
-    | keyCode mod varDict valStr |
+  method: handleEvent: evt <Event> [
+    | keyCode <Integer> mod <Integer> varDict <Dictionary> valStr <String> |
 
     evt isMouse ifTrue: [^self handleMouse: evt].
     evt isKey ifFalse: [^self].
@@ -350,8 +337,8 @@ AltoDebugger subclass: View
     ]
   ]
 
-  method: handleMouse: evt [
-    | mx my btn bufH btnX i label |
+  method: handleMouse: evt <Event> [
+    | mx <Integer> my <Integer> btn <Integer> bufH <Integer> btnX <Integer> i <Integer> label <String> |
     btn := evt buttons.
     mx := evt x.
     my := evt y.
@@ -381,22 +368,22 @@ AltoDebugger subclass: View
 
   "--- Rendering ---"
 
-  method: framePaneWidth: bufW [
+  method: framePaneWidth: bufW <Integer> ^<Integer> [
     "Left pane width, clamped to half the buffer."
-    | w |
+    | w <Integer> |
     w := 35.
     w > (bufW / 2) ifTrue: [w := bufW / 2].
     ^w
   ]
 
-  method: framePaneHeight: bufH [
+  method: framePaneHeight: bufH <Integer> ^<Integer> [
     "Top 60% of available space for frames/source."
     ^((bufH - 2) * 6 / 10) max: 5
   ]
 
-  method: displayOn: aCellBuffer [
+  method: displayOn: aCellBuffer <CellBuffer> [
     "Three-pane layout: frames (top-left), source (top-right), variables (bottom), buttons (bottom row)."
-    | bufW bufH frameH srcY srcH varH varY btnY leftW rightX |
+    | bufW <Integer> bufH <Integer> frameH <Integer> srcY <Integer> srcH <Integer> varH <Integer> varY <Integer> btnY <Integer> leftW <Integer> rightX <Integer> |
     bufW := aCellBuffer width.
     bufH := aCellBuffer height.
 
@@ -440,8 +427,8 @@ AltoDebugger subclass: View
     self renderButtons: aCellBuffer atY: btnY width: bufW
   ]
 
-  method: renderFrames: buf fromY: startY height: h width: w [
-    | headerStyle |
+  method: renderFrames: buf <CellBuffer> fromY: startY <Integer> height: h <Integer> width: w <Integer> [
+    | headerStyle <Object> |
     "Header"
     headerStyle := Theme boldStyle.
     buf putString: 'Stack Frames' x: 0 y: startY style: headerStyle.
@@ -453,8 +440,8 @@ AltoDebugger subclass: View
     frameListView renderInto: buf atX: 0 y: startY + 1 width: w height: h - 1
   ]
 
-  method: renderSource: buf fromX: ox fromY: startY height: h width: w [
-    | i lineIdx lineStr j style currentLine headerStyle numStr srcStart k |
+  method: renderSource: buf <CellBuffer> fromX: ox <Integer> fromY: startY <Integer> height: h <Integer> width: w <Integer> [
+    | i <Integer> lineIdx <Integer> lineStr <String> j <Integer> style <Object> currentLine <Integer> headerStyle <Object> numStr <String> srcStart <Integer> k <Integer> |
     "Header"
     headerStyle := Theme boldStyle.
     buf putString: 'Source' x: ox y: startY style: headerStyle.
@@ -501,8 +488,8 @@ AltoDebugger subclass: View
     ]
   ]
 
-  method: renderVariables: buf fromY: startY height: h width: w [
-    | headerStyle |
+  method: renderVariables: buf <CellBuffer> fromY: startY <Integer> height: h <Integer> width: w <Integer> [
+    | headerStyle <Object> |
     "Header"
     headerStyle := Theme boldStyle.
     buf putString: 'Variables' x: 0 y: startY style: headerStyle.
@@ -514,8 +501,8 @@ AltoDebugger subclass: View
     varListView renderInto: buf atX: 0 y: startY + 1 width: w height: h - 1
   ]
 
-  method: renderButtons: buf atY: y width: w [
-    | btnX i label style padded j |
+  method: renderButtons: buf <CellBuffer> atY: y <Integer> width: w <Integer> [
+    | btnX <Integer> i <Integer> label <String> style <Object> padded <String> j <Integer> |
     btnX := 1.
     i := 0.
     [i < buttonLabels size] whileTrue: [

@@ -5,40 +5,38 @@ import: 'Go'
  Run: mag build --full -o alto && ./alto -m Alto::TodoApp.start"
 
 TodoModel subclass: Model
-  instanceVars: items
+  instanceVars: items <Array>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<TodoModel> [
+    | instance <TodoModel> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
   method: initialize [
-    items := Array new: 0
+    super initialize.
+    items := ArrayList new
   ]
 
-  method: items [ ^items ]
+  method: items ^<ArrayList> [ ^items ]
 
-  method: addItem: aString [
-    items := items copyWith: aString.
+  method: addItem: aString <String> [
+    items add: aString.
     self changed: #items
   ]
 
-  method: removeAt: index [
-    | before after |
+  method: removeAt: index <Integer> [
     (index < 0 or: [index >= items size]) ifTrue: [^self].
-    before := items copyFrom: 0 to: index.
-    after := items copyFrom: index + 1.
-    items := before, after.
+    items removeAt: index.
     self changed: #items
   ]
 
 TodoListView subclass: View
-  instanceVars: model selectedIndex normalStyle selectedStyle doneStyle scrollOffset
+  instanceVars: model <TodoModel> selectedIndex <Integer> normalStyle <Style> selectedStyle <Style> doneStyle <Style> scrollOffset <Integer>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<TodoListView> [
+    | instance <TodoListView> |
     instance := super new.
     instance initialize.
     ^instance
@@ -49,28 +47,28 @@ TodoListView subclass: View
     model := nil.
     selectedIndex := 0.
     scrollOffset := 0.
-    normalStyle := Go::Terminal newStyle.
-    selectedStyle := (Go::Terminal newStyle) reverse: true.
-    doneStyle := (Go::Terminal newStyle) dim: true
+    normalStyle := Theme normalStyle.
+    selectedStyle := Theme reverseStyle.
+    doneStyle := Theme dimStyle
   ]
 
-  method: model: aModel [
+  method: model: aModel <TodoModel> [
     model := aModel.
     model addDependent: self
   ]
 
-  method: model [ ^model ]
-  method: selectedIndex [ ^selectedIndex ]
+  method: model ^<TodoModel> [ ^model ]
+  method: selectedIndex ^<Integer> [ ^selectedIndex ]
 
-  method: update: aspect [
+  method: update: aspect <Symbol> [
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
-    | items i itemIndex itemStr style j ch headerStyle |
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | items <Array> i <Integer> itemIndex <Integer> itemStr <String> style <Style> j <Integer> ch <Integer> headerStyle <Style> |
     model isNil ifTrue: [^self].
     items := model items.
-    headerStyle := (Go::Terminal newStyle) bold: true.
+    headerStyle := Theme boldStyle.
     aCellBuffer putString: 'Todo (', items size printString, ' items)' x: 0 y: 0 style: headerStyle.
 
     i := 1.
@@ -93,14 +91,14 @@ TodoListView subclass: View
     ]
   ]
 
-  method: handleEvent: evt [
-    | keyCode |
+  method: handleEvent: evt <Event> [
+    | keyCode <Integer> |
     evt isKey ifFalse: [^self].
     keyCode := evt key.
     model isNil ifTrue: [^self].
 
     "Up"
-    keyCode = 257 ifTrue: [
+    keyCode = EventConstants keyUp ifTrue: [
       selectedIndex > 0 ifTrue: [
         selectedIndex := selectedIndex - 1.
         selectedIndex < scrollOffset ifTrue: [scrollOffset := selectedIndex]
@@ -108,14 +106,14 @@ TodoListView subclass: View
       self invalidate. ^self
     ].
     "Down"
-    keyCode = 258 ifTrue: [
+    keyCode = EventConstants keyDown ifTrue: [
       selectedIndex < (model items size - 1) ifTrue: [
         selectedIndex := selectedIndex + 1
       ].
       self invalidate. ^self
     ].
     "Delete or Backspace — remove selected item"
-    (keyCode = 8 or: [keyCode = 127]) ifTrue: [
+    (keyCode = EventConstants keyBackspace or: [keyCode = EventConstants keyDelete]) ifTrue: [
       model removeAt: selectedIndex.
       selectedIndex >= model items size ifTrue: [
         selectedIndex := (model items size - 1) max: 0
@@ -125,10 +123,10 @@ TodoListView subclass: View
   ]
 
 TodoInputView subclass: View
-  instanceVars: model editor inputStyle
+  instanceVars: model <TodoModel> editor <TextEditor> inputStyle <Style>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<TodoInputView> [
+    | instance <TodoInputView> |
     instance := super new.
     instance initialize.
     ^instance
@@ -138,34 +136,34 @@ TodoInputView subclass: View
     super initialize.
     model := nil.
     editor := TextEditor new.
-    inputStyle := Go::Terminal newStyle
+    inputStyle := Theme normalStyle
   ]
 
-  method: model: aModel [ model := aModel ]
+  method: model: aModel <TodoModel> [ model := aModel ]
 
-  method: displayOn: aCellBuffer [
-    | promptStyle |
-    promptStyle := (Go::Terminal newStyle) bold: true.
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | promptStyle <Style> |
+    promptStyle := Theme boldStyle.
     aCellBuffer putString: 'New item (Enter to add):' x: 0 y: 0 style: promptStyle.
 
     "Draw editor below the prompt"
     aCellBuffer height > 1 ifTrue: [
-      | editorBuf |
+      | editorBuf <CellBuffer> |
       editorBuf := CellBuffer width: aCellBuffer width height: aCellBuffer height - 1.
       editor displayOn: editorBuf.
       editorBuf blitInto: aCellBuffer atX: 0 y: 1
     ]
   ]
 
-  method: handleEvent: evt [
-    | keyCode runeVal mod text |
+  method: handleEvent: evt <Event> [
+    | keyCode <Integer> runeVal <Integer> mod <Integer> text <String> |
     evt isKey ifFalse: [^self].
     keyCode := evt key.
     runeVal := evt rune.
     mod := evt mod.
 
     "Enter — add item"
-    keyCode = 13 ifTrue: [
+    keyCode = EventConstants keyEnter ifTrue: [
       text := editor lines at: 0.
       (text notNil and: [text size > 0]) ifTrue: [
         model addItem: text.
@@ -184,7 +182,7 @@ TodoInputView subclass: View
 
 TodoApp subclass: Object
   classMethod: start [
-    | app todoModel listView inputView split |
+    | app <App> todoModel <TodoModel> listView <TodoListView> inputView <TodoInputView> split <SplitPane> |
     todoModel := TodoModel new.
     todoModel addItem: 'Buy groceries'.
     todoModel addItem: 'Write README'.

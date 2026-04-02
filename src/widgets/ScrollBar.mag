@@ -10,31 +10,31 @@ import: 'Go'
 "
 
 ScrollBar subclass: View
-  instanceVars: orientation totalItems visibleItems offset onScrollBlock trackStyle thumbStyle
+  instanceVars: orientation <Symbol> totalItems <Integer> visibleItems <Integer> offset <Integer> onScrollBlock <Block> trackStyle <Dynamic> thumbStyle <Dynamic>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<ScrollBar> [
+    | instance <ScrollBar> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: vertical [
-    | sb |
+  classMethod: vertical ^<ScrollBar> [
+    | sb <ScrollBar> |
     sb := self new.
     sb orientation: #vertical.
     ^sb
   ]
 
-  classMethod: horizontal [
-    | sb |
+  classMethod: horizontal ^<ScrollBar> [
+    | sb <ScrollBar> |
     sb := self new.
     sb orientation: #horizontal.
     ^sb
   ]
 
-  classMethod: verticalTotal: total visible: visible offset: off [
-    | sb |
+  classMethod: verticalTotal: total <Integer> visible: visible <Integer> offset: off <Integer> ^<ScrollBar> [
+    | sb <ScrollBar> |
     sb := self new.
     sb orientation: #vertical.
     sb totalItems: total.
@@ -54,24 +54,24 @@ ScrollBar subclass: View
     thumbStyle := Theme reverseStyle
   ]
 
-  method: orientation [ ^orientation ]
-  method: orientation: sym [ orientation := sym ]
-  method: totalItems [ ^totalItems ]
-  method: visibleItems [ ^visibleItems ]
-  method: offset [ ^offset ]
-  method: onScrollBlock [ ^onScrollBlock ]
+  method: orientation ^<Symbol> [ ^orientation ]
+  method: orientation: sym <Symbol> [ orientation := sym ]
+  method: totalItems ^<Integer> [ ^totalItems ]
+  method: visibleItems ^<Integer> [ ^visibleItems ]
+  method: offset ^<Integer> [ ^offset ]
+  method: onScrollBlock ^<Block> [ ^onScrollBlock ]
 
-  method: totalItems: n [
+  method: totalItems: n <Integer> [
     totalItems := n.
     self invalidate
   ]
 
-  method: visibleItems: n [
+  method: visibleItems: n <Integer> [
     visibleItems := n.
     self invalidate
   ]
 
-  method: offset: n [
+  method: offset: n <Integer> [
     offset := n max: 0.
     totalItems > visibleItems ifTrue: [
       offset := offset min: totalItems - visibleItems
@@ -79,35 +79,45 @@ ScrollBar subclass: View
     self invalidate
   ]
 
-  method: onScroll: aBlock [
+  method: onScroll: aBlock <Block> [
     onScrollBlock := aBlock
   ]
 
-  method: trackStyle: aGoStyle [
+  method: trackStyle: aGoStyle <Dynamic> [
     trackStyle := aGoStyle.
     self invalidate
   ]
 
-  method: thumbStyle: aGoStyle [
+  method: thumbStyle: aGoStyle <Dynamic> [
     thumbStyle := aGoStyle.
     self invalidate
   ]
 
-  method: style: aStyle [
+  method: style: aStyle <Object> [
     "Accept an Alto Style — use it for the track, reversed for thumb"
     trackStyle := aStyle goStyle.
     thumbStyle := aStyle goStyle reverse: true.
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
+  method: preferredWidth ^<Integer> [
+    orientation = #vertical ifTrue: [^1].
+    ^nil
+  ]
+
+  method: preferredHeight ^<Integer> [
+    orientation = #horizontal ifTrue: [^1].
+    ^nil
+  ]
+
+  method: displayOn: aCellBuffer <CellBuffer> [
     orientation = #vertical
       ifTrue: [self displayVerticalOn: aCellBuffer]
       ifFalse: [self displayHorizontalOn: aCellBuffer]
   ]
 
-  method: displayVerticalOn: aCellBuffer [
-    | h thumbStart thumbSize i style |
+  method: displayVerticalOn: aCellBuffer <CellBuffer> [
+    | h <Integer> thumbStart <Integer> thumbSize <Integer> i <Integer> style <Dynamic> |
     h := aCellBuffer height.
     h < 1 ifTrue: [^self].
 
@@ -140,8 +150,8 @@ ScrollBar subclass: View
     ]
   ]
 
-  method: displayHorizontalOn: aCellBuffer [
-    | w thumbStart thumbSize i style |
+  method: displayHorizontalOn: aCellBuffer <CellBuffer> [
+    | w <Integer> thumbStart <Integer> thumbSize <Integer> i <Integer> style <Dynamic> |
     w := aCellBuffer width.
     w < 1 ifTrue: [^self].
 
@@ -173,16 +183,17 @@ ScrollBar subclass: View
     ]
   ]
 
-  method: handleMouseLocalX: x y: y buttons: btn [
-    | pos trackLen newOffset |
-    btn = 1 ifFalse: [^self].
+  method: handleEvent: evt <Event> [
+    | pos <Integer> trackLen <Integer> newOffset <Integer> |
+    evt isMouse ifFalse: [^self].
+    evt buttons = 1 ifFalse: [^self].
     totalItems <= visibleItems ifTrue: [^self].
 
     trackLen := orientation = #vertical
       ifTrue: [buffer notNil ifTrue: [buffer height] ifFalse: [10]]
       ifFalse: [buffer notNil ifTrue: [buffer width] ifFalse: [10]].
 
-    pos := orientation = #vertical ifTrue: [y] ifFalse: [x].
+    pos := orientation = #vertical ifTrue: [evt y] ifFalse: [evt x].
     newOffset := pos * totalItems / trackLen.
     self offset: newOffset.
     onScrollBlock notNil ifTrue: [onScrollBlock value: offset]

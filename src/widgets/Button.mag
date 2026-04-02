@@ -8,25 +8,25 @@ import: 'Go'
 "
 
 Button subclass: View
-  instanceVars: label action normalStyle pressedStyle focused
+  instanceVars: label <String> action <Block> normalStyle <Dynamic> pressedStyle <Dynamic>
 
-  classMethod: new [
-    | instance |
+  classMethod: new ^<Button> [
+    | instance <Button> |
     instance := super new.
     instance initialize.
     ^instance
   ]
 
-  classMethod: label: aString action: aBlock [
-    | btn |
+  classMethod: label: aString <String> action: aBlock <Block> ^<Button> [
+    | btn <Button> |
     btn := self new.
     btn privateLabel: aString.
     btn privateAction: aBlock.
     ^btn
   ]
 
-  classMethod: label: aString action: aBlock style: aStyle [
-    | btn |
+  classMethod: label: aString <String> action: aBlock <Block> style: aStyle <Object> ^<Button> [
+    | btn <Button> |
     btn := self new.
     btn privateLabel: aString.
     btn privateAction: aBlock.
@@ -39,39 +39,38 @@ Button subclass: View
     label := ''.
     action := nil.
     normalStyle := Theme normalStyle.
-    pressedStyle := Theme reverseStyle.
-    focused := false
+    pressedStyle := Theme reverseStyle
   ]
 
-  method: privateLabel: aString [ label := aString ]
-  method: privateAction: aBlock [ action := aBlock ]
-  method: label [ ^label ]
-  method: action [ ^action ]
+  method: privateLabel: aString <String> [ label := aString ]
+  method: privateAction: aBlock <Block> [ action := aBlock ]
+  method: label ^<String> [ ^label ]
+  method: action ^<Block> [ ^action ]
 
-  method: label: aString [
+  method: label: aString <String> [
     label := aString.
     self invalidate
   ]
 
-  method: action: aBlock [
+  method: action: aBlock <Block> [
     action := aBlock
   ]
 
-  method: normalStyle: aGoStyle [
+  method: normalStyle: aGoStyle <Dynamic> [
     normalStyle := aGoStyle.
     pressedStyle := aGoStyle reverse: true.
     self invalidate
   ]
 
-  method: style: aStyle [
+  method: style: aStyle <Object> [
     "Accept an Alto Style object"
     normalStyle := aStyle goStyle.
     pressedStyle := aStyle goStyle reverse: true.
     self invalidate
   ]
 
-  method: displayOn: aCellBuffer [
-    | btnText padLeft w i ch style |
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | btnText <String> padLeft <Integer> w <Integer> i <Integer> ch <Integer> style <Dynamic> |
     w := aCellBuffer width.
     btnText := '[ ', label, ' ]'.
     padLeft := (w - btnText size) / 2.
@@ -94,19 +93,23 @@ Button subclass: View
     ]
   ]
 
-  method: handleMouseLocalX: x y: y buttons: btn [
-    btn = 1 ifTrue: [
-      focused := true.
-      self invalidate.
-      action notNil ifTrue: [action value].
-      focused := false.
-      self invalidate
-    ]
-  ]
+  method: preferredHeight ^<Integer> [ ^1 ]
+  method: preferredWidth ^<Integer> [ ^label size + 4 ]
 
-  method: handleEvent: evt [
+  method: handleEvent: evt <Event> [
+    "Mouse click or Enter/Space activates the button."
+    evt isMouse ifTrue: [
+      evt buttons = 1 ifTrue: [
+        focused := true.
+        self invalidate.
+        action notNil ifTrue: [action value].
+        focused := false.
+        self invalidate
+      ].
+      ^self
+    ].
+
     evt isKey ifFalse: [^self].
-    "Enter or Space activates"
     (evt key = EventConstants keyEnter or: [evt key = EventConstants keySpace]) ifTrue: [
       action notNil ifTrue: [action value]
     ]

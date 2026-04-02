@@ -1,40 +1,44 @@
 namespace: 'Alto'
 import: 'Go'
 
-Window subclass: Object
-  instanceVars: title contentView contentController frame buffer dragState display borderStyle contentBuf
+"Window — a framed, draggable container for views.
+ Subclasses View, inheriting buffer, needsRedraw, invalidate, focused.
+ Adds chrome (title bar, close box, resize handle) and content delegation."
 
-  classMethod: title: aString content: aView controller: aController frame: aRect [
-      | win |
+Window subclass: View
+  instanceVars: title <String> contentView <View> contentController <View> frame <Rectangle> dragState <Object> display <Display> borderStyle <Dynamic> contentBuf <CellBuffer>
+
+  classMethod: title: aString <String> content: aView <View> controller: aController <View> frame: aRect <Rectangle> ^<Window> [
+      | win <Window> |
       win := self new.
       win initTitle: aString content: aView controller: aController frame: aRect.
       ^win
   ]
 
-  classMethod: title: aString content: aView frame: aRect [
+  classMethod: title: aString <String> content: aView <View> frame: aRect <Rectangle> ^<Window> [
       "Convenience: view handles its own events (the common case)."
       ^self title: aString content: aView controller: aView frame: aRect
   ]
 
-  classMethod: new [
-      | instance |
+  classMethod: new ^<Window> [
+      | instance <Window> |
       instance := super new.
       instance initialize.
       ^instance
   ]
 
   method: initialize [
+      super initialize.
       title := ''.
       contentView := nil.
       contentController := nil.
       frame := nil.
-      buffer := nil.
       dragState := nil.
       borderStyle := Theme borderStyle.
       contentBuf := nil
   ]
 
-  method: initTitle: aString content: aView controller: aController frame: aRect [
+  method: initTitle: aString <String> content: aView <View> controller: aController <View> frame: aRect <Rectangle> [
       title := aString.
       contentView := aView.
       contentController := aController.
@@ -42,31 +46,19 @@ Window subclass: Object
       buffer := CellBuffer width: aRect width height: aRect height.
       borderStyle := Theme borderStyle.
       contentBuf := CellBuffer width: aRect width - 2 height: aRect height - 2.
-      dragState := nil
+      dragState := nil.
+      needsRedraw := true
   ]
 
-  method: buffer [
-      ^buffer
-  ]
+  method: frame ^<Rectangle> [ ^frame ]
+  method: title ^<String> [ ^title ]
+  method: contentView ^<View> [ ^contentView ]
+  method: contentController ^<View> [ ^contentController ]
+  method: display ^<Display> [ ^display ]
+  method: display: aDisplay <Display> [ display := aDisplay ]
 
-  method: frame [
-      ^frame
-  ]
-
-  method: title [
-      ^title
-  ]
-
-  method: contentView [
-      ^contentView
-  ]
-
-  method: contentController [
-      ^contentController
-  ]
-
-  method: displayOn: aCellBuffer [
-    | borderRect w h titleLen closeX i ch |
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | borderRect <Rectangle> w <Integer> h <Integer> titleLen <Integer> closeX <Integer> i <Integer> ch <Integer> |
     w := frame width.
     h := frame height.
     borderRect := Rectangle x: 0 y: 0 width: w height: h.
@@ -101,21 +93,19 @@ Window subclass: Object
   ]
 
   method: draw [
+      "Override View.draw with content-dirty-aware rendering."
+      | contentDirty <Boolean> |
       buffer isNil ifTrue: [^self].
+      contentDirty := contentView notNil and: [contentView needsRedraw].
+      (needsRedraw or: [contentDirty]) ifFalse: [^self].
+      needsRedraw := false.
+      contentDirty ifTrue: [contentView needsRedraw: false].
       buffer clear.
       self displayOn: buffer
   ]
 
-  method: display [
-      ^display
-  ]
-
-  method: display: aDisplay [
-      display := aDisplay
-  ]
-
-  method: handleEvent: evt [
-    | mx my localX localY w buttons |
+  method: handleEvent: evt <Event> [
+    | mx <Integer> my <Integer> localX <Integer> localY <Integer> w <Integer> buttons <Integer> |
 
     "Handle mouse clicks on window chrome (close box, title bar)"
     evt isMouse ifTrue: [
@@ -146,19 +136,20 @@ Window subclass: Object
     contentController handleEvent: evt
   ]
 
-  method: resizeTo: newWidth height: newHeight [
+  method: resizeTo: newWidth <Integer> height: newHeight <Integer> [
     "Resize the window, reallocating buffers."
-    | minW minH w h |
+    | minW <Integer> minH <Integer> w <Integer> h <Integer> |
     minW := 10. minH := 5.
     w := newWidth max: minW.
     h := newHeight max: minH.
     frame width: w.
     frame height: h.
     buffer := CellBuffer width: w height: h.
-    contentBuf := CellBuffer width: w - 2 height: h - 2
+    contentBuf := CellBuffer width: w - 2 height: h - 2.
+    self invalidate
   ]
 
-  method: close [
+  method: close ^<Self> [
       display notNil ifTrue: [display removeWindow: self].
       ^self
   ]

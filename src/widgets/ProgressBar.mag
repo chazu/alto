@@ -1,0 +1,86 @@
+namespace: 'Alto'
+import: 'Go'
+
+"ProgressBar — horizontal progress indicator.
+ Usage:
+   bar := ProgressBar new.
+   bar value: 0.5.        '50%'
+   bar value: 1.0.        '100%'
+   bar showPercent: true.  'display percentage text'
+"
+
+ProgressBar subclass: View
+  instanceVars: value <Float> filledStyle <Dynamic> emptyStyle <Dynamic> showPercent <Boolean>
+
+  classMethod: new ^<ProgressBar> [
+    | instance <ProgressBar> |
+    instance := super new.
+    instance initialize.
+    ^instance
+  ]
+
+  method: initialize [
+    super initialize.
+    value := 0.0.
+    filledStyle := Theme reverseStyle.
+    emptyStyle := Theme dimStyle.
+    showPercent := false
+  ]
+
+  method: value ^<Float> [ ^value ]
+
+  method: value: aNumber <Float> [
+    value := (aNumber max: 0.0) min: 1.0.
+    self invalidate
+  ]
+
+  method: showPercent ^<Boolean> [ ^showPercent ]
+
+  method: showPercent: aBoolean <Boolean> [
+    showPercent := aBoolean.
+    self invalidate
+  ]
+
+  method: filledStyle: aGoStyle <Dynamic> [
+    filledStyle := aGoStyle.
+    self invalidate
+  ]
+
+  method: emptyStyle: aGoStyle <Dynamic> [
+    emptyStyle := aGoStyle.
+    self invalidate
+  ]
+
+  method: preferredHeight ^<Integer> [ ^1 ]
+
+  method: displayOn: aCellBuffer <CellBuffer> [
+    | w <Integer> filledW <Integer> i <Integer> pctStr <String> pctX <Integer> |
+    w := aCellBuffer width.
+    filledW := (w * value) truncated.
+
+    "Draw filled portion"
+    i := 0.
+    [i < filledW and: [i < w]] whileTrue: [
+      aCellBuffer putChar: 9608 x: i y: 0 style: filledStyle.  "█"
+      i := i + 1
+    ].
+
+    "Draw empty portion"
+    [i < w] whileTrue: [
+      aCellBuffer putChar: 9617 x: i y: 0 style: emptyStyle.  "░"
+      i := i + 1
+    ].
+
+    "Overlay percentage text centered"
+    showPercent ifTrue: [
+      pctStr := (value * 100) truncated printString, '%'.
+      pctX := ((w - pctStr size) / 2) max: 0.
+      i := 0.
+      [i < pctStr size and: [pctX + i < w]] whileTrue: [
+        | style <Dynamic> |
+        style := (pctX + i) < filledW ifTrue: [filledStyle] ifFalse: [emptyStyle].
+        aCellBuffer putChar: (pctStr at: i) value x: pctX + i y: 0 style: style.
+        i := i + 1
+      ]
+    ]
+  ]
