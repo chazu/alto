@@ -27,15 +27,15 @@ func RegisterPrimitives(v *vm.VM) {
 	nsClass := v.RegisterGoType("Go::V2", reflect.TypeOf((*struct{})(nil)))
 	_ = nsClass
 
-	nsClass.AddClassMethod(v.Selectors, "getColor:", vm.NewPrimitiveMethod("getColor:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	nsClass.AddClassMethod(v.Selectors, "getColor:", vm.NewPrimitiveMethod("getColor:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		arg0 := v.ValueToGo(args[0]).(string)
 		result := pkg.GetColor(arg0)
 		return v.GoToValue(result)
 	}))
 
-	nsClass.AddClassMethod(v.Selectors, "newEventKey:_:_:", vm.NewPrimitiveMethod("newEventKey:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	nsClass.AddClassMethod(v.Selectors, "newEventKey:_:_:", vm.NewPrimitiveMethod("newEventKey:_:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		arg0 := pkg.Key(args[0].SmallInt())
 		arg1 := rune(args[1].SmallInt())
 		arg2 := pkg.ModMask(args[2].SmallInt())
@@ -43,8 +43,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	}))
 
-	nsClass.AddClassMethod(v.Selectors, "newEventMouse:_:_:_:", vm.NewPrimitiveMethod("newEventMouse:_:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	nsClass.AddClassMethod(v.Selectors, "newEventMouse:_:_:_:", vm.NewPrimitiveMethod("newEventMouse:_:_:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		arg0 := int(args[0].SmallInt())
 		arg1 := int(args[1].SmallInt())
 		arg2 := pkg.ButtonMask(args[2].SmallInt())
@@ -53,23 +53,23 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	}))
 
-	nsClass.AddClassMethod(v.Selectors, "newEventResize:_:", vm.NewPrimitiveMethod("newEventResize:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	nsClass.AddClassMethod(v.Selectors, "newEventResize:_:", vm.NewPrimitiveMethod("newEventResize:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		arg0 := int(args[0].SmallInt())
 		arg1 := int(args[1].SmallInt())
 		result := pkg.NewEventResize(arg0, arg1)
 		return v.GoToValue(result)
 	}))
 
-	nsClass.AddClassMethod(v.Selectors, "newHexColor:", vm.NewPrimitiveMethod("newHexColor:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	nsClass.AddClassMethod(v.Selectors, "newHexColor:", vm.NewPrimitiveMethod("newHexColor:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		arg0 := int32(args[0].SmallInt())
 		result := pkg.NewHexColor(arg0)
 		return v.GoToValue(result)
 	}))
 
-	nsClass.AddClassMethod(v.Selectors, "newRGBColor:_:_:", vm.NewPrimitiveMethod("newRGBColor:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	nsClass.AddClassMethod(v.Selectors, "newRGBColor:_:_:", vm.NewPrimitiveMethod("newRGBColor:_:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		arg0 := int32(args[0].SmallInt())
 		arg1 := int32(args[1].SmallInt())
 		arg2 := int32(args[2].SmallInt())
@@ -77,15 +77,15 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	}))
 
-	nsClass.AddClassMethod(v.Selectors, "paletteColor:", vm.NewPrimitiveMethod("paletteColor:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	nsClass.AddClassMethod(v.Selectors, "paletteColor:", vm.NewPrimitiveMethod("paletteColor:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		arg0 := int(args[0].SmallInt())
 		result := pkg.PaletteColor(arg0)
 		return v.GoToValue(result)
 	}))
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "dirty:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "dirty:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -97,8 +97,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "fill:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "fill:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -110,8 +110,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return vm.Nil
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "get:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "get:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -127,8 +127,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "getContent:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "getContent:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -145,8 +145,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "invalidate", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "invalidate", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -156,8 +156,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return vm.Nil
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "lockCell:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "lockCell:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -169,8 +169,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return vm.Nil
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "put:_:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "put:_:_:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -187,8 +187,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "resize:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "resize:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -201,8 +201,8 @@ func RegisterPrimitives(v *vm.VM) {
 	})
 
 	// Skipped: CellBuffer.SetContent (too many parameters: 5)
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "setDirty:_:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "setDirty:_:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -215,8 +215,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return vm.Nil
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "size", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "size", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -229,8 +229,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
-	cellBufferClass.AddPrimitiveMethod(v.Selectors, "unlockCell:_:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	cellBufferClass.AddPrimitiveMethod(v.Selectors, "unlockCell:_:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -242,8 +242,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return vm.Nil
 	})
 
-	eventKeyClass.AddPrimitiveMethod(v.Selectors, "key", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventKeyClass.AddPrimitiveMethod(v.Selectors, "key", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -253,8 +253,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	eventKeyClass.AddPrimitiveMethod(v.Selectors, "modifiers", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventKeyClass.AddPrimitiveMethod(v.Selectors, "modifiers", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -264,8 +264,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	eventKeyClass.AddPrimitiveMethod(v.Selectors, "name", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventKeyClass.AddPrimitiveMethod(v.Selectors, "name", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -275,8 +275,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	eventKeyClass.AddPrimitiveMethod(v.Selectors, "rune", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventKeyClass.AddPrimitiveMethod(v.Selectors, "rune", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -286,8 +286,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	eventKeyClass.AddPrimitiveMethod(v.Selectors, "when", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventKeyClass.AddPrimitiveMethod(v.Selectors, "when", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -297,8 +297,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	eventMouseClass.AddPrimitiveMethod(v.Selectors, "buttons", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventMouseClass.AddPrimitiveMethod(v.Selectors, "buttons", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -308,8 +308,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	eventMouseClass.AddPrimitiveMethod(v.Selectors, "modifiers", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventMouseClass.AddPrimitiveMethod(v.Selectors, "modifiers", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -319,8 +319,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	eventMouseClass.AddPrimitiveMethod(v.Selectors, "position", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventMouseClass.AddPrimitiveMethod(v.Selectors, "position", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -333,8 +333,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
-	eventMouseClass.AddPrimitiveMethod(v.Selectors, "when", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventMouseClass.AddPrimitiveMethod(v.Selectors, "when", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -344,8 +344,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	eventResizeClass.AddPrimitiveMethod(v.Selectors, "pixelSize", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventResizeClass.AddPrimitiveMethod(v.Selectors, "pixelSize", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -358,8 +358,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
-	eventResizeClass.AddPrimitiveMethod(v.Selectors, "size", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventResizeClass.AddPrimitiveMethod(v.Selectors, "size", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -372,8 +372,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
-	eventResizeClass.AddPrimitiveMethod(v.Selectors, "when", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	eventResizeClass.AddPrimitiveMethod(v.Selectors, "when", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -383,8 +383,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "attributes:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "attributes:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -395,8 +395,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "background:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "background:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -407,8 +407,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "blink:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "blink:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -419,8 +419,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "bold:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "bold:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -431,8 +431,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "decompose", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "decompose", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -446,8 +446,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.NewArrayWithElements(arr)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "dim:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "dim:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -458,8 +458,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "foreground:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "foreground:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -470,8 +470,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "getUnderlineColor", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "getUnderlineColor", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -481,8 +481,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "getUnderlineStyle", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "getUnderlineStyle", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -492,8 +492,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "italic:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "italic:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -504,8 +504,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "normal", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "normal", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -515,8 +515,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "reverse:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "reverse:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -527,8 +527,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "strikeThrough:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "strikeThrough:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -540,8 +540,8 @@ func RegisterPrimitives(v *vm.VM) {
 	})
 
 	// Skipped: Style.Underline (unconvertible parameter type: []interface{})
-	styleClass.AddPrimitiveMethod(v.Selectors, "url:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "url:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
@@ -552,8 +552,8 @@ func RegisterPrimitives(v *vm.VM) {
 		return v.GoToValue(result)
 	})
 
-	styleClass.AddPrimitiveMethod(v.Selectors, "urlId:", func(vmPtr interface{}, receiver vm.Value, args []vm.Value) vm.Value {
-		v := vmPtr.(*vm.VM)
+	styleClass.AddPrimitiveMethod(v.Selectors, "urlId:", func(vmPtr *vm.VM, receiver vm.Value, args []vm.Value) vm.Value {
+		v := vmPtr
 		goVal, ok := v.GetGoObject(receiver)
 		if !ok {
 			return vm.Nil
